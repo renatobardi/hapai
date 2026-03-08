@@ -1,5 +1,5 @@
 /**
- * Shared utilities for HAPAI
+ * Shared utilities for OUTE
  */
 
 /**

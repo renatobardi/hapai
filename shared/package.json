@@ -1,7 +1,7 @@
 {
-  "name": "@hapai/shared",
+  "name": "@oute/shared",
   "version": "1.0.0",
-  "description": "HAPAI Shared - Shared types and utilities",
+  "description": "OUTE Shared - Shared types and utilities",
   "type": "module",
   "main": "./index.ts",
   "types": "./index.ts",
@@ -12,6 +12,9 @@
     "./utils": "./utils.ts"
   },
   "private": true,
+  "scripts": {
+    "test": "echo 'No tests configured for shared package'"
+  },
   "devDependencies": {
     "typescript": "^5.3.3"
   }

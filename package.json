@@ -1,7 +1,7 @@
 {
-  "name": "hapai",
+  "name": "oute",
   "version": "1.0.0",
-  "description": "HAPAI - Modular monorepo with Svelte 5 + SvelteKit",
+  "description": "OUTE - Modular monorepo with Svelte 5 + SvelteKit",
   "private": true,
   "type": "module",
   "workspaces": [

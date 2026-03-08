@@ -233,6 +233,7 @@ export const assertions = {
    * Assert valid login response
    */
   assertValidLoginResponse(data: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const loginData = data as any;
 
     if (!loginData.token) throw new Error('Missing token in login response');
@@ -247,6 +248,7 @@ export const assertions = {
    * Assert valid profile response
    */
   assertValidProfileResponse(data: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const profile = data as any;
 
     if (!profile.id) throw new Error('Missing id in profile');

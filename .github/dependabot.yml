@@ -1,0 +1,81 @@
+version: 2
+updates:
+  # npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "renatobardi"
+
+    # Auto-merge only for patch updates in devDependencies
+    auto-merge:
+      enabled: false
+      # We disable auto-merge initially - require manual review for all updates
+      # Security note: npm packages should always be reviewed before merge
+
+    # Commit message configuration
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+    # Pull request configuration
+    pull-request-branch-name:
+      separator: "/"
+
+    # Allow updates
+    allow:
+      - dependency-type: "all"
+
+    # Ignore certain dependencies (if needed)
+    ignore: []
+
+    # Group updates
+    groups:
+      development:
+        # Development dependencies can be updated more frequently
+        dependency-types:
+          - "dev"
+        update-types:
+          - "patch"
+          - "minor"
+
+      production:
+        # Production dependencies - more conservative
+        dependency-types:
+          - "production"
+        update-types:
+          - "patch"
+        # Require PRs for minor/major updates
+
+  # Docker image updates
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "renatobardi"
+    auto-merge:
+      enabled: false
+
+  # GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "renatobardi"
+    auto-merge:
+      enabled: false
+    # Group actions by owner for cleaner PRs
+    groups:
+      actions:
+        patterns:
+          - "*"

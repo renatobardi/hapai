@@ -1,7 +1,7 @@
 {
-  "name": "hapai-auth-profile",
+  "name": "oute-auth-profile",
   "version": "1.0.0",
-  "description": "HAPAI Auth-Profile - Authentication & User Profile API",
+  "description": "OUTE Auth-Profile - Authentication & User Profile API",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -15,11 +15,12 @@
   "dependencies": {
     "@sveltejs/kit": "^2.0.0",
     "bcrypt": "^5.1.1",
-    "jsonwebtoken": "^9.1.0",
+    "jsonwebtoken": "^9.0.3",
     "postgres": "^3.4.0",
     "svelte": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.45.0",
     "@sveltejs/vite-plugin-svelte": "^3.1.0",
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.5",

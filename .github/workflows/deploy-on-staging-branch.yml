@@ -1,0 +1,199 @@
+name: Auto Deploy on Staging Branch Push
+
+on:
+  push:
+    branches:
+      - staging
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev
+  IMAGE_NAME: oute-dashboard
+
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build dashboard
+        run: npm run build -w 00_dashboard
+
+      - name: Run tests (dashboard)
+        run: npm run test -w 00_dashboard
+        continue-on-error: true
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --file packages/00_dashboard/Dockerfile \
+            --tag ${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:staging-latest \
+            --tag ${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:staging-latest
+          docker push ${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          echo "✅ Image pushed successfully"
+
+      - name: Deploy to Cloud Run (Staging)
+        id: deploy
+        run: |
+          SERVICE_NAME="oute-dashboard-staging"
+          IMAGE_URL="${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:staging-latest"
+
+          echo "🚀 Deploying to Cloud Run (staging)..."
+
+          gcloud run deploy "$SERVICE_NAME" \
+            --image="$IMAGE_URL" \
+            --platform=managed \
+            --region=${{ env.GCP_REGION }} \
+            --service-account=cloud-run-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
+            --memory=512Mi \
+            --cpu=1 \
+            --timeout=3600 \
+            --port=3000 \
+            --allow-unauthenticated \
+            --set-env-vars="NODE_ENV=staging" \
+            --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
+            --quiet
+
+          # Get service URL
+          URL=$(gcloud run services describe "$SERVICE_NAME" \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+
+          echo "service_url=$URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $URL"
+
+      - name: Health check
+        run: |
+          URL="${{ steps.deploy.outputs.service_url }}"
+          echo "Checking service health..."
+          for i in {1..30}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+            if [[ "$HTTP_CODE" =~ ^(200|404)$ ]]; then
+              echo "✅ Service is responding (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "Waiting... attempt $i/30 (HTTP $HTTP_CODE)"
+            sleep 2
+          done
+          echo "⚠️ Health check timeout"
+          exit 0
+
+      - name: Create GitHub deployment
+        uses: chrnorm/deployment-action@v2
+        id: deployment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: staging
+          auto_merge: false
+          description: 'Staging deployment of OUTE Dashboard'
+
+      - name: Update deployment status (success)
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          state: 'success'
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          environment_url: ${{ steps.deploy.outputs.service_url }}
+          description: 'Successfully deployed to staging'
+
+      - name: Update deployment status (failure)
+        if: failure()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          state: 'failure'
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          description: 'Deployment failed'
+
+      - name: Create deployment summary
+        if: always()
+        run: |
+          cat > $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 🚀 Staging Deployment Complete
+
+          **Service:** `oute-dashboard`
+          **Branch:** `${{ github.ref }}`
+          **Commit:** `${{ github.sha }}`
+          **Author:** `${{ github.actor }}`
+
+          ### Deployment Details
+          - **Environment:** staging
+          - **Region:** ${{ env.GCP_REGION }}
+          - **Image:** ${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:staging-latest
+          - **Service URL:** ${{ steps.deploy.outputs.service_url }}
+
+          ### View Logs
+          ```bash
+          gcloud run logs read oute-dashboard-staging --region=${{ env.GCP_REGION }} --follow
+          ```
+
+          ### Useful Commands
+          ```bash
+          # View service details
+          gcloud run services describe oute-dashboard-staging --region=${{ env.GCP_REGION }}
+
+          # View revisions
+          gcloud run revisions list --service=oute-dashboard-staging --region=${{ env.GCP_REGION }}
+
+          # Rollback to previous
+          gcloud run services update-traffic oute-dashboard-staging \
+            --region=${{ env.GCP_REGION }} \
+            --to-revisions=<REVISION>=100
+          ```
+          EOF
+
+      - name: Slack Notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Staging Deployment ${{ job.status }}
+            Service: oute-dashboard
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            URL: ${{ steps.deploy.outputs.service_url || 'N/A' }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true

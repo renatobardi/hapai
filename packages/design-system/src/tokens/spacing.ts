@@ -1,5 +1,5 @@
 /**
- * Spacing scale for HAPAI design system
+ * Spacing scale for OUTE design system
  * Consistent padding, margin, and gap sizing
  */
 

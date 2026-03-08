@@ -3,12 +3,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy root files
+# Copy root files (build context should be project root)
 COPY package.json package-lock.json tsconfig.json .eslintrc.json .prettierrc ./
 COPY packages/design-system ./packages/design-system
 
 # Install dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Build Storybook
 WORKDIR /app/packages/design-system

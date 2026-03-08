@@ -1,4 +1,4 @@
-import { Password, InvalidPasswordError } from '../../../domain';
+import { Password } from '../../../domain';
 
 /**
  * BcryptPasswordAdapter
