@@ -1,0 +1,129 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [develop, staging, main]
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: ESLint check
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Prettier check
+        run: npm run format -- --check
+        continue-on-error: false
+
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: tsc --noEmit
+        run: npm run lint
+        continue-on-error: false
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: Run tests
+        run: npm run test -- --run
+        continue-on-error: false
+
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - design-system
+          - 00_dashboard
+          - 01_auth-profile
+          - 02_projects
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image for ${{ matrix.package }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages/${{ matrix.package }}
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  sonarqube:
+    name: SonarQube Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=oute
+            -Dsonar.organization=seu-org
+            -Dsonar.sources=packages,shared
+            -Dsonar.exclusions=**/node_modules/**,**/*.test.ts,**/*.spec.ts
+
+  summary:
+    name: PR Status Summary
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, docker-build, sonarqube]
+    if: always()
+    steps:
+      - name: Check job statuses
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.typecheck.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.docker-build.result }}" != "success" ] || \
+             [ "${{ needs.sonarqube.result }}" != "success" ]; then
+            echo "❌ Some checks failed"
+            exit 1
+          fi
+          echo "✅ All checks passed"

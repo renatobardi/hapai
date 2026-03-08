@@ -1,0 +1,18 @@
+{
+  "name": "@oute/shared",
+  "version": "1.0.0",
+  "description": "OUTE Shared - Shared types and utilities",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./types.ts",
+    "./constants": "./constants.ts",
+    "./utils": "./utils.ts"
+  },
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
