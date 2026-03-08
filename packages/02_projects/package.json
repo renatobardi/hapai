@@ -1,7 +1,7 @@
 {
   "name": "hapai-projects",
   "version": "1.0.0",
-  "description": "OUTE Projects - Project Management API",
+  "description": "HAPAI Projects - Project Management API",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

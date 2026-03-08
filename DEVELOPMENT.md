@@ -12,7 +12,7 @@
 
 ```bash
 # Clone repo
-git clone https://github.com/seu-usuario/oute.git
+git clone https://github.com/renatobardi/hapai.git
 cd hapai
 
 # Install all dependencies (workspaces)

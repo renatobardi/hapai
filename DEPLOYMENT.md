@@ -2,7 +2,7 @@
 
 ## Overview
 
-OUTE is deployed to **Google Cloud Platform (GCP)** using **Cloud Run** for compute, **Cloud SQL** for database, and **Artifact Registry** for container images.
+HAPAI is deployed to **Google Cloud Platform (GCP)** using **Cloud Run** for compute, **Cloud SQL** for database, and **Artifact Registry** for container images.
 
 Each package (00_dashboard, 01_auth-profile, 02_projects) is deployed as a separate Cloud Run service.
 
@@ -23,7 +23,7 @@ export REGION="us-central1"
 ## Phase 1: Create GCP Project
 
 ```bash
-gcloud projects create $PROJECT_ID --name="OUTE App"
+gcloud projects create $PROJECT_ID --name="HAPAI App"
 gcloud config set project $PROJECT_ID
 ```
 
@@ -43,7 +43,7 @@ gcloud services enable run.googleapis.com \
 gcloud artifacts repositories create docker-repo \
   --repository-format=docker \
   --location=$REGION \
-  --description="Docker images for OUTE"
+  --description="Docker images for HAPAI"
 
 # Configure Docker authentication
 gcloud auth configure-docker $REGION-docker.pkg.dev

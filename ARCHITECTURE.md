@@ -1,4 +1,4 @@
-# Arquitetura OUTE
+# Arquitetura HAPAI
 
 ## Design Principles
 

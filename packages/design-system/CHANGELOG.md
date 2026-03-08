@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to OUTE Design System will be documented in this file.
+All notable changes to HAPAI Design System will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2024-03-07
 
 ### Added
-- Initial release of OUTE Design System
+- Initial release of HAPAI Design System
 - Tailwind 4 integration
 - Color tokens (primary, secondary, neutral, semantic)
 - Typography scale (headings, body, custom sizes)

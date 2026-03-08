@@ -2,7 +2,7 @@
 
 ## Overview
 
-OUTE is organized into 4 main packages, each with a specific responsibility.
+HAPAI is organized into 4 main packages, each with a specific responsibility.
 
 ```
 packages/
