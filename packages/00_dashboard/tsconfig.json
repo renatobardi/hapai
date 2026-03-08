@@ -6,11 +6,11 @@
     "paths": {
       "$lib": ["src/lib"],
       "$lib/*": ["src/lib/*"],
-      "@hapai/design-system": ["../../packages/design-system/src"],
-      "@hapai/design-system/*": ["../../packages/design-system/src/*"],
-      "@hapai/shared": ["../../shared"],
-      "@hapai/shared/*": ["../../shared/*"]
+      "@oute/design-system": ["../../packages/design-system/src"],
+      "@oute/design-system/*": ["../../packages/design-system/src/*"],
+      "@oute/shared": ["../../shared"],
+      "@oute/shared/*": ["../../shared/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts", "svelte.config.js"]
 }

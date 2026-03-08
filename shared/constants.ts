@@ -1,5 +1,5 @@
 /**
- * Shared constants for HAPAI
+ * Shared constants for OUTE
  */
 
 // Service URLs (development)
@@ -13,9 +13,9 @@ export const JWT_EXPIRY = '24h';
 
 // Local storage keys
 export const STORAGE_KEYS = {
-  authToken: 'hapai:auth:token',
-  user: 'hapai:user',
-  theme: 'hapai:theme',
+  authToken: 'oute:auth:token',
+  user: 'oute:user',
+  theme: 'oute:theme',
 };
 
 // HTTP status codes

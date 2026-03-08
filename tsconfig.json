@@ -10,9 +10,9 @@
     "resolveJsonModule": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "paths": {
-      "@hapai/shared/*": ["./shared/*"],
-      "@hapai/design-system": ["./packages/design-system/src/index.ts"],
-      "@hapai/design-system/*": ["./packages/design-system/src/*"]
+      "@oute/shared/*": ["./shared/*"],
+      "@oute/design-system": ["./packages/design-system/src/index.ts"],
+      "@oute/design-system/*": ["./packages/design-system/src/*"]
     },
     "baseUrl": "."
   },

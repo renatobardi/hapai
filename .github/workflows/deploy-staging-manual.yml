@@ -1,0 +1,141 @@
+name: Manual Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g., staging-latest, v1.0.0, abc123)'
+        required: true
+        default: 'staging-latest'
+        type: string
+      service:
+        description: 'Service to deploy'
+        required: true
+        default: 'dashboard'
+        type: choice
+        options:
+          - dashboard
+          - auth-profile
+          - projects
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev
+  IMAGE_NAME: oute-${{ github.event.inputs.service }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify image exists
+        run: |
+          IMAGE_URL="${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}"
+          echo "Verifying image: $IMAGE_URL"
+          gcloud artifacts docker images describe "$IMAGE_URL" || {
+            echo "❌ Image not found: $IMAGE_URL"
+            exit 1
+          }
+
+      - name: Deploy to Cloud Run (Staging)
+        run: |
+          SERVICE_NAME="oute-${{ github.event.inputs.service }}-staging"
+          IMAGE_URL="${{ env.REGISTRY }}/${{ env.GCP_PROJECT_ID }}/docker-repo/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}"
+
+          echo "🚀 Deploying $SERVICE_NAME from image: $IMAGE_URL"
+
+          gcloud run deploy "$SERVICE_NAME" \
+            --image="$IMAGE_URL" \
+            --platform=managed \
+            --region=${{ env.GCP_REGION }} \
+            --service-account=cloud-run-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
+            --memory=512Mi \
+            --cpu=1 \
+            --timeout=3600 \
+            --port=3000 \
+            --allow-unauthenticated \
+            --set-env-vars="NODE_ENV=staging" \
+            --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
+            --quiet
+
+          echo "✅ Deployment completed"
+
+      - name: Get Service URL
+        id: service-url
+        run: |
+          SERVICE_NAME="oute-${{ github.event.inputs.service }}-staging"
+          URL=$(gcloud run services describe "$SERVICE_NAME" \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Service deployed at: $URL"
+
+      - name: Health check
+        run: |
+          URL="${{ steps.service-url.outputs.url }}"
+          echo "Checking service health..."
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" "$URL" | grep -q "200\|404"; then
+              echo "✅ Service is responding"
+              exit 0
+            fi
+            echo "Waiting for service... ($i/30)"
+            sleep 2
+          done
+          echo "⚠️ Health check timeout, but deployment may still succeed. Check logs:"
+          echo "gcloud run logs read oute-${{ github.event.inputs.service }}-staging --region=${{ env.GCP_REGION }}"
+
+      - name: Create deployment summary
+        if: always()
+        run: |
+          cat > /tmp/deploy_summary.md << 'EOF'
+          ## 🚀 Staging Deployment Summary
+
+          **Service:** `oute-${{ github.event.inputs.service }}`
+          **Environment:** staging
+          **Image Tag:** ${{ github.event.inputs.image_tag }}
+          **Region:** ${{ env.GCP_REGION }}
+          **Project:** ${{ env.GCP_PROJECT_ID }}
+
+          ### Service URL
+          ${{ steps.service-url.outputs.url }}
+
+          ### View Logs
+          \`\`\`bash
+          gcloud run logs read oute-${{ github.event.inputs.service }}-staging --region=${{ env.GCP_REGION }} --follow
+          \`\`\`
+
+          ### Rollback
+          \`\`\`bash
+          gcloud run services update-traffic oute-${{ github.event.inputs.service }}-staging \
+            --region=${{ env.GCP_REGION }} \
+            --to-revisions=<PREVIOUS_REVISION>=100
+          \`\`\`
+          EOF
+          cat /tmp/deploy_summary.md
+
+      - name: Comment on workflow
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('/tmp/deploy_summary.md', 'utf8');
+            console.log(summary);

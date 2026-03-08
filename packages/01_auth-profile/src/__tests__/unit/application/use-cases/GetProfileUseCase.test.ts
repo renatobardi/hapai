@@ -4,7 +4,6 @@ import { GetProfileRequest } from '../../../../application/dto/GetProfileRequest
 import { User } from '../../../../domain/entities/User';
 import { Email } from '../../../../domain/value-objects/Email';
 import { Password } from '../../../../domain/value-objects/Password';
-import { UserId } from '../../../../domain/value-objects/UserId';
 import { Role } from '../../../../domain/value-objects/Role';
 import { UserNotFoundError } from '../../../../domain/errors/UserNotFoundError';
 import type { IUserRepository } from '../../../../domain/repositories/IUserRepository';

@@ -1,6 +1,6 @@
-# HAPAI - Modular Monorepo
+# OUTE - Modular Monorepo
 
-HAPAI é uma aplicação modular construída com **Svelte 5 + SvelteKit**, organizada como um monorepo com múltiplos domínios independentes. A arquitetura suporta escalabilidade, deployment em **GCP Cloud Run** e implementa padrões enterprise de qualidade e segurança.
+OUTE é uma aplicação modular construída com **Svelte 5 + SvelteKit**, organizada como um monorepo com múltiplos domínios independentes. A arquitetura suporta escalabilidade, deployment em **GCP Cloud Run** e implementa padrões enterprise de qualidade e segurança.
 
 ## 🏗️ Arquitetura
 
@@ -41,8 +41,8 @@ Ver: [APPLYING_PATTERN_TO_OTHER_SERVICES.md](./APPLYING_PATTERN_TO_OTHER_SERVICE
 
 ```bash
 # Clone o repositório
-git clone https://github.com/renatobardi/hapai.git
-cd hapai
+git clone https://github.com/seu-usuario/oute.git
+cd oute
 
 # Instale dependências (todos os packages)
 npm install
@@ -153,14 +153,50 @@ npm run docker:logs   # Ver logs
 
 ## ☁️ Deployment
 
-Deploy automático em GCP Cloud Run via GitHub Actions:
+### Pipeline CI/CD Automático
 
-1. **PR** → Lint, tests, SonarQube checks
-2. **develop** → Deploy em preview
-3. **staging** → Deploy em homolog
-4. **main** → Deploy em produção
+Deploy totalmente automático em GCP Cloud Run via GitHub Actions:
 
-Ver [DEPLOYMENT.md](./DEPLOYMENT.md) para detalhes.
+```
+Push → Build & Test → Docker Build → Artifact Registry → Cloud Run Deploy → Health Check → Release
+```
+
+**Pipeline por Branch:**
+- **PR** → Lint checks, TypeScript validation, Tests
+- **main** → Build completo + Deploy em produção + Release automático
+
+**Features do Pipeline:**
+- ✅ Build de imagem Docker multi-estágio
+- ✅ Push automático para Artifact Registry
+- ✅ Deploy em Cloud Run com zero downtime
+- ✅ Health check automático pós-deploy
+- ✅ Rollback automático em caso de falha
+- ✅ Rastreamento de deployments no GitHub
+- ✅ Criação automática de releases
+- ✅ Logs disponíveis em Cloud Run
+
+**Permissões do Workflow:**
+```yaml
+permissions:
+  contents: write          # Criar releases
+  id-token: write         # Autenticar com GCP (Workload Identity)
+  deployments: write      # Rastrear deployments
+  statuses: write         # Atualizar status
+```
+
+**Acessar Serviço em Produção:**
+```bash
+# Ver logs
+gcloud run logs read oute-dashboard --region=us-central1 --follow
+
+# Ver revisions
+gcloud run revisions list --service=oute-dashboard --region=us-central1
+
+# Rollback se necessário
+gcloud run services update-traffic oute-dashboard --region=us-central1 --to-revisions=<REVISION>=100
+```
+
+Ver [DEPLOYMENT.md](./DEPLOYMENT.md) para detalhes completos.
 
 ## 📦 Stack Técnico
 

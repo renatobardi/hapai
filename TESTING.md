@@ -1,6 +1,6 @@
-# Testing HAPAI Locally
+# Testing OUTE Locally
 
-Guia para testar a aplicação HAPAI em ambiente local.
+Guia para testar a aplicação OUTE em ambiente local.
 
 ## Pré-requisitos
 
@@ -62,9 +62,9 @@ Serviços disponíveis:
 
 #### Terminal 1: PostgreSQL
 ```bash
-docker run --name hapai-postgres \
+docker run --name oute-postgres \
   -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=hapai_db \
+  -e POSTGRES_DB=oute_db \
   -p 5432:5432 \
   postgres:15-alpine
 ```
@@ -154,7 +154,7 @@ curl http://localhost:3002/projects \
 
 ## Troubleshooting
 
-### Erro: "Cannot find module '@hapai/design-system'"
+### Erro: "Cannot find module '@oute/design-system'"
 
 **Solução**: Rode `npm install` na raiz do monorepo para instalar workspaces:
 ```bash

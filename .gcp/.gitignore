@@ -1,0 +1,29 @@
+# GCP Setup Files - Keep Local Only
+# Never commit service account keys or secrets to git!
+
+# Service Account Keys
+keys/
+*.json
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Local environment files
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sensitive backups
+*~
+*.bak
+*.backup

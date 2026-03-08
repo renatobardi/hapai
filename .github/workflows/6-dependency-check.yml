@@ -7,6 +7,11 @@ on:
     # Check weekly on Monday at 9 AM UTC
     - cron: '0 9 * * 1'
 
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
 jobs:
   dependency-check:
     name: OWASP Dependency Check
@@ -23,12 +28,11 @@ jobs:
           args: >
             --enableExperimental
             --enableRetired
-            --suppression dependency-check-suppressions.xml
 
       - name: Upload Dependency Check results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'dependency-check-report.sarif'
+          sarif_file: 'reports/dependency-check-report.sarif'
 
   npm-audit:
     name: NPM Audit
@@ -50,20 +54,42 @@ jobs:
           npm audit --json > audit-results.json || true
           cat audit-results.json
 
+      - name: Check npm audit for HIGH/CRITICAL vulnerabilities
+        run: |
+          AUDIT_RESULT=$(cat audit-results.json)
+          CRITICAL_COUNT=$(echo $AUDIT_RESULT | jq '[.vulnerabilities[] | select(.severity == "critical")] | length')
+          HIGH_COUNT=$(echo $AUDIT_RESULT | jq '[.vulnerabilities[] | select(.severity == "high")] | length')
+
+          echo "🔍 Vulnerability Report:"
+          echo "  - CRITICAL: $CRITICAL_COUNT"
+          echo "  - HIGH: $HIGH_COUNT"
+
+          if [ "$CRITICAL_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
+            echo ""
+            echo "❌ Found $((CRITICAL_COUNT + HIGH_COUNT)) HIGH/CRITICAL vulnerabilities"
+            echo "❌ PR is blocked due to security issues"
+            exit 1
+          fi
+
+          echo "✅ No HIGH/CRITICAL vulnerabilities found"
+
       - name: Comment PR with audit results
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const audit = JSON.parse(fs.readFileSync('audit-results.json', 'utf8'));
 
-            if (audit.vulnerabilities) {
+            if (audit.vulnerabilities && Object.keys(audit.vulnerabilities).length > 0) {
               const critical = Object.values(audit.vulnerabilities).filter(v => v.severity === 'critical').length;
               const high = Object.values(audit.vulnerabilities).filter(v => v.severity === 'high').length;
+              const moderate = Object.values(audit.vulnerabilities).filter(v => v.severity === 'moderate').length;
+              const low = Object.values(audit.vulnerabilities).filter(v => v.severity === 'low').length;
 
-              const comment = `## 📦 NPM Audit Results\n\n- **Critical**: ${critical}\n- **High**: ${high}\n\nRun \`npm audit\` locally for more details.`;
+              const comment = `## 📦 NPM Audit Results\n\n- **Critical**: ${critical} ❌\n- **High**: ${high} ❌\n- **Moderate**: ${moderate} ⚠️\n- **Low**: ${low} ℹ️\n\n${critical > 0 || high > 0 ? '**⚠️ PR BLOCKED**: Found HIGH/CRITICAL vulnerabilities. Run \`npm audit fix\` locally to resolve.\n\n' : ''}Run \`npm audit\` locally for more details.`;
 
               github.rest.issues.createComment({
                 issue_number: context.issue.number,
@@ -95,7 +121,7 @@ jobs:
             --markdown > LICENSE_REPORT.md || echo "License check completed with warnings"
 
       - name: Upload license report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: license-report
           path: LICENSE_REPORT.md

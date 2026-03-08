@@ -24,6 +24,7 @@ describe('JwtTokenAdapter (Integration)', () => {
     });
 
     it('should throw error for null secret', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect(() => new JwtTokenAdapter(null as any)).toThrow();
     });
   });

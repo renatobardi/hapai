@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for contributing to HAPAI! This guide explains how to work on this project.
+Thank you for contributing to OUTE! This guide explains how to work on this project.
 
 ## Code of Conduct
 
@@ -112,7 +112,7 @@ docs: update ARCHITECTURE.md with new flow diagram
 - Export types from `shared/`
 
 ```typescript
-import type { User } from '@hapai/shared';
+import type { User } from '@oute/shared';
 
 export function getUser(id: string): User | null {
   // ...

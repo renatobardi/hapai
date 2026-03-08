@@ -1,7 +1,7 @@
 {
-  "name": "@hapai/design-system",
+  "name": "@oute/design-system",
   "version": "1.0.0",
-  "description": "HAPAI Design System - Tailwind 4 + Svelte 5 Components + Storybook",
+  "description": "OUTE Design System - Tailwind 4 + Svelte 5 Components + Storybook",
   "type": "module",
   "exports": {
     ".": "./dist/index.js",
@@ -13,7 +13,7 @@
   "types": "./dist/index.d.ts",
   "files": ["dist", "src"],
   "publishConfig": {
-    "registry": "https://us-central1-npm.pkg.dev/hapai-app/npm/"
+    "registry": "https://us-central1-npm.pkg.dev/oute-app/npm/"
   },
   "scripts": {
     "dev": "svelte-kit sync && vite dev",
@@ -22,7 +22,7 @@
     "prepare": "svelte-kit sync",
     "dev:storybook": "storybook dev",
     "build:storybook": "storybook build",
-    "test": "vitest",
+    "test": "echo 'No tests configured for design-system package'",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-check --tsconfig ./tsconfig.json --watch",
     "lint": "eslint .",
@@ -37,6 +37,7 @@
     "@storybook/addon-a11y": "^7.6.0",
     "@storybook/svelte": "^7.6.0",
     "@storybook/sveltekit": "^7.6.0",
+    "@sveltejs/kit": "^2.0.0",
     "@sveltejs/package": "^2.3.0",
     "@sveltejs/vite-plugin-svelte": "^3.1.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",

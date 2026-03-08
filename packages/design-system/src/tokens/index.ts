@@ -1,5 +1,5 @@
 /**
- * HAPAI Design System Tokens
+ * OUTE Design System Tokens
  * Central export point for all design tokens
  */
 

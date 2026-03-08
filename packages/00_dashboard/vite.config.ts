@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
-import { sveltekit } from '@sveltejs/vite-plugin-svelte';
 
+// SvelteKit handles Vite configuration automatically
+// This is only needed if you need custom Vite options
 export default defineConfig({
-  plugins: [sveltekit()],
   server: {
     port: 3000,
     host: '0.0.0.0',

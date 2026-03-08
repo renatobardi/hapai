@@ -4,7 +4,6 @@ import { UserMapper } from '../../dto/mappers/UserMapper';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
 import { Email } from '../../../domain/value-objects/Email';
 import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError';
-import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
 import type { IPasswordHasher } from '../../ports/IPasswordHasher';
 import type { ITokenGenerator } from '../../ports/ITokenGenerator';
 

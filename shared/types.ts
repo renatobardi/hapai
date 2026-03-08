@@ -1,5 +1,5 @@
 /**
- * Shared types for HAPAI
+ * Shared types for OUTE
  * Used across all packages
  */
 

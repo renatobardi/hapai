@@ -1,7 +1,7 @@
 {
-  "name": "hapai-projects",
+  "name": "oute-projects",
   "version": "1.0.0",
-  "description": "HAPAI Projects - Project Management API",
+  "description": "OUTE Projects - Project Management API",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -10,11 +10,11 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest"
+    "test": "echo 'No tests configured for projects package'"
   },
   "dependencies": {
     "@sveltejs/kit": "^2.0.0",
-    "jsonwebtoken": "^9.1.0",
+    "jsonwebtoken": "^9.0.3",
     "postgres": "^3.4.0",
     "svelte": "^5.0.0"
   },

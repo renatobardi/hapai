@@ -29,10 +29,14 @@ COPY shared ./shared
 RUN npm ci --legacy-peer-deps --production && npm cache clean --force
 
 # Copy built app
-COPY --from=builder /app/packages/00_dashboard/build ./packages/00_dashboard/build
+COPY --from=builder /app/packages/00_dashboard/dist ./packages/00_dashboard/dist
+
+# Install simple HTTP server for serving static files
+RUN npm install -g serve
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
 
-CMD ["node", "packages/00_dashboard/build/index.js"]
+# Serve the static dashboard
+CMD ["serve", "-s", "packages/00_dashboard/dist", "-l", "3000"]

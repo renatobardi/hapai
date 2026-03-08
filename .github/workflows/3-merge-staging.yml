@@ -49,8 +49,8 @@ jobs:
           context: ./packages/${{ matrix.package.name }}
           push: true
           tags: |
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-${{ matrix.package.name }}:${{ github.sha }}
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-${{ matrix.package.name }}:staging-latest
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-${{ matrix.package.name }}:${{ github.sha }}
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-${{ matrix.package.name }}:staging-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -106,7 +106,7 @@ jobs:
 
       - name: Deploy to Cloud Run (staging)
         env:
-          SERVICES: "hapai-dashboard hapai-auth-profile hapai-projects"
+          SERVICES: "oute-dashboard oute-auth-profile oute-projects"
         run: |
           for SERVICE in $SERVICES; do
             echo "Deploying $SERVICE to staging..."
@@ -114,7 +114,7 @@ jobs:
               --image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/${SERVICE}:${{ github.sha }} \
               --platform=managed \
               --region=${{ secrets.GCP_REGION }} \
-              --set-cloudsql-instances=${{ secrets.GCP_PROJECT_ID }}:${{ secrets.GCP_REGION }}:hapai-postgres \
+              --set-cloudsql-instances=${{ secrets.GCP_PROJECT_ID }}:${{ secrets.GCP_REGION }}:oute-postgres \
               --set-env-vars="NODE_ENV=staging" \
               --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
               --memory=512Mi \

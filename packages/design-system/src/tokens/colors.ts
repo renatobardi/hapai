@@ -1,5 +1,5 @@
 /**
- * Color tokens for HAPAI design system
+ * Color tokens for OUTE design system
  * Used across all applications
  */
 

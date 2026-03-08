@@ -30,7 +30,9 @@ describe('UserMapper', () => {
     it('should not include password hash in response', () => {
       const response = UserMapper.toLoginResponse(testUser);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((response as any).passwordHash).toBeUndefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((response as any).password).toBeUndefined();
     });
 
@@ -57,7 +59,9 @@ describe('UserMapper', () => {
     it('should not include password hash in response', () => {
       const response = UserMapper.toRegisterResponse(testUser);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((response as any).passwordHash).toBeUndefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((response as any).password).toBeUndefined();
     });
   });
@@ -100,7 +104,9 @@ describe('UserMapper', () => {
     it('should not include password hash in profile response', () => {
       const response = UserMapper.toProfileResponse(testUser);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((response as any).passwordHash).toBeUndefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((response as any).password).toBeUndefined();
     });
 

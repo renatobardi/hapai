@@ -3,11 +3,11 @@
  */
 
 import { writable, type Writable } from 'svelte/store';
-import type { User } from '@hapai/shared';
+import type { User } from '@oute/shared';
 
 // Auth token storage key
-const TOKEN_KEY = 'hapai:auth:token';
-const USER_KEY = 'hapai:user';
+const TOKEN_KEY = 'oute:auth:token';
+const USER_KEY = 'oute:user';
 
 // Auth state store
 export const authToken: Writable<string | null> = writable(null);
@@ -30,6 +30,7 @@ export function initializeAuth(): void {
         try {
           user.set(JSON.parse(userData));
         } catch {
+          // eslint-disable-next-line no-console
           console.error('Failed to parse user data');
         }
       }
