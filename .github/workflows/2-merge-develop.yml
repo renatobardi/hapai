@@ -49,8 +49,8 @@ jobs:
           context: ./packages/${{ matrix.package.name }}
           push: true
           tags: |
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-${{ matrix.package.name }}:${{ github.sha }}
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-${{ matrix.package.name }}:develop-latest
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-${{ matrix.package.name }}:${{ github.sha }}
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-${{ matrix.package.name }}:develop-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -70,7 +70,7 @@ jobs:
 
       - name: Deploy to Cloud Run (preview)
         run: |
-          for SERVICE in oute-dashboard oute-auth-profile oute-projects; do
+          for SERVICE in hapai-dashboard hapai-auth-profile hapai-projects; do
             gcloud run deploy ${SERVICE}-preview \
               --image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/${SERVICE}:${{ github.sha }} \
               --platform=managed \

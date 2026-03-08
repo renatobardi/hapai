@@ -82,12 +82,12 @@ jobs:
           context: ./packages/${{ matrix.package }}
           push: false
           load: true
-          tags: oute-${{ matrix.package }}:test
+          tags: hapai-${{ matrix.package }}:test
 
       - name: Trivy container scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: oute-${{ matrix.package }}:test
+          image-ref: hapai-${{ matrix.package }}:test
           format: 'sarif'
           output: 'trivy-container-${{ matrix.package }}.sarif'
           severity: 'CRITICAL,HIGH'

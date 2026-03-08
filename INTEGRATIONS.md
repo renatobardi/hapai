@@ -492,9 +492,9 @@ Projects:       http://localhost:3002
 
 Production (GCP Cloud Run):
 ```
-Dashboard:      https://oute-dashboard-xxx.run.app
-Auth-Profile:   https://oute-auth-profile-xxx.run.app
-Projects:       https://oute-projects-xxx.run.app
+Dashboard:      https://hapai-dashboard-xxx.run.app
+Auth-Profile:   https://hapai-auth-profile-xxx.run.app
+Projects:       https://hapai-projects-xxx.run.app
 ```
 
 **Update environment variables** in Cloud Run deployment.

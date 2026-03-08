@@ -7,16 +7,16 @@ Configure estes secrets no repositório GitHub para que os workflows funcionem.
 Após executar o script GCP (setup-gcp.sh), adicione em **Settings → Secrets and variables → Actions**:
 
 ### GCP_SA_KEY
-- **Valor**: Conteúdo do arquivo `~/oute-github-key.json`
+- **Valor**: Conteúdo do arquivo `~/hapai-github-key.json`
 - **Usar para**: GitHub Actions fazer deploy em Cloud Run
 - **Como obter**:
   ```bash
-  cat ~/oute-github-key.json
+  cat ~/hapai-github-key.json
   # Copie todo o conteúdo JSON
   ```
 
 ### GCP_PROJECT_ID
-- **Valor**: `oute-app` (ou seu project ID)
+- **Valor**: `hapai-app` (ou seu project ID)
 - **Usar para**: Identificar projeto GCP nos workflows
 
 ### GCP_REGION
@@ -28,7 +28,7 @@ Após executar o script GCP (setup-gcp.sh), adicione em **Settings → Secrets a
 Após criar repo npm em Artifact Registry:
 
 ### ARTIFACT_REGISTRY_URL
-- **Valor**: `us-central1-npm.pkg.dev/oute-app/npm/`
+- **Valor**: `us-central1-npm.pkg.dev/hapai-app/npm/`
 - **Usar para**: Publicar design-system package
 
 ## 3. SonarQube

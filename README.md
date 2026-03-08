@@ -42,7 +42,7 @@ Ver: [APPLYING_PATTERN_TO_OTHER_SERVICES.md](./APPLYING_PATTERN_TO_OTHER_SERVICE
 ```bash
 # Clone o repositório
 git clone https://github.com/seu-usuario/oute.git
-cd oute
+cd hapai
 
 # Instale dependências (todos os packages)
 npm install

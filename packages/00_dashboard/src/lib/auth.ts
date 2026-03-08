@@ -3,11 +3,11 @@
  */
 
 import { writable, type Writable } from 'svelte/store';
-import type { User } from '@oute/shared';
+import type { User } from '@hapai/shared';
 
 // Auth token storage key
-const TOKEN_KEY = 'oute:auth:token';
-const USER_KEY = 'oute:user';
+const TOKEN_KEY = 'hapai:auth:token';
+const USER_KEY = 'hapai:user';
 
 // Auth state store
 export const authToken: Writable<string | null> = writable(null);

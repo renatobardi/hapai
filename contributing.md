@@ -112,7 +112,7 @@ docs: update ARCHITECTURE.md with new flow diagram
 - Export types from `shared/`
 
 ```typescript
-import type { User } from '@oute/shared';
+import type { User } from '@hapai/shared';
 
 export function getUser(id: string): User | null {
   // ...

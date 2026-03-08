@@ -13,7 +13,7 @@
 ```bash
 # Clone repo
 git clone https://github.com/seu-usuario/oute.git
-cd oute
+cd hapai
 
 # Install all dependencies (workspaces)
 npm install
@@ -96,13 +96,13 @@ npx husky install
 npm run docker:logs
 
 # Or specific service
-docker logs oute-dashboard -f
+docker logs hapai-dashboard -f
 ```
 
 ### Database
 ```bash
 # Connect to PostgreSQL
-psql -h localhost -U app-user -d oute_db
+psql -h localhost -U app-user -d hapai_db
 
 # List tables
 \dt
@@ -232,7 +232,7 @@ npm run lint  # includes tsc --noEmit
 
 Import from shared types:
 ```typescript
-import type { User, Project } from '@oute/shared';
+import type { User, Project } from '@hapai/shared';
 ```
 
 ## Troubleshooting

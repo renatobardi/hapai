@@ -13,9 +13,9 @@ export const JWT_EXPIRY = '24h';
 
 // Local storage keys
 export const STORAGE_KEYS = {
-  authToken: 'oute:auth:token',
-  user: 'oute:user',
-  theme: 'oute:theme',
+  authToken: 'hapai:auth:token',
+  user: 'hapai:user',
+  theme: 'hapai:theme',
 };
 
 // HTTP status codes

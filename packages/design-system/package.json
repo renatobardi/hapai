@@ -1,5 +1,5 @@
 {
-  "name": "@oute/design-system",
+  "name": "@hapai/design-system",
   "version": "1.0.0",
   "description": "OUTE Design System - Tailwind 4 + Svelte 5 Components + Storybook",
   "type": "module",
@@ -13,7 +13,7 @@
   "types": "./dist/index.d.ts",
   "files": ["dist", "src"],
   "publishConfig": {
-    "registry": "https://us-central1-npm.pkg.dev/oute-app/npm/"
+    "registry": "https://us-central1-npm.pkg.dev/hapai-app/npm/"
   },
   "scripts": {
     "dev": "svelte-kit sync && vite dev",

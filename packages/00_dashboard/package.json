@@ -1,5 +1,5 @@
 {
-  "name": "oute-dashboard",
+  "name": "hapai-dashboard",
   "version": "1.0.0",
   "description": "OUTE Dashboard - Main web interface",
   "type": "module",
@@ -14,8 +14,8 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@oute/design-system": "^1.0.0",
-    "@oute/shared": "^1.0.0",
+    "@hapai/design-system": "^1.0.0",
+    "@hapai/shared": "^1.0.0",
     "@sveltejs/adapter-node": "^5.0.0",
     "@sveltejs/kit": "^2.0.0",
     "svelte": "^5.0.0",

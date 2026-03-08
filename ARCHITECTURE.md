@@ -11,7 +11,7 @@
 ## Estrutura
 
 ```
-oute/
+hapai/
 ├── packages/
 │   ├── design-system/    (Tokens + Componentes + Storybook)
 │   ├── 00_dashboard/     (Frontend principal)
@@ -30,7 +30,7 @@ oute/
     │   └── Recebe JWT
     ├── Dashboard → GET /projects (02_projects)
     │   └── Envia JWT no header
-    └── Usa @oute/design-system (componentes)
+    └── Usa @hapai/design-system (componentes)
 
 01_auth-profile (Port 3001)
     ├── POST /auth/login → Gera JWT
@@ -77,8 +77,8 @@ PostgreSQL centralizado compartilhado por todos os serviços.
 
 ```typescript
 // Imports
-import { Button, Card } from '@oute/design-system';
-import { colors, typography } from '@oute/design-system/tokens';
+import { Button, Card } from '@hapai/design-system';
+import { colors, typography } from '@hapai/design-system/tokens';
 
 // Uso
 <Button variant="primary" size="md">Clique aqui</Button>
@@ -111,9 +111,9 @@ Inicia:
 
 ### Cloud (GCP Cloud Run)
 Cada package → Container separado:
-- `oute-dashboard` (Cloud Run Service)
-- `oute-auth-profile` (Cloud Run Service)
-- `oute-projects` (Cloud Run Service)
+- `hapai-dashboard` (Cloud Run Service)
+- `hapai-auth-profile` (Cloud Run Service)
+- `hapai-projects` (Cloud Run Service)
 
 Todos compartilham Cloud SQL (PostgreSQL).
 

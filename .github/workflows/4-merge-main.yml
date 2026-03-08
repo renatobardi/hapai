@@ -49,9 +49,9 @@ jobs:
           context: ./packages/${{ matrix.package }}
           push: true
           tags: |
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-${{ matrix.package }}:${{ github.sha }}
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-${{ matrix.package }}:latest
-            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-${{ matrix.package }}:v${{ github.run_number }}
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-${{ matrix.package }}:${{ github.sha }}
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-${{ matrix.package }}:latest
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-${{ matrix.package }}:v${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -71,7 +71,7 @@ jobs:
 
       - name: Deploy to Cloud Run (production)
         env:
-          SERVICES: "oute-dashboard oute-auth-profile oute-projects"
+          SERVICES: "hapai-dashboard hapai-auth-profile hapai-projects"
         run: |
           for SERVICE in $SERVICES; do
             echo "Deploying $SERVICE to production..."
@@ -79,7 +79,7 @@ jobs:
               --image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/${SERVICE}:${{ github.sha }} \
               --platform=managed \
               --region=${{ secrets.GCP_REGION }} \
-              --set-cloudsql-instances=${{ secrets.GCP_PROJECT_ID }}:${{ secrets.GCP_REGION }}:oute-postgres \
+              --set-cloudsql-instances=${{ secrets.GCP_PROJECT_ID }}:${{ secrets.GCP_REGION }}:hapai-postgres \
               --set-env-vars="NODE_ENV=production" \
               --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
               --memory=512Mi \
@@ -103,9 +103,9 @@ jobs:
           echo "## 🚀 Production Release: $VERSION" > release_notes.md
           echo "" >> release_notes.md
           echo "### Deployed Services" >> release_notes.md
-          echo "- oute-dashboard: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-dashboard:${{ github.sha }}" >> release_notes.md
-          echo "- oute-auth-profile: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-auth-profile:${{ github.sha }}" >> release_notes.md
-          echo "- oute-projects: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/oute-projects:${{ github.sha }}" >> release_notes.md
+          echo "- hapai-dashboard: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-dashboard:${{ github.sha }}" >> release_notes.md
+          echo "- hapai-auth-profile: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-auth-profile:${{ github.sha }}" >> release_notes.md
+          echo "- hapai-projects: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/docker-repo/hapai-projects:${{ github.sha }}" >> release_notes.md
 
       - uses: actions/create-release@v1
         env:

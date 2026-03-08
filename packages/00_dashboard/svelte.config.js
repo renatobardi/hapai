@@ -9,8 +9,8 @@ const config = {
     }),
     alias: {
       '$lib': 'src/lib',
-      '@oute/design-system': '../../packages/design-system/src',
-      '@oute/shared': '../../shared',
+      '@hapai/design-system': '../../packages/design-system/src',
+      '@hapai/shared': '../../shared',
     },
   },
 };

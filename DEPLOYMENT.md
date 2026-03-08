@@ -16,7 +16,7 @@ curl https://sdk.cloud.google.com | bash
 gcloud auth login
 
 # Set variables
-export PROJECT_ID="oute-app"
+export PROJECT_ID="hapai-app"
 export REGION="us-central1"
 ```
 
@@ -52,7 +52,7 @@ gcloud auth configure-docker $REGION-docker.pkg.dev
 ## Phase 4: Create PostgreSQL Instance
 
 ```bash
-gcloud sql instances create oute-postgres \
+gcloud sql instances create hapai-postgres \
   --database-version=POSTGRES_15 \
   --tier=db-f1-micro \
   --region=$REGION \
@@ -61,15 +61,15 @@ gcloud sql instances create oute-postgres \
   --enable-bin-log
 
 # Create database
-gcloud sql databases create oute_db --instance=oute-postgres
+gcloud sql databases create hapai_db --instance=hapai-postgres
 
 # Create user
 gcloud sql users create app-user \
-  --instance=oute-postgres \
+  --instance=hapai-postgres \
   --password=$(openssl rand -base64 32)
 
 # Get connection name (for Cloud Run)
-gcloud sql instances describe oute-postgres \
+gcloud sql instances describe hapai-postgres \
   --format='get(connectionName)'
 ```
 
@@ -77,7 +77,7 @@ gcloud sql instances describe oute-postgres \
 
 ```bash
 # Database URL
-echo "postgresql://app-user:PASSWORD@/oute_db?cloudSqlInstance=PROJECT:REGION:oute-postgres" | \
+echo "postgresql://app-user:PASSWORD@/hapai_db?cloudSqlInstance=PROJECT:REGION:hapai-postgres" | \
   gcloud secrets create DATABASE_URL --data-file=-
 
 # JWT Secret
@@ -126,7 +126,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role="roles/artifactregistry.writer"
 
 # Create and download key
-gcloud iam service-accounts keys create ~/oute-github-key.json \
+gcloud iam service-accounts keys create ~/hapai-github-key.json \
   --iam-account=$GH_SA
 ```
 
@@ -134,23 +134,23 @@ gcloud iam service-accounts keys create ~/oute-github-key.json \
 
 ```bash
 # Build image
-docker build -t oute-dashboard:v1 packages/00_dashboard/
+docker build -t hapai-dashboard:v1 packages/00_dashboard/
 
 # Tag for Artifact Registry
-docker tag oute-dashboard:v1 \
-  $REGION-docker.pkg.dev/$PROJECT_ID/docker-repo/oute-dashboard:v1
+docker tag hapai-dashboard:v1 \
+  $REGION-docker.pkg.dev/$PROJECT_ID/docker-repo/hapai-dashboard:v1
 
 # Push to Artifact Registry
-docker push $REGION-docker.pkg.dev/$PROJECT_ID/docker-repo/oute-dashboard:v1
+docker push $REGION-docker.pkg.dev/$PROJECT_ID/docker-repo/hapai-dashboard:v1
 
 # Deploy to Cloud Run
-gcloud run deploy oute-dashboard \
-  --image=$REGION-docker.pkg.dev/$PROJECT_ID/docker-repo/oute-dashboard:v1 \
+gcloud run deploy hapai-dashboard \
+  --image=$REGION-docker.pkg.dev/$PROJECT_ID/docker-repo/hapai-dashboard:v1 \
   --platform=managed \
   --region=$REGION \
   --port=3000 \
   --service-account=$SA_EMAIL \
-  --set-cloudsql-instances=$PROJECT_ID:$REGION:oute-postgres \
+  --set-cloudsql-instances=$PROJECT_ID:$REGION:hapai-postgres \
   --set-env-vars="NODE_ENV=production" \
   --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest" \
   --memory=512Mi \
@@ -158,15 +158,15 @@ gcloud run deploy oute-dashboard \
   --allow-unauthenticated
 
 # Get service URL
-gcloud run services describe oute-dashboard --region=$REGION --format='value(status.url)'
+gcloud run services describe hapai-dashboard --region=$REGION --format='value(status.url)'
 ```
 
 ## Phase 8: Setup GitHub Actions
 
 Add secrets to GitHub repository:
-- `GCP_PROJECT_ID=oute-app`
+- `GCP_PROJECT_ID=hapai-app`
 - `GCP_REGION=us-central1`
-- `GCP_SA_KEY=<content of ~/oute-github-key.json>`
+- `GCP_SA_KEY=<content of ~/hapai-github-key.json>`
 
 ## Phase 9: Configure CI/CD
 
@@ -183,12 +183,12 @@ CI/CD workflows (in `.github/workflows/`) handle automatic deployment:
 
 ```bash
 # View service logs
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=oute-dashboard" \
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=hapai-dashboard" \
   --limit 50 \
   --format json
 
 # Describe service
-gcloud run services describe oute-dashboard --region=$REGION
+gcloud run services describe hapai-dashboard --region=$REGION
 
 # List all services
 gcloud run services list --region=$REGION
@@ -209,7 +209,7 @@ If deployment fails:
 
 ```bash
 # Rollback to previous revision
-gcloud run services update-traffic oute-dashboard \
+gcloud run services update-traffic hapai-dashboard \
   --region=$REGION \
   --to-revisions=<previous-revision>=100
 ```
@@ -219,7 +219,7 @@ gcloud run services update-traffic oute-dashboard \
 ```bash
 # Map custom domain
 gcloud run domain-mappings create \
-  --service=oute-dashboard \
+  --service=hapai-dashboard \
   --domain=api.seu-dominio.com \
   --region=$REGION
 

@@ -42,13 +42,13 @@ src/
 **Version**: Semantic versioning (v1.0.0, v1.1.0, etc.)
 
 **Publishing**:
-- Published to GCP Artifact Registry as `@oute/design-system`
+- Published to GCP Artifact Registry as `@hapai/design-system`
 - Imported by 00_dashboard as dependency
 
 **Example Usage**:
 ```typescript
-import { Button, Card } from '@oute/design-system';
-import { colors } from '@oute/design-system/tokens';
+import { Button, Card } from '@hapai/design-system';
+import { colors } from '@hapai/design-system/tokens';
 
 <Button variant="primary">Click me</Button>
 ```
@@ -72,7 +72,7 @@ npm run dev:storybook --workspace=design-system
 **Tech Stack**:
 - SvelteKit
 - Svelte 5
-- @oute/design-system
+- @hapai/design-system
 - TypeScript
 
 **Routes**:
@@ -340,7 +340,7 @@ export interface JWTPayload {
 
 **Import from shared**:
 ```typescript
-import type { User, Project } from '@oute/shared';
+import type { User, Project } from '@hapai/shared';
 ```
 
 ---

@@ -1,5 +1,5 @@
 {
-  "name": "@oute/shared",
+  "name": "@hapai/shared",
   "version": "1.0.0",
   "description": "OUTE Shared - Shared types and utilities",
   "type": "module",

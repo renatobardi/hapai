@@ -3,92 +3,92 @@ version: '3.9'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: oute-postgres
+    container_name: hapai-postgres
     environment:
       POSTGRES_USER: app-user
       POSTGRES_PASSWORD: dev-password
-      POSTGRES_DB: oute_db
+      POSTGRES_DB: hapai_db
     ports:
       - '5432:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U app-user -d oute_db']
+      test: ['CMD-SHELL', 'pg_isready -U app-user -d hapai_db']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - oute-network
+      - hapai-network
 
   design-system:
     build:
       context: ./packages/design-system
       dockerfile: Dockerfile
-    container_name: oute-design-system
+    container_name: hapai-design-system
     ports:
       - '6006:6006'
     environment:
       - NODE_ENV=development
     networks:
-      - oute-network
+      - hapai-network
 
   00_dashboard:
     build:
       context: ./packages/00_dashboard
       dockerfile: Dockerfile
-    container_name: oute-dashboard
+    container_name: hapai-dashboard
     ports:
       - '3000:3000'
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://app-user:dev-password@postgres:5432/oute_db
+      - DATABASE_URL=postgresql://app-user:dev-password@postgres:5432/hapai_db
       - AUTH_SERVICE_URL=http://01_auth-profile:3001
       - PROJECTS_SERVICE_URL=http://02_projects:3002
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - oute-network
+      - hapai-network
 
   01_auth-profile:
     build:
       context: ./packages/01_auth-profile
       dockerfile: Dockerfile
-    container_name: oute-auth-profile
+    container_name: hapai-auth-profile
     ports:
       - '3001:3001'
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://app-user:dev-password@postgres:5432/oute_db
+      - DATABASE_URL=postgresql://app-user:dev-password@postgres:5432/hapai_db
       - JWT_SECRET=dev-secret-key-change-in-production
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - oute-network
+      - hapai-network
 
   02_projects:
     build:
       context: ./packages/02_projects
       dockerfile: Dockerfile
-    container_name: oute-projects
+    container_name: hapai-projects
     ports:
       - '3002:3002'
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://app-user:dev-password@postgres:5432/oute_db
+      - DATABASE_URL=postgresql://app-user:dev-password@postgres:5432/hapai_db
       - AUTH_SERVICE_URL=http://01_auth-profile:3001
       - JWT_SECRET=dev-secret-key-change-in-production
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - oute-network
+      - hapai-network
 
 volumes:
   postgres-data:
     driver: local
 
 networks:
-  oute-network:
+  hapai-network:
     driver: bridge
