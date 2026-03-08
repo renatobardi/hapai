@@ -1,6 +1,6 @@
-# Testing OUTE Locally
+# Testing HAPAI Locally
 
-Guia para testar a aplicação OUTE em ambiente local.
+Guia para testar a aplicação HAPAI em ambiente local.
 
 ## Pré-requisitos
 

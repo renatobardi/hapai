@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for contributing to OUTE! This guide explains how to work on this project.
+Thank you for contributing to HAPAI! This guide explains how to work on this project.
 
 ## Code of Conduct
 

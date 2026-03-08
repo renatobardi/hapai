@@ -1,6 +1,6 @@
-# OUTE - Modular Monorepo
+# HAPAI - Modular Monorepo
 
-OUTE é uma aplicação modular construída com **Svelte 5 + SvelteKit**, organizada como um monorepo com múltiplos domínios independentes. A arquitetura suporta escalabilidade, deployment em **GCP Cloud Run** e implementa padrões enterprise de qualidade e segurança.
+HAPAI é uma aplicação modular construída com **Svelte 5 + SvelteKit**, organizada como um monorepo com múltiplos domínios independentes. A arquitetura suporta escalabilidade, deployment em **GCP Cloud Run** e implementa padrões enterprise de qualidade e segurança.
 
 ## 🏗️ Arquitetura
 
@@ -41,7 +41,7 @@ Ver: [APPLYING_PATTERN_TO_OTHER_SERVICES.md](./APPLYING_PATTERN_TO_OTHER_SERVICE
 
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/oute.git
+git clone https://github.com/renatobardi/hapai.git
 cd hapai
 
 # Instale dependências (todos os packages)

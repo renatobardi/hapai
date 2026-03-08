@@ -1,4 +1,4 @@
-# Integration Flows - OUTE
+# Integration Flows - HAPAI
 
 Guia detalhado dos fluxos de integração entre os 3 domínios da aplicação.
 

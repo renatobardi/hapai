@@ -1,5 +1,5 @@
 /**
- * Shared constants for OUTE
+ * Shared constants for HAPAI
  */
 
 // Service URLs (development)

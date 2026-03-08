@@ -1,5 +1,5 @@
 /**
- * OUTE Shared
+ * HAPAI Shared
  * Central export point for types, constants, and utilities
  */
 

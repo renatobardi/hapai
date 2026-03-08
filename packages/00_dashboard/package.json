@@ -1,7 +1,7 @@
 {
   "name": "hapai-dashboard",
   "version": "1.0.0",
-  "description": "OUTE Dashboard - Main web interface",
+  "description": "HAPAI Dashboard - Main web interface",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

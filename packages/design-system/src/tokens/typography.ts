@@ -1,5 +1,5 @@
 /**
- * Typography tokens for OUTE design system
+ * Typography tokens for HAPAI design system
  * Font families, sizes, and weights
  */
 
