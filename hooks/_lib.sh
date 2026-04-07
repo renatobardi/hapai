@@ -46,28 +46,30 @@ get_hook_event() {
 # ─── Response helpers ───────────────────────────────────────────────────────
 
 # Deny the tool call with a reason message
+# Uses exit code 2 + stderr (official Claude Code mechanism for blocking)
 # Usage: deny "Cannot commit to main branch"
 deny() {
   local reason="${1:-Blocked by hapai guardrail}"
-  cat <<EOF
-{
-  "decision": "block",
-  "reason": "$reason"
-}
-EOF
   audit_log "deny" "$reason"
-  exit 0
+  echo "$reason" >&2
+  exit 2
 }
 
 # Allow with an optional system message (informational, non-blocking)
+# Uses hookSpecificOutput.additionalContext for inline warnings
 # Usage: warn "This commit touches 15 files across 3 packages"
 warn() {
   local message="${1:-}"
   if [[ -n "$message" ]]; then
+    local hook_event
+    hook_event="$(get_hook_event 2>/dev/null || echo "PreToolUse")"
     cat <<EOF
 {
-  "decision": "allow",
-  "reason": "$message"
+  "hookSpecificOutput": {
+    "hookEventName": "$hook_event",
+    "permissionDecision": "allow",
+    "additionalContext": "$message"
+  }
 }
 EOF
     audit_log "warn" "$message"

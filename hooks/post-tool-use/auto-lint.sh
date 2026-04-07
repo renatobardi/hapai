@@ -51,15 +51,10 @@ actual_cmd="${linter//\{file\}/$file_path}"
 lint_output="$(eval "$actual_cmd" 2>&1)" || true
 
 if [[ -n "$lint_output" ]]; then
-  # Report lint issues as a system message (non-blocking)
+  # Report lint issues via stderr (non-blocking info in PostToolUse)
   truncated="$(echo "$lint_output" | head -20)"
   audit_log "lint" "Issues found in $(basename "$file_path")"
-  cat <<EOF
-{
-  "decision": "allow",
-  "reason": "⚠️ hapai lint: Issues found in $(basename "$file_path"):\n$truncated"
-}
-EOF
+  echo "⚠️ hapai lint: Issues in $(basename "$file_path"): $truncated" >&2
   exit 0
 fi
 
