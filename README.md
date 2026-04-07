@@ -12,10 +12,10 @@ AI coding tools (Claude Code, Cursor, Copilot) frequently ignore instructions in
 
 ```bash
 # Clone
-git clone https://github.com/renatobardi/hapai.git ~/Projetos/hapai
+git clone https://github.com/renatobardi/hapai.git ~/hapai
 
 # Add to PATH
-ln -sf ~/Projetos/hapai/bin/hapai /usr/local/bin/hapai
+ln -sf ~/hapai/bin/hapai /usr/local/bin/hapai
 
 # Install globally (all projects)
 hapai install --global
@@ -133,7 +133,7 @@ User prompt → Claude Code → PreToolUse hook → hapai guard script
 ## Running Tests
 
 ```bash
-cd ~/Projetos/hapai
+cd ~/hapai
 bash tests/run-tests.sh
 ```
 

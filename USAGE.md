@@ -4,10 +4,10 @@
 
 ```bash
 # 1. Clone o repo
-git clone https://github.com/renatobardi/hapai.git ~/Projetos/hapai
+git clone https://github.com/renatobardi/hapai.git ~/hapai
 
 # 2. Adicione ao PATH
-ln -sf ~/Projetos/hapai/bin/hapai /usr/local/bin/hapai
+ln -sf ~/hapai/bin/hapai /usr/local/bin/hapai
 
 # 3. Instale globalmente (aplica a todos os projetos)
 hapai install --global
