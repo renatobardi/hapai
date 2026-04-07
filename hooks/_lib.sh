@@ -102,6 +102,10 @@ find_config() {
   fi
 }
 
+# YAML indent tracking helpers (used by config_get and config_get_list)
+_get_indent_at() { eval "echo \$indent_at_$1"; }
+_set_indent_at() { eval "indent_at_$1=$2"; }
+
 # Read a config value from hapai.yaml — context-aware YAML parser.
 # Walks the dot-separated key path through YAML indentation levels.
 # Usage: config_get "guardrails.branch_protection.enabled" "true"
@@ -124,10 +128,9 @@ config_get() {
   local leaf_key="${segments[$((depth - 1))]}"
 
   # Walk the YAML file tracking indentation context
-  local current_depth=0
   local match_depth=0
-  local found=0
-  local indent_stack=(-1)  # track indentation per depth level
+  # indent_at[N] = the indentation level where depth N was matched
+  local indent_at_0=-1 indent_at_1=-1 indent_at_2=-1 indent_at_3=-1 indent_at_4=-1
 
   while IFS= read -r line; do
     # Skip empty lines and comments
@@ -141,23 +144,29 @@ config_get() {
     # Extract key from this line
     local line_key=""
     if echo "$stripped" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:'; then
-      line_key="$(echo "$stripped" | sed 's/\s*:.*//')"
+      line_key="$(echo "$stripped" | sed 's/[[:space:]]*:.*//')"
     fi
 
     [[ -z "$line_key" ]] && continue
 
-    # Determine which depth level this line is at
-    # Reset match_depth if we've gone back to a shallower level
-    if [[ $indent -le ${indent_stack[$match_depth]:-999} ]] && [[ $match_depth -gt 0 ]]; then
-      # We've exited the current section — recalculate depth
-      local new_depth=0
-      for ((i=1; i<=match_depth; i++)); do
-        if [[ $indent -le ${indent_stack[$i]:-999} ]]; then
-          new_depth=$((i - 1))
-          break
-        fi
-      done
-      match_depth=$new_depth
+    # If we've gone back to a shallower indentation, reset match_depth
+    if [[ $match_depth -gt 0 ]]; then
+      local parent_indent
+      parent_indent="$(_get_indent_at $match_depth)"
+      if [[ $indent -le $parent_indent ]]; then
+        # Recalculate: find the deepest level whose indent is strictly less than current
+        match_depth=0
+        local i
+        for ((i=1; i<=4; i++)); do
+          local lvl_indent
+          lvl_indent="$(_get_indent_at $i)"
+          if [[ $lvl_indent -ge 0 ]] && [[ $indent -gt $lvl_indent ]]; then
+            match_depth=$i
+          else
+            break
+          fi
+        done
+      fi
     fi
 
     # Check if this line matches the expected key at the current depth
@@ -166,18 +175,17 @@ config_get() {
       if [[ $match_depth -eq $((depth - 1)) ]]; then
         # Found the leaf key in the correct context!
         local value
-        value="$(echo "$stripped" | sed 's/^[^:]*:\s*//' | sed 's/\s*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/" | tr -d '[:space:]')"
+        value="$(echo "$stripped" | sed 's/^[^:]*:[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/" | tr -d '[:space:]')"
         if [[ -n "$value" && "$value" != "[]" && "$value" != "{}" ]]; then
           echo "$value"
           return
         fi
-        # Value might be on next line (block scalar) — return default for now
         echo "$default"
         return
       else
         # Matched an intermediate key — go deeper
         match_depth=$((match_depth + 1))
-        indent_stack[$match_depth]=$indent
+        _set_indent_at $match_depth $indent
       fi
     fi
   done < "$_HAPAI_CONFIG"
@@ -203,7 +211,7 @@ config_get_list() {
   local depth=${#segments[@]}
 
   local match_depth=0
-  local indent_stack=(-1)
+  local indent_at_0=-1 indent_at_1=-1 indent_at_2=-1 indent_at_3=-1 indent_at_4=-1
   local in_target=0
   local target_indent=-1
 
@@ -217,11 +225,10 @@ config_get_list() {
     # If we're reading list items from the target key
     if [[ $in_target -eq 1 ]]; then
       if [[ $indent -le $target_indent ]]; then
-        # Exited the list section
         return
       fi
       if echo "$stripped" | grep -qE '^-\s+'; then
-        echo "$stripped" | sed 's/^-\s*//' | sed 's/\s*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/"
+        echo "$stripped" | sed 's/^-[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/"
       fi
       continue
     fi
@@ -229,20 +236,27 @@ config_get_list() {
     # Extract key from this line
     local line_key=""
     if echo "$stripped" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:'; then
-      line_key="$(echo "$stripped" | sed 's/\s*:.*//')"
+      line_key="$(echo "$stripped" | sed 's/[[:space:]]*:.*//')"
     fi
     [[ -z "$line_key" ]] && continue
 
-    # Track depth via indentation
-    if [[ $indent -le ${indent_stack[$match_depth]:-999} ]] && [[ $match_depth -gt 0 ]]; then
-      local new_depth=0
-      for ((i=1; i<=match_depth; i++)); do
-        if [[ $indent -le ${indent_stack[$i]:-999} ]]; then
-          new_depth=$((i - 1))
-          break
-        fi
-      done
-      match_depth=$new_depth
+    # Track depth via indentation (same approach as config_get)
+    if [[ $match_depth -gt 0 ]]; then
+      local parent_indent
+      parent_indent="$(_get_indent_at $match_depth)"
+      if [[ $indent -le $parent_indent ]]; then
+        match_depth=0
+        local i
+        for ((i=1; i<=4; i++)); do
+          local lvl_indent
+          lvl_indent="$(_get_indent_at $i)"
+          if [[ $lvl_indent -ge 0 ]] && [[ $indent -gt $lvl_indent ]]; then
+            match_depth=$i
+          else
+            break
+          fi
+        done
+      fi
     fi
 
     local expected_key="${segments[$match_depth]:-}"
@@ -250,10 +264,9 @@ config_get_list() {
       if [[ $match_depth -eq $((depth - 1)) ]]; then
         # Found the leaf key — check for inline array or block list
         local value_part
-        value_part="$(echo "$stripped" | sed 's/^[^:]*:\s*//' | tr -d '[:space:]')"
+        value_part="$(echo "$stripped" | sed 's/^[^:]*:[[:space:]]*//' | tr -d '[:space:]')"
 
         if [[ "$value_part" == "["*"]" ]]; then
-          # Inline array: key: [val1, val2, val3]
           echo "$value_part" | tr -d '[]"'"'" | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//'
           return
         fi
@@ -263,7 +276,7 @@ config_get_list() {
         target_indent=$indent
       else
         match_depth=$((match_depth + 1))
-        indent_stack[$match_depth]=$indent
+        _set_indent_at $match_depth $indent
       fi
     fi
   done < "$_HAPAI_CONFIG"

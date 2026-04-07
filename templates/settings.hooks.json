@@ -75,6 +75,47 @@
             "type": "command",
             "command": "bash __HAPAI_HOOKS__/stop/squash-checkpoints.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/stop/require-tests.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/pre-compact/backup-transcript.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/notification/sound-alert.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/permission-request/auto-allow-readonly.sh",
+            "timeout": 5
           }
         ]
       }

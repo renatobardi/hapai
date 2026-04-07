@@ -95,6 +95,22 @@ observability:
     enabled: true
     path: "~/.hapai/state/"
 
+  require_tests:
+    enabled: false         # enable per-project for test enforcement
+    test_commands: ["vitest", "pytest", "jest", "mocha", "cargo test", "go test"]
+    fail_open: true        # true = warn, false = block session completion
+
+  backup_transcripts:
+    enabled: true          # save transcripts before context compaction
+    retention_days: 30
+
+  notifications:
+    sound_enabled: false   # play sound when Claude needs input
+    sound_command: ""      # custom command (leave empty for platform default)
+
+  auto_allow_readonly:
+    enabled: false         # auto-approve Read/Glob/Grep and safe bash commands
+
 # ─── Hook timeouts (seconds) ───────────────────────────────────────────────
 
 hooks:

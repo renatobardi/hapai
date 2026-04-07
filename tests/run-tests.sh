@@ -220,6 +220,100 @@ output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreT
 assert_allowed "$output" "Allows write to src/app.ts"
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}auto-allow-readonly.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Enable auto-allow in test config
+echo -e "observability:\n  auto_allow_readonly:\n    enabled: true" > "$HAPAI_HOME/hapai.yaml"
+
+# Test: Read tool should be auto-allowed
+output="$(run_hook_check "permission-request/auto-allow-readonly.sh" '{"hook_event_name":"PermissionRequest","tool_name":"Read","tool_input":{"file_path":"/tmp/test"}}')"
+assert_contains "$output" "allow" "Auto-allows Read tool"
+
+# Test: Glob tool should be auto-allowed
+output="$(run_hook_check "permission-request/auto-allow-readonly.sh" '{"hook_event_name":"PermissionRequest","tool_name":"Glob","tool_input":{"pattern":"**/*.ts"}}')"
+assert_contains "$output" "allow" "Auto-allows Glob tool"
+
+# Test: safe bash (ls) should be auto-allowed
+output="$(run_hook_check "permission-request/auto-allow-readonly.sh" '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"ls -la"}}')"
+assert_contains "$output" "allow" "Auto-allows ls command"
+
+# Test: git status should be auto-allowed
+output="$(run_hook_check "permission-request/auto-allow-readonly.sh" '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"git status"}}')"
+assert_contains "$output" "allow" "Auto-allows git status"
+
+# Test: git push should NOT be auto-allowed (exit 0 with no output = defer)
+output="$(run_hook_check "permission-request/auto-allow-readonly.sh" '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"git push origin main"}}')"
+assert_not_contains "$output" "allow" "Does not auto-allow git push"
+
+# Test: Write tool should NOT be auto-allowed
+output="$(run_hook_check "permission-request/auto-allow-readonly.sh" '{"hook_event_name":"PermissionRequest","tool_name":"Write","tool_input":{"file_path":"/tmp/test"}}')"
+assert_not_contains "$output" "allow" "Does not auto-allow Write tool"
+
+# Restore default config
+cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}sound-alert.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Test: disabled by default (should exit 0 with no output)
+output="$(run_hook_check "notification/sound-alert.sh" '{"hook_event_name":"Notification","tool_name":"","tool_input":{}}')"
+assert_allowed "$output" "Sound alert exits cleanly when disabled"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}backup-transcript.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Create a fake transcript for testing
+FAKE_TRANSCRIPT="$(mktemp)"
+echo '{"role":"user","content":"test"}' > "$FAKE_TRANSCRIPT"
+
+# Test: backs up transcript when file exists
+output="$(run_hook_check "pre-compact/backup-transcript.sh" "{\"hook_event_name\":\"PreCompact\",\"transcript_path\":\"$FAKE_TRANSCRIPT\",\"session_id\":\"test123\"}")"
+assert_allowed "$output" "Backup transcript exits cleanly"
+
+# Verify backup was created
+TOTAL=$((TOTAL + 1))
+if ls "$HAPAI_HOME/transcripts/"*.jsonl &>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} Transcript backup file created"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Transcript backup file not created"
+  FAIL=$((FAIL + 1))
+fi
+
+rm -f "$FAKE_TRANSCRIPT"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}require-tests.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Enable require-tests in test config
+echo -e "observability:\n  require_tests:\n    enabled: true\n    fail_open: true" > "$HAPAI_HOME/hapai.yaml"
+
+# Create transcript WITHOUT test commands
+NO_TEST_TRANSCRIPT="$(mktemp)"
+echo '{"tool_input":{"command":"git status"}}' > "$NO_TEST_TRANSCRIPT"
+
+# Test: warns when no tests were run
+output="$(run_hook_check "stop/require-tests.sh" "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$NO_TEST_TRANSCRIPT\"}")"
+assert_contains "$output" "test" "Warns when no tests run in session"
+
+# Create transcript WITH test commands
+TEST_TRANSCRIPT="$(mktemp)"
+echo '{"tool_input":{"command":"vitest run"}}' > "$TEST_TRANSCRIPT"
+
+# Test: allows when tests were found
+output="$(run_hook_check "stop/require-tests.sh" "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$TEST_TRANSCRIPT\"}")"
+assert_allowed "$output" "Allows when tests detected in session"
+
+rm -f "$NO_TEST_TRANSCRIPT" "$TEST_TRANSCRIPT"
+
+# Restore default config
+cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
+
+# ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}CLI tests${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 
