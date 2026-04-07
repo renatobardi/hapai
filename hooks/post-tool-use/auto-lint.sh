@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # hapai/hooks/post-tool-use/auto-lint.sh
-# Runs linter (eslint/ruff check) after Write/Edit and reports issues
+# Runs linter (eslint/ruff check) after Write/Edit and reports issues.
+# Uses direct invocation (no eval) to prevent command injection.
+# Reports via stdout JSON (not stderr, which PostToolUse may treat as error).
 # Event: PostToolUse | Matcher: Write|Edit|MultiEdit | Timeout: 5s
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,15 +27,16 @@ file_path="$(get_field '.tool_input.file_path')"
 
 # Get file extension
 ext="${file_path##*.}"
-ext=".${ext}"
 
-# Determine linter based on extension
-case "$ext" in
+# Determine linter command and args (safe, no eval)
+case ".$ext" in
   .py)
-    linter="$(config_get "automation.auto_lint.python" "ruff check {file}")"
+    cmd_name="ruff"
+    cmd_args=("check" "$file_path")
     ;;
   .ts|.tsx|.js|.jsx|.svelte)
-    linter="$(config_get "automation.auto_lint.javascript" "eslint {file}")"
+    cmd_name="eslint"
+    cmd_args=("$file_path")
     ;;
   *)
     exit 0
@@ -41,21 +44,19 @@ case "$ext" in
 esac
 
 # Check if linter exists
-cmd_name="$(echo "$linter" | awk '{print $1}')"
 if ! command -v "$cmd_name" &>/dev/null; then
   exit 0
 fi
 
-# Run linter and capture output
-actual_cmd="${linter//\{file\}/$file_path}"
-lint_output="$(eval "$actual_cmd" 2>&1)" || true
+# Run linter and capture output (direct invocation, no eval)
+lint_output=""
+lint_output="$("$cmd_name" "${cmd_args[@]}" 2>&1)" || true
 
 if [[ -n "$lint_output" ]]; then
-  # Report lint issues via stderr (non-blocking info in PostToolUse)
   truncated="$(echo "$lint_output" | head -20)"
   audit_log "lint" "Issues found in $(basename "$file_path")"
-  echo "⚠️ hapai lint: Issues in $(basename "$file_path"): $truncated" >&2
-  exit 0
+  # Report via warn() which uses safe JSON construction via jq
+  warn "hapai lint: Issues in $(basename "$file_path"): $truncated"
 fi
 
 exit 0

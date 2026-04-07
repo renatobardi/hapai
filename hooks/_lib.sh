@@ -3,8 +3,9 @@
 # Sourced by every hook script. Provides JSON I/O, config loading, audit logging.
 #
 # Principles:
-#   - Graceful failure: never crash the host tool (exit 0 on internal errors)
-#   - Fast: all operations must complete within timeout budgets
+#   - Deterministic blocking: deny() uses exit 2 + stderr (Claude Code official API)
+#   - Graceful failure: internal errors exit 0 (never crash the host tool)
+#   - Fast: all operations must complete within timeout budgets (PreToolUse=7s, PostToolUse=5s)
 #   - No external deps beyond jq (required) and standard unix tools
 
 set -euo pipefail
@@ -45,8 +46,8 @@ get_hook_event() {
 
 # ─── Response helpers ───────────────────────────────────────────────────────
 
-# Deny the tool call with a reason message
-# Uses exit code 2 + stderr (official Claude Code mechanism for blocking)
+# Deny the tool call with a reason message.
+# Uses exit code 2 + stderr (official Claude Code blocking mechanism).
 # Usage: deny "Cannot commit to main branch"
 deny() {
   local reason="${1:-Blocked by hapai guardrail}"
@@ -55,23 +56,19 @@ deny() {
   exit 2
 }
 
-# Allow with an optional system message (informational, non-blocking)
-# Uses hookSpecificOutput.additionalContext for inline warnings
+# Allow with an optional warning message (informational, non-blocking).
+# Uses jq for safe JSON construction (no injection risk).
 # Usage: warn "This commit touches 15 files across 3 packages"
 warn() {
   local message="${1:-}"
   if [[ -n "$message" ]]; then
     local hook_event
     hook_event="$(get_hook_event 2>/dev/null || echo "PreToolUse")"
-    cat <<EOF
-{
-  "hookSpecificOutput": {
-    "hookEventName": "$hook_event",
-    "permissionDecision": "allow",
-    "additionalContext": "$message"
-  }
-}
-EOF
+    # Safe JSON construction via jq --arg (handles quotes, newlines, special chars)
+    jq -n \
+      --arg event "$hook_event" \
+      --arg ctx "$message" \
+      '{hookSpecificOutput: {hookEventName: $event, permissionDecision: "allow", additionalContext: $ctx}}'
     audit_log "warn" "$message"
   fi
   exit 0
@@ -105,8 +102,8 @@ find_config() {
   fi
 }
 
-# Read a config value from hapai.yaml using grep/awk (no yq dependency)
-# Supports simple key: value and nested keys via dot notation (1 level)
+# Read a config value from hapai.yaml — context-aware YAML parser.
+# Walks the dot-separated key path through YAML indentation levels.
 # Usage: config_get "guardrails.branch_protection.enabled" "true"
 config_get() {
   local key="$1"
@@ -121,25 +118,77 @@ config_get() {
     return
   fi
 
-  # Simple approach: search for the key as-is or last segment after dot
-  local value=""
-  local leaf_key="${key##*.}"
+  # Split key into path segments
+  IFS='.' read -ra segments <<< "$key"
+  local depth=${#segments[@]}
+  local leaf_key="${segments[$((depth - 1))]}"
 
-  # Try exact key match (indentation-aware)
-  value=$(grep -E "^\s*${leaf_key}\s*:" "$_HAPAI_CONFIG" 2>/dev/null | head -1 | sed 's/^[^:]*:\s*//' | sed 's/\s*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/" | tr -d '[:space:]' || echo "")
+  # Walk the YAML file tracking indentation context
+  local current_depth=0
+  local match_depth=0
+  local found=0
+  local indent_stack=(-1)  # track indentation per depth level
 
-  if [[ -n "$value" && "$value" != "[]" && "$value" != "{}" ]]; then
-    echo "$value"
-  else
-    echo "$default"
-  fi
+  while IFS= read -r line; do
+    # Skip empty lines and comments
+    [[ -z "$line" ]] && continue
+    echo "$line" | grep -qE '^\s*#' && continue
+
+    # Calculate indentation (number of leading spaces)
+    local stripped="${line#"${line%%[![:space:]]*}"}"
+    local indent=$(( ${#line} - ${#stripped} ))
+
+    # Extract key from this line
+    local line_key=""
+    if echo "$stripped" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:'; then
+      line_key="$(echo "$stripped" | sed 's/\s*:.*//')"
+    fi
+
+    [[ -z "$line_key" ]] && continue
+
+    # Determine which depth level this line is at
+    # Reset match_depth if we've gone back to a shallower level
+    if [[ $indent -le ${indent_stack[$match_depth]:-999} ]] && [[ $match_depth -gt 0 ]]; then
+      # We've exited the current section — recalculate depth
+      local new_depth=0
+      for ((i=1; i<=match_depth; i++)); do
+        if [[ $indent -le ${indent_stack[$i]:-999} ]]; then
+          new_depth=$((i - 1))
+          break
+        fi
+      done
+      match_depth=$new_depth
+    fi
+
+    # Check if this line matches the expected key at the current depth
+    local expected_key="${segments[$match_depth]:-}"
+    if [[ "$line_key" == "$expected_key" ]]; then
+      if [[ $match_depth -eq $((depth - 1)) ]]; then
+        # Found the leaf key in the correct context!
+        local value
+        value="$(echo "$stripped" | sed 's/^[^:]*:\s*//' | sed 's/\s*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/" | tr -d '[:space:]')"
+        if [[ -n "$value" && "$value" != "[]" && "$value" != "{}" ]]; then
+          echo "$value"
+          return
+        fi
+        # Value might be on next line (block scalar) — return default for now
+        echo "$default"
+        return
+      else
+        # Matched an intermediate key — go deeper
+        match_depth=$((match_depth + 1))
+        indent_stack[$match_depth]=$indent
+      fi
+    fi
+  done < "$_HAPAI_CONFIG"
+
+  echo "$default"
 }
 
-# Read a YAML list into a bash array (one item per line)
+# Read a YAML list — context-aware (respects section hierarchy).
 # Usage: config_get_list "guardrails.branch_protection.protected"
 config_get_list() {
   local key="$1"
-  local leaf_key="${key##*.}"
 
   if [[ -z "$_HAPAI_CONFIG" ]]; then
     find_config
@@ -149,38 +198,80 @@ config_get_list() {
     return
   fi
 
-  # Handle inline array: key: [val1, val2, val3]
-  local inline
-  inline=$(grep -E "^\s*${leaf_key}\s*:" "$_HAPAI_CONFIG" 2>/dev/null | head -1 | sed 's/^[^:]*:\s*//' | tr -d '[:space:]' || echo "")
+  # Split key into path segments
+  IFS='.' read -ra segments <<< "$key"
+  local depth=${#segments[@]}
 
-  if [[ "$inline" == "["*"]" ]]; then
-    # Strip brackets, split by comma, strip quotes
-    echo "$inline" | tr -d '[]"'"'" | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//'
-    return
-  fi
+  local match_depth=0
+  local indent_stack=(-1)
+  local in_target=0
+  local target_indent=-1
 
-  # Handle block list:
-  #   key:
-  #     - val1
-  #     - val2
-  local in_section=0
   while IFS= read -r line; do
-    if [[ $in_section -eq 1 ]]; then
-      if echo "$line" | grep -qE '^\s+-\s+'; then
-        echo "$line" | sed 's/^\s*-\s*//' | sed 's/\s*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/"
-      else
-        break
+    [[ -z "$line" ]] && continue
+    echo "$line" | grep -qE '^\s*#' && continue
+
+    local stripped="${line#"${line%%[![:space:]]*}"}"
+    local indent=$(( ${#line} - ${#stripped} ))
+
+    # If we're reading list items from the target key
+    if [[ $in_target -eq 1 ]]; then
+      if [[ $indent -le $target_indent ]]; then
+        # Exited the list section
+        return
       fi
+      if echo "$stripped" | grep -qE '^-\s+'; then
+        echo "$stripped" | sed 's/^-\s*//' | sed 's/\s*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/"
+      fi
+      continue
     fi
-    if echo "$line" | grep -qE "^\s*${leaf_key}\s*:"; then
-      in_section=1
+
+    # Extract key from this line
+    local line_key=""
+    if echo "$stripped" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:'; then
+      line_key="$(echo "$stripped" | sed 's/\s*:.*//')"
+    fi
+    [[ -z "$line_key" ]] && continue
+
+    # Track depth via indentation
+    if [[ $indent -le ${indent_stack[$match_depth]:-999} ]] && [[ $match_depth -gt 0 ]]; then
+      local new_depth=0
+      for ((i=1; i<=match_depth; i++)); do
+        if [[ $indent -le ${indent_stack[$i]:-999} ]]; then
+          new_depth=$((i - 1))
+          break
+        fi
+      done
+      match_depth=$new_depth
+    fi
+
+    local expected_key="${segments[$match_depth]:-}"
+    if [[ "$line_key" == "$expected_key" ]]; then
+      if [[ $match_depth -eq $((depth - 1)) ]]; then
+        # Found the leaf key — check for inline array or block list
+        local value_part
+        value_part="$(echo "$stripped" | sed 's/^[^:]*:\s*//' | tr -d '[:space:]')"
+
+        if [[ "$value_part" == "["*"]" ]]; then
+          # Inline array: key: [val1, val2, val3]
+          echo "$value_part" | tr -d '[]"'"'" | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//'
+          return
+        fi
+
+        # Block list follows on subsequent lines
+        in_target=1
+        target_indent=$indent
+      else
+        match_depth=$((match_depth + 1))
+        indent_stack[$match_depth]=$indent
+      fi
     fi
   done < "$_HAPAI_CONFIG"
 }
 
 # ─── Audit Log ──────────────────────────────────────────────────────────────
 
-# Log an event to the audit JSONL file
+# Log an event to the audit JSONL file — safe JSON via jq.
 # Usage: audit_log "deny" "Blocked commit to main"
 audit_log() {
   local result="${1:-unknown}"
@@ -195,14 +286,17 @@ audit_log() {
   local timestamp
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")"
 
-  # Escape reason for JSON
-  local escaped_reason
-  escaped_reason="$(echo "$reason" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr '\n' ' ' | head -c 500)"
-
-  # Append to audit log (non-blocking, fire-and-forget)
+  # Safe JSON construction via jq (handles all special chars, tabs, control chars)
   {
-    printf '{"ts":"%s","event":"%s","hook":"%s","tool":"%s","result":"%s","reason":"%s","project":"%s"}\n' \
-      "$timestamp" "$hook_event" "$hook_name" "$tool_name" "$result" "$escaped_reason" "$project_dir"
+    jq -n -c \
+      --arg ts "$timestamp" \
+      --arg event "$hook_event" \
+      --arg hook "$hook_name" \
+      --arg tool "$tool_name" \
+      --arg result "$result" \
+      --arg reason "$(echo "$reason" | head -c 500)" \
+      --arg project "$project_dir" \
+      '{ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
   } >> "$HAPAI_AUDIT_LOG" 2>/dev/null || true
 }
 
@@ -268,9 +362,9 @@ master"
 
 # ─── Error handling ─────────────────────────────────────────────────────────
 
-# Trap: on any unexpected error, allow gracefully (never break the host tool)
+# Trap: on any unexpected error, allow gracefully (never block on internal bugs)
 _hapai_error_handler() {
-  # Log the error but don't block
+  # Log the error but don't block — fail-open on internal errors only
   audit_log "error" "Internal hook error at line ${BASH_LINENO[0]:-unknown}"
   exit 0
 }

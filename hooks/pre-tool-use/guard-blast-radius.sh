@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # hapai/hooks/pre-tool-use/guard-blast-radius.sh
-# Warns when a commit touches too many files or packages (monorepo awareness)
-# Event: PreToolUse | Matcher: Bash | Timeout: 7s
+# Warns or blocks when a commit touches too many files or packages (monorepo awareness).
+# Behavior depends on fail_open config: true=warn, false=block.
+# Event: PreToolUse | Matcher: Bash | if: Bash(git commit*) | Timeout: 7s
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../_lib.sh"

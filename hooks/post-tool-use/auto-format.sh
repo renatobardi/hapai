@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # hapai/hooks/post-tool-use/auto-format.sh
-# Runs formatter (prettier/ruff) after Write/Edit operations
+# Runs formatter (prettier/ruff) after Write/Edit operations.
+# Uses direct invocation (no eval) to prevent command injection.
 # Event: PostToolUse | Matcher: Write|Edit|MultiEdit | Timeout: 5s
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,31 +26,30 @@ file_path="$(get_field '.tool_input.file_path')"
 
 # Get file extension
 ext="${file_path##*.}"
-ext=".${ext}"
 
-# Determine formatter based on extension
-case "$ext" in
+# Determine formatter command and args based on extension (safe, no eval)
+case ".$ext" in
   .py)
-    formatter="$(config_get "automation.auto_format.python" "ruff format {file}")"
+    cmd_name="ruff"
+    cmd_args=("format" "$file_path")
     ;;
   .ts|.tsx|.js|.jsx|.svelte|.css|.scss|.json)
-    formatter="$(config_get "automation.auto_format.javascript" "prettier --write {file}")"
+    cmd_name="prettier"
+    cmd_args=("--write" "$file_path")
     ;;
   *)
     exit 0
     ;;
 esac
 
-# Extract the command name to check if it exists
-cmd_name="$(echo "$formatter" | awk '{print $1}')"
+# Check if formatter exists
 if ! command -v "$cmd_name" &>/dev/null; then
   # Formatter not installed — fail silently
   exit 0
 fi
 
-# Replace {file} placeholder and run
-actual_cmd="${formatter//\{file\}/$file_path}"
-eval "$actual_cmd" &>/dev/null || true
+# Direct invocation (safe — no eval, no shell expansion on file_path)
+"$cmd_name" "${cmd_args[@]}" &>/dev/null || true
 
-audit_log "format" "Ran: $actual_cmd"
+audit_log "format" "Ran: $cmd_name ${cmd_args[*]}"
 exit 0

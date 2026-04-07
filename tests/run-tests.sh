@@ -63,18 +63,7 @@ assert_not_contains() {
 _HOOK_EXIT_FILE="$(mktemp)"
 _HOOK_OUTPUT_FILE="$(mktemp)"
 
-run_hook() {
-  local hook="$1" input="$2"
-  echo "$input" | bash "$HAPAI_ROOT/hooks/$hook" >"$_HOOK_OUTPUT_FILE" 2>&1 || true
-  echo $? > "$_HOOK_EXIT_FILE"
-  # Re-run to get actual exit code (the || true above eats it)
-  echo "0" > "$_HOOK_EXIT_FILE"
-  echo "$input" | bash "$HAPAI_ROOT/hooks/$hook" >"$_HOOK_OUTPUT_FILE" 2>&1
-  echo $? > "$_HOOK_EXIT_FILE"
-  cat "$_HOOK_OUTPUT_FILE"
-}
-
-# Wrapper that captures exit code properly
+# Run a hook with JSON input, capture stdout+stderr and exit code
 run_hook_check() {
   local hook="$1" input="$2"
   local ec=0

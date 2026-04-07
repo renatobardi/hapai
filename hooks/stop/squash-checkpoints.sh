@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # hapai/hooks/stop/squash-checkpoints.sh
-# Consolidates checkpoint commits into a single clean commit when session ends
-# Inspired by wangbooth/Claude-Code-Guardrails
+# Consolidates checkpoint commits into a single clean commit when session ends.
+# Uses --no-verify intentionally (avoids recursion with hapai's own hooks).
+# Inspired by wangbooth/Claude-Code-Guardrails.
 # Event: Stop | Timeout: 10s
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,9 +24,10 @@ git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 prefix="$(config_get "automation.auto_checkpoint.commit_prefix" "checkpoint:")"
 
 # Count consecutive checkpoint commits from HEAD
+# Uses grep -F (fixed string) to avoid regex metacharacters in prefix
 checkpoint_count=0
 while IFS= read -r msg; do
-  if echo "$msg" | grep -q "^${prefix}"; then
+  if echo "$msg" | grep -qF "${prefix}"; then
     checkpoint_count=$((checkpoint_count + 1))
   else
     break
@@ -41,6 +43,7 @@ fi
 git reset --soft "HEAD~${checkpoint_count}" 2>/dev/null || exit 0
 
 # Create a single consolidated commit
+# --no-verify: intentional — avoids recursion with hapai's own PreToolUse hooks
 file_list="$(git diff --cached --name-only 2>/dev/null | head -10 | tr '\n' ', ' | sed 's/,$//')"
 file_total="$(git diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')"
 

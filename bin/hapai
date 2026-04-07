@@ -10,7 +10,7 @@
 #   revive      Restore hooks after kill
 #   status      Show active hooks, risk tier, last execution
 #   audit       Show recent audit log entries
-#   export      Export guardrails for other tools (cursor, copilot)
+#   export      Export guardrails for other tools (claude, cursor, copilot)
 
 set -euo pipefail
 
@@ -70,8 +70,8 @@ cmd_install() {
   # 1. Copy hooks
   mkdir -p "$hooks_dest"
   cp -r "$HAPAI_ROOT/hooks/"* "$hooks_dest/" 2>/dev/null || true
-  chmod +x "$hooks_dest"/**/*.sh 2>/dev/null || true
-  chmod +x "$hooks_dest"/_lib.sh 2>/dev/null || true
+  # chmod +x on all .sh files (find instead of globstar which needs shopt -s globstar)
+  find "$hooks_dest" -name "*.sh" -type f -exec chmod +x {} + 2>/dev/null || true
   log_ok "Hooks copied to $hooks_dest"
 
   # 2. Backup settings.json
@@ -88,7 +88,8 @@ cmd_install() {
   # Generate settings from template with resolved paths
   local template="$HAPAI_ROOT/templates/settings.hooks.json"
   local resolved
-  resolved="$(sed "s|__HAPAI_HOOKS__|${hooks_abs_path}|g" "$template")"
+  # Use jq for safe path substitution (avoids sed delimiter collision if path contains |)
+  resolved="$(jq --arg path "$hooks_abs_path" 'walk(if type == "string" then gsub("__HAPAI_HOOKS__"; $path) else . end)' "$template")"
 
   if [[ -f "$settings_file" ]]; then
     # Deep merge: existing settings + hapai hooks
@@ -366,8 +367,10 @@ cmd_revive() {
     if [[ -f "$killed_file" ]]; then
       local target="${killed_file%.hapai-killed}"
       if [[ -f "$target" ]]; then
-        # Target exists again — merge back
-        log_warn "Both $target and $killed_file exist. Restoring killed version."
+        # Target was recreated after kill — backup the new one, then merge
+        local new_backup="${target}.pre-revive.$(date +%Y%m%d%H%M%S)"
+        cp "$target" "$new_backup"
+        log_warn "Existing $target backed up to $new_backup before restoring killed version."
       fi
       mv "$killed_file" "$target"
       log_ok "Restored: $target"
@@ -429,16 +432,26 @@ cmd_status() {
     log_info "Audit log: empty"
   fi
 
-  # State counters
+  # State counters (deny_count + warn_count)
   echo ""
-  echo -e "${BOLD}Denial counters:${NC}"
-  for state_file in "$HAPAI_HOME/state/"*.deny_count; do
+  echo -e "${BOLD}Hook counters:${NC}"
+  local found_counters=0
+  for state_file in "$HAPAI_HOME/state/"*_count; do
     [[ -f "$state_file" ]] || continue
-    local name count
-    name="$(basename "$state_file" .deny_count)"
+    local name count suffix
+    name="$(basename "$state_file")"
     count="$(cat "$state_file" 2>/dev/null || echo "0")"
-    [[ "$count" -gt 0 ]] && echo "  $name: $count blocks"
+    [[ "$count" -gt 0 ]] || continue
+    found_counters=1
+    # Format: guard-branch.deny_count → guard-branch: 5 blocks
+    #         guard-blast-radius.warn_count → guard-blast-radius: 3 warnings
+    if [[ "$name" == *.deny_count ]]; then
+      echo -e "  ${RED}${name%.deny_count}${NC}: $count blocks"
+    elif [[ "$name" == *.warn_count ]]; then
+      echo -e "  ${YELLOW}${name%.warn_count}${NC}: $count warnings"
+    fi
   done
+  [[ $found_counters -eq 0 ]] && echo "  (none yet)"
 }
 
 # ─── AUDIT ──────────────────────────────────────────────────────────────────
@@ -486,8 +499,13 @@ cmd_export() {
 
   case "$target" in
     claude)
-      log_info "Claude Code hooks are installed via 'hapai install'"
+      log_info "Claude Code hooks are managed via 'hapai install --global' or 'hapai install --project'."
+      log_info "Verifying current installation:"
+      echo ""
       cmd_validate
+      echo ""
+      log_info "To reinstall/update: hapai install --global"
+      log_info "Config file: ${HAPAI_HOME}/hapai.yaml (global) or hapai.yaml (project)"
       ;;
     cursor)
       _export_cursor

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # hapai/hooks/pre-tool-use/guard-uncommitted.sh
-# Warns when writing to files while there are uncommitted changes
-# Prevents AI from overwriting manual work that hasn't been saved
+# Warns or blocks when writing to files that have uncommitted changes.
+# Prevents AI from overwriting manual work that hasn't been saved.
+# Uses full relative path matching (not basename) to avoid false positives.
 # Event: PreToolUse | Matcher: Write|Edit|MultiEdit | Timeout: 7s
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,17 +27,34 @@ git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 file_path="$(get_field '.tool_input.file_path')"
 [[ -z "$file_path" ]] && exit 0
 
-# Check if the specific file has uncommitted changes (staged or unstaged)
-if git diff --name-only HEAD 2>/dev/null | grep -qF "$(basename "$file_path")" || \
-   git diff --cached --name-only 2>/dev/null | grep -qF "$(basename "$file_path")"; then
+# Resolve to relative path from git root for accurate matching
+git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+rel_file=""
 
+# If file_path is absolute, make it relative to git root
+if [[ "$file_path" == /* ]]; then
+  rel_file="${file_path#"$git_root/"}"
+else
+  rel_file="$file_path"
+fi
+
+# Check if the specific file (full relative path) has uncommitted changes
+has_changes=0
+if git diff --name-only HEAD 2>/dev/null | grep -qxF "$rel_file"; then
+  has_changes=1
+elif git diff --cached --name-only 2>/dev/null | grep -qxF "$rel_file"; then
+  has_changes=1
+fi
+
+if [[ $has_changes -eq 1 ]]; then
   fail_open="$(config_get "guardrails.uncommitted_changes.fail_open" "true")"
+  filename="$(basename "$file_path")"
 
   if [[ "$fail_open" == "true" ]]; then
-    warn "⚠️ hapai: File '$(basename "$file_path")' has uncommitted changes. Consider committing before AI modifies it."
+    warn "hapai: File '$filename' has uncommitted changes. Consider committing before AI modifies it."
   else
     state_increment "guard-uncommitted.deny_count"
-    deny "🛑 hapai: File '$(basename "$file_path")' has uncommitted changes. Commit your work first to avoid losing manual edits."
+    deny "hapai: File '$filename' has uncommitted changes. Commit your work first to avoid losing manual edits."
   fi
 fi
 
