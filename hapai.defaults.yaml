@@ -111,6 +111,26 @@ observability:
   auto_allow_readonly:
     enabled: false         # auto-approve Read/Glob/Grep and safe bash commands
 
+# ─── Intelligence (Phase 5 — session awareness) ────────────────────────────
+
+intelligence:
+  production_warning:
+    enabled: true          # warn when prompts mention prod/deploy/release
+    keywords: ["prod", "production", "deploy", "deployment", "--prod", "release", "hotfix", "rollback"]
+
+  load_context:
+    enabled: false         # load git status, TODOs, issues at session start
+    scan_todos: true       # scan codebase for TODO/FIXME
+    scan_issues: false     # query GitHub issues (requires gh CLI)
+
+  audit_trail:
+    enabled: false         # log every tool execution to audit-trail.jsonl
+
+  cost_tracker:
+    enabled: false         # estimate session cost and warn on thresholds
+    max_tool_calls: 200    # warn if session exceeds N tool calls
+    max_cost_cents: 500    # warn if estimated cost exceeds (in cents)
+
 # ─── Hook timeouts (seconds) ───────────────────────────────────────────────
 
 hooks:

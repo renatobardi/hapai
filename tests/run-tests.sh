@@ -314,6 +314,84 @@ rm -f "$NO_TEST_TRANSCRIPT" "$TEST_TRANSCRIPT"
 cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}warn-production.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Enable production warning
+echo -e "intelligence:\n  production_warning:\n    enabled: true\n    keywords:\n      - prod\n      - deploy\n      - rollback" > "$HAPAI_HOME/hapai.yaml"
+
+# Test: prompt with "deploy" should warn
+output="$(run_hook_check "user-prompt-submit/warn-production.sh" '{"hook_event_name":"UserPromptSubmit","user_prompt":"please deploy this to production"}')"
+assert_contains "$output" "Production" "Warns on production keyword in prompt"
+
+# Test: prompt without production keywords should pass silently
+output="$(run_hook_check "user-prompt-submit/warn-production.sh" '{"hook_event_name":"UserPromptSubmit","user_prompt":"add a login button"}')"
+assert_not_contains "$output" "Production" "Allows non-production prompts"
+
+# Test: prompt with "rollback" should warn
+output="$(run_hook_check "user-prompt-submit/warn-production.sh" '{"hook_event_name":"UserPromptSubmit","user_prompt":"rollback the last release"}')"
+assert_contains "$output" "Production" "Warns on rollback keyword"
+
+cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}audit-trail.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Enable audit trail
+echo -e "intelligence:\n  audit_trail:\n    enabled: true" > "$HAPAI_HOME/hapai.yaml"
+
+# Test: logs a Bash tool execution
+output="$(run_hook_check "post-tool-use/audit-trail.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"ls -la"},"session_id":"test1234"}')"
+assert_allowed "$output" "Audit trail exits cleanly"
+
+# Verify audit-trail.jsonl was written
+TOTAL=$((TOTAL + 1))
+if [[ -f "$HAPAI_HOME/audit-trail.jsonl" ]] && grep -q '"tool":"Bash"' "$HAPAI_HOME/audit-trail.jsonl" 2>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} Audit trail entry written"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Audit trail entry not found"
+  FAIL=$((FAIL + 1))
+fi
+
+cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}cost-tracker.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Enable cost tracker
+echo -e "intelligence:\n  cost_tracker:\n    enabled: true\n    max_tool_calls: 5\n    max_cost_cents: 100" > "$HAPAI_HOME/hapai.yaml"
+
+# Create transcript with many tool calls (>5 threshold)
+COST_TRANSCRIPT="$(mktemp)"
+for i in $(seq 1 10); do
+  echo "{\"type\":\"tool_use\",\"tool_input\":{\"command\":\"echo $i\"}}" >> "$COST_TRANSCRIPT"
+done
+
+# Test: warns when tool calls exceed threshold
+output="$(run_hook_check "stop/cost-tracker.sh" "{\"hook_event_name\":\"Stop\",\"transcript_path\":\"$COST_TRANSCRIPT\"}")"
+assert_contains "$output" "tool call" "Warns on high tool call count"
+
+rm -f "$COST_TRANSCRIPT"
+cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}load-context.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Enable load-context
+echo -e "intelligence:\n  load_context:\n    enabled: true\n    scan_todos: false\n    scan_issues: false" > "$HAPAI_HOME/hapai.yaml"
+
+# Test: loads git context (we're in a git repo from MOCK_REPO)
+cd "$MOCK_REPO"
+output="$(run_hook_check "session-start/load-context.sh" '{"hook_event_name":"SessionStart","session_id":"ctx123"}')"
+assert_contains "$output" "Git" "Loads git context at session start"
+
+cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
+
+# ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}CLI tests${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 

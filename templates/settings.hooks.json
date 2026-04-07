@@ -65,6 +65,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/post-tool-use/audit-trail.sh",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "Stop": [
@@ -79,6 +89,35 @@
           {
             "type": "command",
             "command": "bash __HAPAI_HOOKS__/stop/require-tests.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/stop/cost-tracker.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/user-prompt-submit/warn-production.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/session-start/load-context.sh",
             "timeout": 10
           }
         ]
