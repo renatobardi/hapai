@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# hapai/hooks/pre-tool-use/guard-blast-radius.sh
+# Warns when a commit touches too many files or packages (monorepo awareness)
+# Event: PreToolUse | Matcher: Bash | Timeout: 7s
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../_lib.sh"
+
+read_input
+
+# Only care about Bash tool
+tool_name="$(get_tool_name)"
+[[ "$tool_name" != "Bash" ]] && exit 0
+
+command="$(get_field '.tool_input.command')"
+[[ -z "$command" ]] && exit 0
+
+# Only check git commit commands
+echo "$command" | grep -qE 'git\s+commit' || exit 0
+
+# Check if enabled
+enabled="$(config_get "guardrails.blast_radius.enabled" "true")"
+[[ "$enabled" != "true" ]] && allow
+
+# Check if we're in a git repo
+git rev-parse --is-inside-work-tree &>/dev/null || exit 0
+
+# Count staged files
+staged_files="$(git diff --cached --name-only 2>/dev/null)"
+file_count="$(echo "$staged_files" | grep -c '.' 2>/dev/null || echo "0")"
+
+# Get thresholds from config
+max_files="$(config_get "guardrails.blast_radius.max_files" "10")"
+max_packages="$(config_get "guardrails.blast_radius.max_packages" "2")"
+fail_open="$(config_get "guardrails.blast_radius.fail_open" "true")"
+
+warnings=""
+
+# Check file count
+if [[ "$file_count" -gt "$max_files" ]]; then
+  warnings="⚠️ Blast radius: $file_count files staged (threshold: $max_files)."
+fi
+
+# Check package/directory spread (monorepo awareness)
+# Count unique top-level directories (packages/, apps/, etc.)
+if [[ -n "$staged_files" ]]; then
+  package_dirs="$(echo "$staged_files" | grep -oE '^(packages|apps|modules|services)/[^/]+' 2>/dev/null | sort -u)"
+  package_count="$(echo "$package_dirs" | grep -c '.' 2>/dev/null || echo "0")"
+
+  if [[ "$package_count" -gt "$max_packages" ]]; then
+    package_list="$(echo "$package_dirs" | tr '\n' ', ' | sed 's/,$//')"
+    if [[ -n "$warnings" ]]; then
+      warnings="$warnings Also touches $package_count packages ($package_list)."
+    else
+      warnings="⚠️ Blast radius: commit touches $package_count packages ($package_list) (threshold: $max_packages)."
+    fi
+  fi
+fi
+
+# If warnings exist, act on them
+if [[ -n "$warnings" ]]; then
+  state_increment "guard-blast-radius.warn_count"
+
+  if [[ "$fail_open" == "true" ]]; then
+    warn "$warnings Consider splitting into smaller, focused commits."
+  else
+    deny "🛑 hapai: $warnings Split into smaller commits before proceeding."
+  fi
+fi
+
+allow

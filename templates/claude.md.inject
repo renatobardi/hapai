@@ -1,0 +1,12 @@
+<!-- hapai:start -->
+## Hapai Guardrails (enforced by hooks)
+
+These rules are deterministically enforced by hapai hooks. Violations are blocked before execution.
+
+- NEVER commit directly to protected branches (main, master)
+- NEVER add Co-Authored-By or mention AI/Claude/Anthropic in commits, PRs, or docs
+- NEVER run destructive commands (rm -rf, force-push, git reset --hard, DROP TABLE)
+- NEVER edit .env, lockfiles, or CI workflow files without explicit permission
+- ALWAYS create a feature branch before making changes
+- ALWAYS keep commits focused — avoid touching many files/packages in a single commit
+<!-- hapai:end -->

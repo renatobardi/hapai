@@ -1,0 +1,15 @@
+# State and audit (runtime, not tracked)
+.hapai/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local settings
+.claude/settings.local.json
