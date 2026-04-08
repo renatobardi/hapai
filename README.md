@@ -2,15 +2,24 @@
 
 > Deterministic guardrails for AI coding assistants. Hooks that enforce rules **before execution** — not probabilistic prompts that get ignored.
 
-**hapai** uses Claude Code hooks to intercept tool calls in real-time. When a violation is detected, it's blocked immediately. No markdown instructions to ignore. No promises. Just enforcement.
+**hapai** v1.3+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
+
+## What's New in v1.3+
+
+- **Svelte 5 Analytics Dashboard** — Real-time visualization of guardrail events
+- **Cloud Integration** — BigQuery streaming + Cloud Functions + GitHub Pages
+- **GitHub OAuth** — Firebase Authentication for dashboard access
+- **Extended Guardrails** — Branch taxonomy, PR reviews, git workflows
+- **OIDC Authentication** — Keyless service account access for Cloud Storage sync
+- **Node.js 24 Ready** — All GitHub Actions workflows upgraded to Node.js 24
 
 ## The Problem
 
-AI coding tools (Claude Code, Cursor, GitHub Copilot) frequently ignore markdown instructions and safety guidelines. They commit to protected branches, add AI attribution, edit secrets files, and run destructive commands despite explicit rules.
+AI coding tools frequently ignore markdown instructions and safety guidelines. They commit to protected branches, edit secrets files, run destructive commands, and add AI attribution despite explicit rules.
 
-**Why this happens:** LLMs see markdown as suggestions, not requirements. They can't reliably enforce their own rules.
+**Why this happens:** LLMs see markdown as suggestions, not requirements.
 
-**The solution:** Deterministic enforcement via hooks. You can't ignore a hook — it runs *before* the action, not after.
+**The solution:** Deterministic enforcement via hooks running *before* the action, not after.
 
 ## Quick Start
 
@@ -24,7 +33,7 @@ ln -sf ~/hapai/bin/hapai /usr/local/bin/hapai
 # Install globally (all projects)
 hapai install --global
 
-# Or install per-project
+# Or per-project
 cd your-project && hapai install --project
 
 # Verify
@@ -36,384 +45,265 @@ hapai validate
 | Guardrail | What it prevents | Config key |
 |-----------|-----------------|-----------|
 | **Branch Protection** | Commits/pushes to protected branches (main, master, etc.) | `branch_protection.protected` |
+| **Branch Taxonomy** | Enforces naming conventions (feat/, fix/, chore/, etc.) | `branch_taxonomy.allowed_prefixes` |
+| **Branch Rules** | Validates description + origin branch | `branch_rules.enabled` |
 | **Commit Hygiene** | Co-Authored-By, AI mentions, "Generated with Claude" | `commit_hygiene.blocked_patterns` |
-| **File Protection** | Writes to .env, lockfiles, CI workflow files, and custom protected files | `file_protection.protected` |
-| **Destructive Commands** | `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE`, etc. | `command_safety.blocked` |
+| **File Protection** | Writes to .env, lockfiles, CI workflow files | `file_protection.protected` |
+| **Destructive Commands** | `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE` | `command_safety.blocked` |
+| **Blast Radius** | Large commits touching too many files or packages | `blast_radius.max_files` |
 | **Uncommitted Changes** | AI overwriting your uncommitted work | `uncommitted_changes.enabled` |
-| **Blast Radius** | Large commits touching too many files or changing multiple packages | `blast_radius.max_files` |
+| **PR Review** | Background code review on all PRs | `pr_review.enabled` |
+| **Git Workflow** | Trunk-based or GitFlow enforcement | `git_workflow.model` |
 
-All guardrails have a `fail_open` setting:
-- **`fail_open: false`** — Block execution and show error
-- **`fail_open: true`** — Warn but allow execution (for soft constraints)
+All guardrails support `fail_open`:
+- **`fail_open: false`** — Block execution, show error
+- **`fail_open: true`** — Warn but allow (soft constraints)
+
+## Analytics Dashboard
+
+Deploy a real-time analytics dashboard to GitHub Pages to monitor guardrail events across your team.
+
+### Features
+
+- **Timeline** — Daily denial/warning counts (30-day rolling window)
+- **Top Blocking Hooks** — Which guardrails are most active
+- **Recent Events** — Live feed of all denials and warnings
+- **Tool Distribution** — Which tools trigger guards most
+- **Project Breakdown** — Per-project statistics
+- **Deny Rate Trend** — Historical deny rate analysis
+
+### Setup
+
+1. Create Firebase project with GitHub OAuth provider
+2. Set GitHub Actions secrets (VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID, VITE_BQ_PROXY_URL)
+3. Merge to main → GitHub Actions builds and deploys to GitHub Pages
+4. Dashboard live at: `https://{owner}.github.io/{repo}/`
+
+See [`infra/gcp/SETUP.md`](infra/gcp/SETUP.md) for complete setup guide.
+
+## Cloud Logging (Optional)
+
+Sync audit logs to GCP for enterprise analytics and compliance.
+
+**Architecture:**
+```
+hapai audit logs (local)
+    ↓
+GitHub Actions OIDC (keyless auth)
+    ↓
+Cloud Storage bucket
+    ↓
+Cloud Function (triggered on upload)
+    ↓
+BigQuery dataset (hapai_dataset)
+    ↓
+Analytics Dashboard (GitHub Pages)
+```
+
+**What you get:**
+- Immutable audit trail in BigQuery
+- Real-time dashboard with 30-day rolling analytics
+- Integration with GCP Cloud Audit Logs
+- No service account keys (OIDC + Workload Identity)
+
+See [`infra/gcp/SETUP.md`](infra/gcp/SETUP.md) for setup instructions.
 
 ## Automations (Run After Execution)
 
 | Automation | What it does | Config key |
 |-----------|-------------|-----------|
-| **Auto-Checkpoint** | Creates granular git snapshots per file edited | `automation.auto_checkpoint` |
+| **Auto-Checkpoint** | Granular git snapshots per file edited | `automation.auto_checkpoint` |
 | **Auto-Format** | Runs prettier/ruff/black after writes | `automation.auto_format` |
-| **Auto-Lint** | Runs ESLint/ruff/pylint, reports issues inline | `automation.auto_lint` |
-| **Squash on Stop** | Consolidates checkpoint commits into one clean commit | `automation.auto_checkpoint.squash_on_stop` |
-
-## Observability & Intelligence
-
-| Feature | What it does | Config key |
-|---------|-----------|-----------|
-| **Audit Log** | Immutable JSONL log of every hook execution | `observability.audit_log` |
-| **State Persistence** | Cross-session counters and context | `observability.state` |
-| **Production Warnings** | Alerts when prompts mention prod/deploy/release | `intelligence.production_warning` |
-| **Session Intelligence** | Loads git status, TODOs, issues at session start | `intelligence.load_context` |
-| **Cost Tracker** | Estimates session token cost and warns on thresholds | `intelligence.cost_tracker` |
+| **Auto-Lint** | Runs ESLint/ruff/pylint, reports issues | `automation.auto_lint` |
+| **Squash on Stop** | Consolidates checkpoints into clean commits | `automation.auto_checkpoint.squash_on_stop` |
 
 ## CLI Commands
 
 ### Installation
 ```bash
-hapai install --global       # Install hooks in ~/.hapai for all projects
-hapai install --project      # Install hooks in ./hapai/ for current project only
-hapai uninstall [--global]   # Remove hooks (global or current project)
-hapai validate               # Verify installation: hooks registered, scripts executable, config OK
+hapai install --global        # Global (~/.hapai)
+hapai install --project       # Per-project (./hapai/)
+hapai uninstall [--global]    # Remove hooks
+hapai validate                # Verify installation
 ```
 
-### Status & Monitoring
+### Monitoring
 ```bash
-hapai status                 # Show hook registration, audit stats, active guardrails
-hapai audit [N]              # Show last N audit entries (default: 20)
+hapai status                  # Hook registration and active guardrails
+hapai audit [N]               # Show last N audit entries (default: 20)
 ```
 
-### Emergency Controls
+### Emergency
 ```bash
-hapai kill                   # Disable ALL hooks immediately (for urgent edits)
-hapai revive                 # Re-enable hooks after kill
+hapai kill                    # Disable all hooks immediately
+hapai revive                  # Re-enable hooks
 ```
 
-### Export to Other Tools
+### Export
 ```bash
-hapai export --target cursor      # Generate .cursor/rules/ for Cursor
-hapai export --target copilot     # Generate .github/copilot-instructions.md
-hapai export --target claude      # Generate CLAUDE.md rules
+hapai export --target cursor     # Generate Cursor rules
+hapai export --target copilot    # Generate Copilot rules
+hapai export --target claude     # Generate CLAUDE.md rules
 ```
 
 ## Configuration
 
-Configuration is YAML-based with a three-tier fallback:
-1. **Project-level** `./hapai.yaml` (overrides all)
-2. **Global** `~/.hapai/hapai.yaml` (applies to all projects)
-3. **Defaults** `hapai.defaults.yaml` (shipped with hapai)
+YAML-based with three-tier fallback:
+1. **Project** `./hapai.yaml` (overrides all)
+2. **Global** `~/.hapai/hapai.yaml`
+3. **Defaults** `hapai.defaults.yaml`
 
-### Quick Start: Copy Defaults
-
+### Quick Start
 ```bash
 cp hapai.defaults.yaml hapai.yaml
+# Edit hapai.yaml for your project
 ```
 
-Then edit `hapai.yaml` for your project needs.
-
-### Config Structure
-
+### Example: Strict Settings
 ```yaml
 version: "1.0"
-risk_tier: medium  # low | medium | high | critical
+risk_tier: high
 
-# ─── Guardrails (block violations) ───────────────────────
 guardrails:
   branch_protection:
     enabled: true
-    protected: [main, master]  # List of protected branches
-    fail_open: false           # false = block, true = warn only
-
-  commit_hygiene:
-    enabled: true
-    blocked_patterns:
-      - "Co-Authored-By:"
-      - "Generated with Claude"
-      - "noreply@anthropic.com"
+    protected: [main, develop]
     fail_open: false
 
-  file_protection:
+  branch_taxonomy:
     enabled: true
-    protected:
-      - ".env"
-      - ".env.*"
-      - "*.lock"
-      - ".github/workflows/*"
-    unprotected:
-      - ".env.example"
-      - ".env.sample"
-    fail_open: false
-
-  command_safety:
-    enabled: true
-    blocked:
-      - "rm -rf"
-      - "git push --force"
-      - "git reset --hard"
-      - "DROP TABLE"
+    allowed_prefixes: [feat, fix, chore, docs, refactor]
+    require_description: true
     fail_open: false
 
   blast_radius:
     enabled: true
-    max_files: 10        # warn if commit touches >N files
-    max_packages: 2      # warn if touches >N packages (monorepo)
-    fail_open: true      # warn but allow (soft constraint)
+    max_files: 5
+    max_packages: 1
+    fail_open: false  # Block large changes
 
-  uncommitted_changes:
+  pr_review:
     enabled: true
-    fail_open: true      # warn but allow
+    model: "claude-haiku-4-5-20251001"
+    fail_open: false  # Require review to pass
 
-# ─── Automations (run after execution) ───────────────────
-automation:
-  auto_checkpoint:
-    enabled: false       # Create git snapshots per file
-    squash_on_stop: true # Consolidate on session end
-    commit_prefix: "checkpoint:"
-
-  auto_format:
-    enabled: false
-    python: "ruff format {file}"
-    javascript: "prettier --write {file}"
-
-  auto_lint:
-    enabled: false
-    python: "ruff check {file}"
-    javascript: "eslint {file}"
-
-# ─── Observability ──────────────────────────────────────
-observability:
-  audit_log:
-    enabled: true
-    path: "~/.hapai/audit.jsonl"
-    retention_days: 30
-
-  require_tests:
-    enabled: false  # Enforce test run before stop
-    fail_open: true
-
-  backup_transcripts:
-    enabled: true   # Save transcripts before context compaction
-
-  notifications:
-    sound_enabled: false
-
-  auto_allow_readonly:
-    enabled: false  # Auto-approve Read/Glob/Grep operations
-
-# ─── Intelligence (session awareness) ────────────────────
-intelligence:
-  production_warning:
-    enabled: true
-    keywords: ["prod", "production", "deploy", "--prod", "release"]
-
-  load_context:
-    enabled: false  # Load git status, TODOs at session start
-    scan_todos: true
-
-  cost_tracker:
-    enabled: false
-    max_tool_calls: 200
-    max_cost_cents: 500
-
-# ─── Hook timeouts (seconds) ────────────────────────────
-hooks:
-  timeouts:
-    pre_tool_use: 7
-    post_tool_use: 5
-    stop: 10
-```
-
-### Per-Project Customization
-
-Create `hapai.yaml` in your project root to override global settings. Common customizations:
-
-**Protect project-specific files:**
-```yaml
-file_protection:
-  protected:
-    - ".env"
-    - "CONSTITUTION.md"
-    - "firebase.json"
-```
-
-**Strict monorepo rules:**
-```yaml
-blast_radius:
-  max_files: 5
-  max_packages: 1
-  fail_open: false  # Block instead of warn
-```
-
-**Enable automations:**
-```yaml
 automation:
   auto_format:
     enabled: true
     python: "ruff format {file}"
     javascript: "prettier --write {file}"
-  auto_lint:
-    enabled: true
 ```
 
-## Architecture & Design
+## Architecture
 
-**Technology:**
-- **Pure Bash 4+** — No Node, Python, or external services
-- **Single external dependency** — `jq` (for JSON I/O, safer than parsing JSON in bash)
-- **~2,200 lines of shell code** — 1,550 LOC in hooks + 645 LOC in CLI
+**Technology Stack:**
+- **Hooks**: Pure Bash 4+ (~1,550 LOC)
+- **CLI**: Pure Bash (~645 LOC)
+- **Dashboard**: Svelte 5 + Vite
+- **Backend**: Python Cloud Functions
+- **Analytics**: BigQuery
+- **Auth**: Firebase Auth + GitHub OAuth
+- **Deployment**: GitHub Pages + OIDC
 
-**Safety & Reliability:**
-- **Graceful failure** — Hooks never crash Claude Code. Internal errors exit 0 (allow execution).
-- **Timeouts** — PreToolUse (7s), PostToolUse (5s), Stop (10s). Prevents hanging.
-- **No blocking operations** — All hooks run synchronously, no background jobs or subshells.
-- **Permission-safe** — Uses `realpath` to resolve symlinks, prevents bypass attempts.
+**Design Principles:**
+- **Graceful Failure** — Hooks never crash Claude Code
+- **Timeouts** — PreToolUse (7s), PostToolUse (5s), Stop (10s)
+- **Modular** — One concern per file, 50-100 LOC
+- **Immutable Audit** — Append-only JSONL audit log
 
-**Modular Design:**
-- **One concern per file** — Each guardrail is 50-100 LOC in its own script
-- **Shared library** — `hooks/_lib.sh` provides config loading, JSON I/O, audit logging
-- **Conditional execution** — Hooks check tool name and only run if relevant
-
-**Observability:**
-- **Immutable audit log** — `~/.hapai/audit.jsonl` (JSONL format, append-only)
-- **Per-hook counters** — `~/.hapai/state/{hook-name}.count` for cross-session tracking
-- **Structured logging** — JSON audit entries include timestamp, hook name, result, reason, project
-
-**Portability:**
-- **Global + Project scope** — Hooks can be installed globally or per-project
-- **Export targets** — Generate rules for Cursor (`.cursor/rules/`) and GitHub Copilot (`.github/copilot-instructions.md`)
-- **Idempotent installation** — Running `hapai install` twice doesn't duplicate entries
-
-## How It Works
-
-hapai uses Claude Code's hook system to intercept tool calls at three critical points:
-
-1. **PreToolUse** — Before execution (guard scripts block violations)
-2. **PostToolUse** — After execution (automations like format/lint/checkpoint run)
-3. **Stop** — Session completion (squash checkpoints, require tests, estimate cost)
-
+**Directory Structure:**
 ```
-User prompt
-    ↓
-Claude Code tool call
-    ↓
-PreToolUse hook → hapai guard script
-    ├─ Violation detected? → exit 2 (DENY) + log audit entry
-    └─ Clean? → exit 0 (ALLOW)
-    ↓
-[Tool executes or is blocked]
-    ↓
-PostToolUse hook → hapai automation script
-    └─ Format, lint, checkpoint, audit log
-    ↓
-[Continue or Stop]
-    ↓
-Stop hook → hapai cleanup script
-    └─ Squash checkpoints, verify tests, estimate cost
-```
-
-All hooks:
-- Run with **7-10 second timeouts** (never hang Claude Code)
-- Exit gracefully on internal errors (exit 0, never crash the host tool)
-- Log actions to `~/.hapai/audit.jsonl` (append-only, immutable)
-- Read config from `hapai.yaml` (project-local first, then global)
-
-## Directory Structure
-
-```
-~/.hapai/                          # Global hapai directory
-├── hooks/                         # Hook scripts (11 files, ~1550 LOC)
-│   ├── _lib.sh                    # Shared library (config, JSON I/O, audit)
-│   ├── pre-tool-use/              # Guardrails (block violations)
-│   │   ├── guard-branch.sh
-│   │   ├── guard-commit-msg.sh
-│   │   ├── guard-destructive.sh
-│   │   ├── guard-files.sh
-│   │   ├── guard-blast-radius.sh
-│   │   └── guard-uncommitted.sh
-│   ├── post-tool-use/             # Automations (run after execution)
-│   │   ├── auto-checkpoint.sh
-│   │   ├── auto-format.sh
-│   │   ├── auto-lint.sh
-│   │   └── audit-trail.sh
-│   ├── stop/                      # Session-end hooks
-│   │   ├── squash-checkpoints.sh
-│   │   ├── require-tests.sh
-│   │   └── cost-tracker.sh
-│   └── [other hooks for observability, notifications, etc.]
-├── hapai.yaml                     # Global config (same structure as defaults)
-├── audit.jsonl                    # Immutable audit log (JSONL format)
-└── state/                         # Cross-session state
-    ├── guard-branch.count
-    ├── guard-files.count
-    └── [other guardrail counters]
+~/.hapai/
+├── hooks/
+│   ├── _lib.sh (config, JSON I/O, audit)
+│   ├── pre-tool-use/ (11 guardrails)
+│   ├── post-tool-use/ (automations)
+│   └── stop/ (session cleanup)
+├── audit.jsonl (immutable audit log)
+└── state/ (cross-session counters)
 
 project-root/
-├── hapai.yaml                     # Project-specific config (overrides global)
-├── .claude/settings.json          # Hooks registered here (project scope)
-└── CLAUDE.md                      # Rules injected with <!-- hapai:start/end -->
+├── hapai.yaml (project config)
+├── infra/gcp/
+│   ├── dashboard/ (Svelte 5 frontend)
+│   ├── functions/ (Cloud Function)
+│   └── SETUP.md (deployment guide)
+├── .github/workflows/
+│   ├── hapai-sync.yml (OIDC Cloud Storage sync)
+│   └── deploy-dashboard.yml (GitHub Pages)
 ```
 
-## Testing & Development
-
-### Run the Test Suite
+## Testing
 
 ```bash
 bash tests/run-tests.sh
 ```
 
-The test suite is pure bash assertions (no test framework dependency). Tests include:
-- Unit tests for guard scripts (violation detection, edge cases)
-- Integration tests (config loading, JSON parsing, audit logging)
-- End-to-end tests (hook registration, CLI commands)
-
-Coverage: ~200 assertions across 11 hook modules.
-
-## Troubleshooting
-
-**Q: Hooks are running but not blocking. Why?**
-- Check `hapai status` to verify hooks are registered
-- Check `fail_open: false` in `hapai.yaml` (default is to block)
-- Run `hapai audit` to see what the hook decided
-- Verify config is in the right place: project `hapai.yaml` overrides global
-
-**Q: Can I disable a specific guardrail?**
-- Edit `hapai.yaml` and set `enabled: false` for that guardrail
-- Or run `hapai kill` to disable all hooks temporarily
-
-**Q: The hook timed out. What happened?**
-- Hooks have timeouts: PreToolUse (7s), PostToolUse (5s), Stop (10s)
-- If a hook times out, it's killed and execution continues (fail-open behavior)
-- This prevents Claude Code from hanging
-
-**Q: Can I add custom guardrails?**
-- Yes. Create a new script in `~/.hapai/hooks/pre-tool-use/my-custom-guard.sh`
-- Source `_lib.sh` to access config/audit utilities
-- Exit 0 (allow) or 2 (deny)
-- Register in `~/.claude/settings.json`
-
-**Q: How do I see what hooks are doing?**
-- `hapai audit` — Shows recent hook executions
-- `hapai status` — Shows registration and stats
-- Manual: `tail -f ~/.hapai/audit.jsonl | jq` — Stream audit log as JSON
+Pure bash assertions (no test framework). ~200 assertions covering:
+- Unit tests for 11 guardrail modules
+- Integration tests (config, JSON, audit)
+- End-to-end tests (hooks, CLI)
 
 ## Requirements
 
-- **bash 4+** (check with `bash --version`)
-- **jq** (JSON parser; install via `brew install jq`, `apt install jq`, etc.)
-- **git** (for branch detection and git commands)
+- **bash 4+** (check: `bash --version`)
+- **jq** (JSON parser)
+- **git** (for guard scripts)
+- **Node.js 24+** (for GitHub Actions workflows only)
+
+For cloud logging (optional):
+- **gcloud CLI** (Cloud Storage, Cloud Functions, BigQuery)
+- **firebase-admin** (Python, Cloud Function runtime)
+
+## Troubleshooting
+
+**Q: Hooks aren't blocking. Why?**
+```bash
+hapai status              # Check registration
+hapai audit               # See what hooks decided
+# Edit hapai.yaml: ensure fail_open: false
+```
+
+**Q: How do I see hook execution?**
+```bash
+hapai audit 50 | jq      # Recent entries
+tail -f ~/.hapai/audit.jsonl | jq  # Live stream
+```
+
+**Q: Can I disable a guardrail?**
+```yaml
+# In hapai.yaml
+guardrails:
+  branch_protection:
+    enabled: false  # Disable specific guard
+```
+
+**Q: Custom guardrails?**
+
+Create `~/.hapai/hooks/pre-tool-use/my-guard.sh`:
+```bash
+#!/bin/bash
+source "$HAPAI_LIB"
+# Your logic here
+exit 0  # allow
+# or exit 2  # deny
+```
 
 ## License
 
-MIT — See LICENSE file for details.
+MIT — See LICENSE file.
 
 ## Contributing
 
 Contributions welcome. Please:
-1. Add tests for new guardrails (see `tests/run-tests.sh` for format)
-2. Follow bash conventions: `set -euo pipefail`, shellcheck compliance
-3. Keep hooks modular: one concern per file, 50-100 LOC
-4. Document config keys in `hapai.defaults.yaml` with comments
+1. Add tests for new features
+2. Follow bash conventions (`set -euo pipefail`, shellcheck)
+3. Keep modules modular (50-100 LOC)
+4. Document config keys in `hapai.defaults.yaml`
 
-## Support & Issues
+## Support
 
-- **Bugs:** [GitHub Issues](https://github.com/renatobardi/hapai/issues)
-- **Docs:** See [USAGE.md](USAGE.md) (Portuguese) for detailed examples
-- **CLAUDE.md:** See [CLAUDE.md](CLAUDE.md) for developer guidance on codebase architecture
+- **Issues:** [GitHub Issues](https://github.com/renatobardi/hapai/issues)
+- **Setup Guide:** [infra/gcp/SETUP.md](infra/gcp/SETUP.md)
+- **Developer Guide:** [CLAUDE.md](CLAUDE.md)
+- **Examples:** [USAGE.md](USAGE.md) (Portuguese)
