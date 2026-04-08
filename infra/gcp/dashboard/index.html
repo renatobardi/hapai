@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hapai — Guardrails Analytics Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      max-width: 1400px;
+      margin: 0 auto 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      color: #38bdf8;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #0ea5e9;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #0284c7;
+    }
+
+    button:disabled {
+      background: #64748b;
+      cursor: not-allowed;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 10px 15px;
+      background: rgba(30, 41, 59, 0.7);
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .loading, .error, .auth-required {
+      max-width: 1400px;
+      margin: 20px auto;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .loading {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid #3b82f6;
+      color: #93c5fd;
+    }
+
+    .error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+    }
+
+    .auth-required {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid #3b82f6;
+      color: #93c5fd;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .dashboard {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .grid.full {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .card h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #cbd5e1;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      background: rgba(51, 65, 85, 0.5);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    tr:hover {
+      background: rgba(51, 65, 85, 0.3);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #38bdf8;
+      margin: 10px 0;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }
+
+    .event-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .event-deny {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    .event-warn {
+      background: rgba(202, 138, 4, 0.2);
+      color: #fcd34d;
+    }
+
+    .event-allow {
+      background: rgba(34, 197, 94, 0.2);
+      color: #86efac;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+      background: #22c55e;
+    }
+
+    .status-indicator.warning {
+      background: #eab308;
+    }
+
+    .status-indicator.error {
+      background: #ef4444;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 20px;
+      }
+
+      header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-container {
+        height: 250px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>hapai — Guardrails Analytics</h1>
+    <div class="header-actions">
+      <button id="refreshBtn" onclick="refreshData()">Refresh</button>
+      <button id="signOutBtn" onclick="signOut()" style="display:none;">Sign Out</button>
+      <button id="signInBtn" onclick="signIn()">Sign in with Google</button>
+    </div>
+  </header>
+
+  <div id="authRequired" class="auth-required" style="display:none;">
+    <p>Sign in with your Google account to view analytics.</p>
+    <p style="font-size: 12px; color: #64748b;">Your data is queried from BigQuery. We never store your credentials.</p>
+  </div>
+
+  <div id="loading" class="loading" style="display:none;">
+    <p>Loading analytics...</p>
+  </div>
+
+  <div id="error" class="error" style="display:none;"></div>
+
+  <div id="dashboard" class="dashboard" style="display:none;">
+    <div class="grid">
+      <div class="card">
+        <h2>Stats</h2>
+        <div>
+          <div class="stat-label">Total Denials (30d)</div>
+          <div class="stat-value" id="statDenials">—</div>
+        </div>
+        <div style="margin-top: 20px;">
+          <div class="stat-label">Total Warnings (30d)</div>
+          <div class="stat-value" id="statWarnings">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Timeline</h2>
+        <div class="chart-container">
+          <canvas id="timelineChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Top Blocking Hooks</h2>
+        <div class="chart-container">
+          <canvas id="hooksChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid full">
+      <div class="card">
+        <h2>Recent Denials & Warnings</h2>
+        <div class="table-container">
+          <table id="denialTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Hook</th>
+                <th>Tool</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="denialTableBody">
+              <tr><td colspan="5" style="text-align: center; color: #64748b;">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Tools Distribution</h2>
+        <div class="chart-container">
+          <canvas id="toolsChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Projects Distribution</h2>
+        <div class="chart-container">
+          <canvas id="projectsChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Deny Rate Trend</h2>
+        <div class="chart-container">
+          <canvas id="trendsChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://accounts.google.com/gapi_ts/gapi.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

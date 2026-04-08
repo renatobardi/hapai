@@ -496,3 +496,162 @@ R: Configure `retention_days` no `hapai.yaml`. Para limpar manualmente: `> ~/.ha
 
 **P: O que é o AGENTS.md?**
 R: É um padrão cross-tool (agents.md) para instrução de agentes AI. Devin, Antigravity, VS Code Copilot e Trae lêem esse arquivo automaticamente. `hapai export --target universal` gera/atualiza esse arquivo.
+
+---
+
+## Cloud Dashboard — Análise em Tempo Real (v1.3)
+
+### Overview
+
+O Dashboard hapai visualiza seus audit logs em um painel interativo em **GitHub Pages** com:
+- Timeline de denials/warnings (últimos 30 dias)
+- Top hooks que bloquearam mais
+- Tabela de eventos recentes com detalhes
+- Distribuição por tool e por projeto
+- Trends de deny rate
+
+Arquitetura:
+1. `hapai sync` — sobe logs de auditoria para Cloud Storage
+2. Cloud Function — processa e carrega dados no BigQuery
+3. GitHub Pages — Dashboard vanilla JS consulta BigQuery via OAuth2
+
+### Setup Rápido
+
+1. **Prepare GCP infrastructure:**
+   ```bash
+   cd infra/gcp
+   bash SETUP.md  # Seguir todas as fases (Phase 1-5)
+   ```
+
+2. **Configure seu projeto:**
+   ```bash
+   # Crie hapai.yaml na raiz do seu projeto
+   cat > hapai.yaml <<EOF
+   gcp:
+     enabled: true
+     project_id: hapai-oute
+     bucket: hapai-audit-username
+     region: us-east1
+   EOF
+   ```
+
+3. **Teste local sync:**
+   ```bash
+   export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json
+   hapai sync --dry-run    # Preview
+   hapai sync              # Upload real
+   ```
+
+4. **Configure cron para sync automático:**
+   ```bash
+   crontab -e
+   # Adicionar: 0 2 * * * GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json /usr/local/bin/hapai sync
+   ```
+
+5. **Visit dashboard:**
+   - Local: http://localhost:8000 (se rodar servidor local)
+   - Production: https://hapai.oute.pro (custom domain)
+
+### Comandos do Dashboard
+
+```bash
+# Sincronizar audit logs para Cloud Storage
+hapai sync
+
+# Preview da sincronização (sem fazer upload)
+hapai sync --dry-run
+
+# Verificar logs de sincronização
+tail ~/.hapai/sync.log
+
+# Verificar uploads no Cloud Storage
+gsutil ls -r "gs://hapai-audit-username/"
+```
+
+### Configuração
+
+```yaml
+# hapai.yaml
+gcp:
+  enabled: true              # ativar/desativar sync
+  project_id: hapai-oute     # seu GCP project
+  bucket: hapai-audit-you    # Cloud Storage bucket
+  region: us-east1           # GCP region
+  retention_days: 90         # manter dados por 90 dias no BigQuery
+```
+
+### Autenticação no Dashboard
+
+O dashboard usa **Google OAuth2** para:
+1. Você faz login com sua conta Google
+2. Dashboard acessa **sua** autorização do BigQuery
+3. Não guardamos token — ele fica no localStorage do seu browser
+
+**Nota:** Você precisa ter acesso ao dataset `hapai_dataset` no GCP.
+
+### Consultas BigQuery (exemplos)
+
+```sql
+-- Top 10 hooks que bloquearam mais
+SELECT hook, COUNT(*) as blocks
+FROM `project.hapai_dataset.events`
+WHERE event = 'deny'
+  AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+GROUP BY hook
+ORDER BY blocks DESC
+LIMIT 10;
+
+-- Timeline de denials por dia
+SELECT DATE(ts) as day, COUNT(*) as denials
+FROM `project.hapai_dataset.events`
+WHERE event = 'deny'
+  AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+GROUP BY day
+ORDER BY day DESC;
+
+-- Correlações: quais hooks negaram juntos
+SELECT h1, h2, COUNT(*) as frequency
+FROM (
+  SELECT 
+    LAG(hook) OVER (PARTITION BY DATE(ts) ORDER BY ts) as h1,
+    hook as h2
+  FROM `project.hapai_dataset.events`
+  WHERE event = 'deny'
+)
+WHERE h1 IS NOT NULL
+GROUP BY h1, h2
+ORDER BY frequency DESC
+LIMIT 20;
+```
+
+### Troubleshooting Dashboard
+
+**"Sync failed: GOOGLE_APPLICATION_CREDENTIALS not set"**
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json
+hapai sync
+```
+
+**"Permission denied" no BigQuery**
+- Verifique que seu service account tem `roles/bigquery.dataEditor` no dataset
+- Ou use sua própria conta Google (OAuth2 no dashboard usa sua conta, não a service account)
+
+**Cloud Function não triggerou (arquivo não carregou no BigQuery)**
+```bash
+# Verificar logs da função
+gcloud functions logs read hapai-load-audit --limit 50
+
+# Triggeração manual
+gsutil cp test.jsonl gs://hapai-audit-you/2026-04/test.jsonl
+```
+
+**Dashboard não mostra dados**
+1. Verifique se sync rodar: `hapai sync`
+2. Verifique se Cloud Function processou: `gcloud functions logs read hapai-load-audit`
+3. Query BigQuery manualmente: `bq query --use_legacy_sql=false 'SELECT * FROM hapai_dataset.events LIMIT 5'`
+4. Limpe localStorage do navegador: Ctrl+Shift+Delete → Cookies and other site data
+
+### Documentação Completa
+
+Para setup detalhado, passo a passo, com todos os comandos gcloud:
+→ **[infra/gcp/SETUP.md](infra/gcp/SETUP.md)**

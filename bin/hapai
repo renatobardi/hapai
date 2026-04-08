@@ -10,6 +10,7 @@
 #   revive      Restore hooks after kill
 #   status      Show active hooks, risk tier, last execution
 #   audit       Show recent audit log entries
+#   sync        Sync audit logs to Cloud Storage (requires GCP setup)
 #   export      Export guardrails for other tools (claude, cursor, copilot)
 
 set -euo pipefail
@@ -694,6 +695,101 @@ cmd_list_hooks() {
   [[ $found -eq 0 ]] && log_warn "No hooks installed. Run 'hapai install' first."
 }
 
+# ─── SYNC (Cloud Logging) ───────────────────────────────────────────────────
+
+cmd_sync() {
+  ensure_jq
+
+  # Parse arguments
+  local dry_run=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run) dry_run=true; shift ;;
+      *) shift ;;
+    esac
+  done
+
+  # Load config
+  source "$HAPAI_ROOT/hooks/_lib.sh" || {
+    log_error "Failed to load config library"
+    exit 1
+  }
+
+  # Check if GCP is configured
+  local gcp_enabled project_id bucket region
+  gcp_enabled="$(config_get "gcp.enabled" "false")"
+  if [[ "$gcp_enabled" != "true" ]]; then
+    log_error "GCP sync is not enabled. Set 'gcp.enabled: true' in hapai.yaml"
+    exit 1
+  fi
+
+  project_id="$(config_get "gcp.project_id" "")"
+  bucket="$(config_get "gcp.bucket" "")"
+  region="$(config_get "gcp.region" "us-east1")"
+
+  if [[ -z "$project_id" ]] || [[ -z "$bucket" ]]; then
+    log_error "Missing GCP config: project_id and bucket are required"
+    log_info "Set these in hapai.yaml:"
+    log_info "  gcp:"
+    log_info "    enabled: true"
+    log_info "    project_id: my-gcp-project"
+    log_info "    bucket: hapai-audit-username"
+    exit 1
+  fi
+
+  # Check credentials
+  if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+    log_error "GOOGLE_APPLICATION_CREDENTIALS environment variable is not set"
+    log_info "Set it to your service account key file:"
+    log_info "  export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json"
+    exit 1
+  fi
+
+  if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
+    log_error "GOOGLE_APPLICATION_CREDENTIALS file not found: $GOOGLE_APPLICATION_CREDENTIALS"
+    exit 1
+  fi
+
+  # Check source file
+  local audit_file="$HAPAI_HOME/audit.jsonl"
+  if [[ ! -f "$audit_file" ]]; then
+    log_warn "No audit log found at $audit_file"
+    return 0
+  fi
+
+  # Prepare destination path: gs://bucket/YYYY-MM/DD.jsonl
+  local now date_part day_part gcs_path
+  now="$(date -u +%Y-%m-%d)"
+  date_part="${now:0:7}"  # YYYY-MM
+  day_part="${now:8:2}"   # DD
+  gcs_path="gs://${bucket}/${date_part}/${day_part}.jsonl"
+
+  log_info "Syncing audit log to Cloud Storage..."
+  log_info "Source: $audit_file"
+  log_info "Destination: $gcs_path"
+
+  if [[ "$dry_run" == "true" ]]; then
+    log_info "[DRY-RUN] Would sync to $gcs_path"
+    return 0
+  fi
+
+  # Check if gsutil is available
+  if ! command -v gsutil &>/dev/null; then
+    log_error "gsutil is required but not installed"
+    log_info "Install Google Cloud SDK: https://cloud.google.com/sdk/docs/install"
+    exit 1
+  fi
+
+  # Upload to Cloud Storage
+  if gsutil -m cp "$audit_file" "$gcs_path" 2>&1; then
+    log_ok "Sync completed successfully"
+    log_info "Uploaded to $gcs_path"
+  else
+    log_error "Failed to sync audit log to Cloud Storage"
+    exit 1
+  fi
+}
+
 # ─── EXPORT ─────────────────────────────────────────────────────────────────
 
 SUPPORTED_TARGETS="claude cursor copilot windsurf devin trae antigravity universal"
@@ -808,6 +904,8 @@ ${BOLD}Examples:${NC}
   hapai blocklist                     Show all active blocks
   hapai unblock main
   hapai list-hooks                    Show installed hooks
+  hapai sync                          Sync audit logs to Cloud Storage
+  hapai sync --dry-run                Preview sync without uploading
   hapai export --target cursor        Generate .cursor/rules/hapai.mdc
   hapai export --all                  Export to all supported tools
 
@@ -823,6 +921,7 @@ case "${1:-help}" in
   revive)       cmd_revive ;;
   status)       cmd_status ;;
   audit)        shift; cmd_audit "${1:-20}" ;;
+  sync)         shift; cmd_sync "$@" ;;
   export)       shift; cmd_export "$@" ;;
   block)        shift; cmd_block "$@" ;;
   unblock)      shift; cmd_unblock "$@" ;;

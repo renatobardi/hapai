@@ -1,0 +1,38 @@
+[
+  {
+    "name": "ts",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Event timestamp (RFC 3339 format)"
+  },
+  {
+    "name": "event",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Event type: allow, deny, warn"
+  },
+  {
+    "name": "hook",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Hook name (guard-branch, guard-files, etc)"
+  },
+  {
+    "name": "tool",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Tool name (Bash, Read, Write, Edit, etc)"
+  },
+  {
+    "name": "result",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Deny/warn reason or result details"
+  },
+  {
+    "name": "project",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Git repository root path"
+  }
+]
