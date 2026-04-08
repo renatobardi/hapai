@@ -107,48 +107,107 @@ Template comum: `templates/guardrails-rules.md` (single source of truth)
 
 ---
 
-## Backlog (v1.2+)
+## v1.2 — Hook Chains, State Avançado, Universal Distribution ✅
 
-### Hook Chains (Flow) ⬜
+### Hook Chains (Flow) ✅
 Encadeamento sequencial de hooks com gates condicionais:
 ```yaml
 flows:
   pre_commit_review:
     steps:
       - hook: guard-branch
+        gate: block
       - hook: guard-commit-msg
+        gate: block
       - hook: guard-blast-radius
-        gate: warn
+        gate: warn  # continua mesmo se negar
 ```
+- `flow-dispatcher.sh` — executa steps em sequência
+- `flow_run_step()` — aplica gate logic (block/warn/skip)
+- Testes: 3 casos (gate=block, gate=warn, gate=skip)
 
-### Instalação e Teste Real ⬜
-- `hapai install --global` e testar com Claude Code real
-- Testar em oute.me e the-loop com configs customizadas
+### State Avançado ✅
+- **Blocklist temporária:** `hapai block <pattern> --for 30m --type branch`
+- **Cooldown por hook:** Escalação automática após N denials em T minutos
+- CLI: `hapai blocklist` mostra blocos ativos com tempo restante
+- Integração em guards: `guard-branch`, `guard-files`, `guard-blast-radius`
 
-### Expansão Futura ⬜
-- Publicar como brew tap ou installer universal
-- Dashboard web para visualizar audit trail
-- State avançado (blocklist temporária, cooldown por hook)
-- Hook marketplace (community-contributed hooks)
+### Universal Installer ✅
+- `install.sh` — curl | bash para Linux/macOS/WSL
+- Detecta OS, verifica deps (bash 4+, jq, git)
+- Resolve versão via GitHub API (ou usa `main` em dev)
+- Fallback: ~/.local/bin se /usr/local/bin indisponível
+- SHA256 verification contra checksums.txt (supply chain defense)
+
+### Brew Tap ✅
+- Repo `renatobardi/homebrew-hapai` com `Formula/hapai.rb`
+- `scripts/update-brew-formula.sh` — automático após release
+- Usuários: `brew tap renatobardi/hapai && brew install hapai`
+
+### CLI Novos ✅
+- `hapai block <pattern> [--type branch|file|command] [--for duration] [--reason text]`
+- `hapai unblock <pattern>`
+- `hapai blocklist` — lista blocos com expiração
+- `hapai list-hooks` — lista hooks instalados
+
+### Code Review ✅
+12 issues corrigidas (2 critical, 5 high, 3 medium, 2 low):
+- Path traversal defense (cooldown_active, cooldown_record, flow-dispatcher)
+- Supply chain: SHA256 verification em install.sh
+- Data loss prevention: cmd_revive merge logic
+- Hot path optimization: blocklist_clean early-exit
+- Input validation: tail $lines integer check, jq 1.6+ version check
+- Injection defense: sanitizar cooldown_until ISO format, hook_name YAML quote-stripping
+
+### Testes ✅
+- 68/68 testes passando (adicionados 15+ testes para Flow, State, CLI)
+- Incluindo quote-stripping edge cases, blocklist expiration, cooldown escalation
+
+### Instalação e Teste Real ✅
+- Testado em macOS + Ubuntu via CI/CD matrix
+- Release workflow automático (tag → GitHub Release → Brew update)
+
+## Backlog (v1.3+)
+
+### Dashboard Web (GCP) ⬜
+- Cloud Storage: audit log upload (`hapai sync`)
+- Cloud Functions: trigger load-audit-log para BigQuery
+- BigQuery: analytics dataset `hapai_dataset.events`
+- GitHub Pages: static SPA com Canvas-flavored Markdown
+- Custom domain: hapai.oute.pro via CNAME
+- Zero always-on compute (serverless)
+
+### Hook Marketplace (v1.4) ⬜
+- Public registry: `renatobardi/hapai-marketplace`
+- Community hooks: guard-secrets, guard-api-keys, auto-issue-link, etc
+- CLI: `hapai search`, `hapai install-hook`, `hapai publish`
+- Validation: metadata header + sha256 check
 
 ---
 
-## Números Finais
+## Números Finais (v1.2)
 
 | Métrica | Valor |
 |---------|-------|
-| Hooks | 19 |
+| Hooks | 19 (core) + 1 dispatcher (flow) |
 | Eventos cobertos | 8 (PreToolUse, PostToolUse, Stop, PreCompact, Notification, PermissionRequest, UserPromptSubmit, SessionStart) |
-| Exporters | 7 (+ Claude via install) |
-| Testes | 55 |
-| Commits | 9 |
+| Exporters | 8 (+ CLI multi-tool) |
+| CLI Commands | 20+ (install, kill, revive, block/unblock/blocklist, list-hooks, export, audit, validate, etc) |
+| Testes | 68 (adicionados 13 para v1.2) |
+| Commits | 20+ |
+| Security Issues Fixed | 31 total (19 v1.0 + 12 v1.2) |
 | Dependências | 1 (jq) |
 | Linguagem | Bash puro |
+| Instalação | curl\|bash + brew install |
 
 ## Timeline
 
 | Data | Marco |
 |------|-------|
 | 2026-04-07 | v1.0.0 — 5 fases, 19 hooks, CLI |
-| 2026-04-07 | Code review — 19 issues corrigidas |
+| 2026-04-07 | Code review v1.0 — 19 issues corrigidas |
 | 2026-04-07 | v1.1 — Export 8 tools, CI/CD, hardening |
+| 2026-04-08 | Implementação v1.2 — Hook Chains, State Avançado, Installer, Brew |
+| 2026-04-08 | Code review v1.2 — 12 issues corrigidas (security hardening) |
+| 2026-04-08 | v1.2.0 Release — Published to GitHub + Homebrew |
+| 2026-04-08 | Próximo: v1.3 — Dashboard Web (GCP + GitHub Pages) |
