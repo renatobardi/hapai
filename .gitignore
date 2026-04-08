@@ -13,3 +13,9 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Dashboard — local env (contains Firebase keys)
+infra/gcp/dashboard/.env.local
+infra/gcp/dashboard/.env
+infra/gcp/dashboard/node_modules/
+_site/

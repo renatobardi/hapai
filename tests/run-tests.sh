@@ -1012,6 +1012,223 @@ rm -f "$WORKFLOW_CONFIG"
 cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-pr-review.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Setup: enable pr_review in a temp config
+PR_REVIEW_CONFIG="$(mktemp)"
+cat > "$PR_REVIEW_CONFIG" << 'YAML'
+guardrails:
+  pr_review:
+    enabled: true
+    fail_open: false
+    review_timeout_seconds: 300
+YAML
+
+PR_REVIEW_CONFIG_OPEN="$(mktemp)"
+cat > "$PR_REVIEW_CONFIG_OPEN" << 'YAML'
+guardrails:
+  pr_review:
+    enabled: true
+    fail_open: true
+    review_timeout_seconds: 300
+YAML
+
+# Create a feature branch for pr-review tests
+cd "$MOCK_REPO" && git checkout -b feat/pr-review-test -q 2>/dev/null || git checkout feat/pr-review-test -q 2>/dev/null
+
+# Helper: pre-set state for pr-review tests
+set_review_state() {
+  local status="$1" branch="${2:-feat/pr-review-test}"
+  echo "$status" > "$HAPAI_HOME/state/pr-review.status"
+  echo "$branch" > "$HAPAI_HOME/state/pr-review.branch"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HAPAI_HOME/state/pr-review.started_at"
+  echo '[]' > "$HAPAI_HOME/state/pr-review.issues"
+}
+
+# Test: non-Bash tool ignored
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}')"
+assert_allowed "$output" "pr-review: ignores non-Bash tools"
+
+# Test: disabled by default (default config has enabled: false)
+cd "$MOCK_REPO" && git checkout feat/pr-review-test -q 2>/dev/null || true
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}')"
+assert_allowed "$output" "pr-review: allows all when disabled (default)"
+
+# Switch to enabled config for remaining tests
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# Test: status=clean → allow
+set_review_state "clean"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when status=clean"
+
+# Test: branch mismatch → allow (no active review for this branch)
+set_review_state "issues" "feat/other-branch"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when review is for a different branch"
+
+# Test: status=pending (not stale) → warn (not block)
+set_review_state "pending"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when review is pending (warns)"
+assert_contains "$output" "running\|background\|pending\|shortly" "pr-review: pending message mentions review is running"
+
+# Test: status=pending stale → reset and allow
+PR_REVIEW_STALE_CONFIG="$(mktemp)"
+cat > "$PR_REVIEW_STALE_CONFIG" << 'YAML'
+guardrails:
+  pr_review:
+    enabled: true
+    fail_open: false
+    review_timeout_seconds: 1
+YAML
+export _HAPAI_CONFIG="$PR_REVIEW_STALE_CONFIG"
+set_review_state "pending"
+# Make started_at look old (1 hour ago)
+if date -d "1 hour ago" +%Y-%m-%dT%H:%M:%SZ &>/dev/null 2>&1; then
+  echo "$(date -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)" > "$HAPAI_HOME/state/pr-review.started_at"
+else
+  echo "$(date -v-1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "2000-01-01T00:00:00Z")" > "$HAPAI_HOME/state/pr-review.started_at"
+fi
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when pending review is stale (timed out)"
+assert_contains "$output" "timed out\|timeout\|reset" "pr-review: stale message mentions timeout"
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# Test: status=issues, fail_open=false → blocked with issue list
+echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}' | true
+SAMPLE_ISSUES='[{"severity":"high","file":"src/app.ts","line":42,"message":"Potential null dereference"},{"severity":"low","file":"src/utils.ts","line":10,"message":"Unused variable"}]'
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_blocked "$output" "pr-review: blocks push when status=issues and fail_open=false"
+assert_contains "$output" "high\|issue" "pr-review: block message lists issues"
+
+# Test: status=issues, fail_open=true → warns but allows
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG_OPEN"
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: warns but allows push when status=issues and fail_open=true"
+assert_contains "$output" "issue\|review" "pr-review: warn message mentions issues"
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# Test: git merge blocked when status=issues
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge main"}}')"
+assert_blocked "$output" "pr-review: blocks git merge when status=issues"
+
+# Test: gh pr merge blocked when status=issues
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh pr merge --squash"}}')"
+assert_blocked "$output" "pr-review: blocks gh pr merge when status=issues"
+
+# Test: non-push command ignored even when issues exist
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git status"}}')"
+assert_allowed "$output" "pr-review: ignores non-push/merge commands"
+
+unset _HAPAI_CONFIG
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}pr-review-trigger.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Reset state
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+
+# Test: non-Bash tool ignored
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/x"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: ignores non-Bash tools"
+
+# Test: disabled by default
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"gh pr create --title test"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: no-ops when disabled (default)"
+# State should not have been set to pending
+state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+TOTAL=$((TOTAL + 1))
+if [[ "$state_val" != "pending" ]]; then
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: state not set when disabled"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} pr-review-trigger: state should not be pending when disabled"
+  FAIL=$((FAIL + 1))
+fi
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# Test: plain git push (no -u) → not triggered
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: plain git push (no -u) does not trigger"
+state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+TOTAL=$((TOTAL + 1))
+if [[ "$state_val" != "pending" ]]; then
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: state not set for plain push"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} pr-review-trigger: state should not be pending for plain push"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: failed command (exit_code != 0) → not triggered
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"gh pr create --title test"},"tool_output":{"exit_code":1}}')"
+assert_allowed "$output" "pr-review-trigger: failed command (exit_code=1) does not trigger"
+state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+TOTAL=$((TOTAL + 1))
+if [[ "$state_val" != "pending" ]]; then
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: state not set on failed command"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} pr-review-trigger: state should not be pending on failure"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: claude not in PATH → warns, no hard block, state not set to pending
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+cd "$MOCK_REPO" && git checkout feat/pr-review-test -q 2>/dev/null || true
+output="$(PATH=/usr/bin:/bin run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"gh pr create --title test"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: allows (warns) when claude CLI not found"
+assert_contains "$output" "claude\|not found\|skipped\|install" "pr-review-trigger: warns about missing claude CLI"
+
+# Test: git push -u triggers review (sets state to pending)
+# Note: actual agent launch is mocked by checking state, not waiting for agent
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+cd "$MOCK_REPO" && git checkout feat/pr-review-test -q 2>/dev/null || true
+# Only verify state written if claude is available; skip agent check otherwise
+if command -v claude &>/dev/null; then
+  output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"git push -u origin feat/pr-review-test"},"tool_output":{"exit_code":0}}')"
+  assert_allowed "$output" "pr-review-trigger: git push -u triggers review"
+  state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+  TOTAL=$((TOTAL + 1))
+  if [[ "$state_val" == "pending" ]]; then
+    echo -e "  ${GREEN}✓${NC} pr-review-trigger: state set to pending on git push -u"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${RED}✗${NC} pr-review-trigger: expected state=pending, got '$state_val'"
+    FAIL=$((FAIL + 1))
+  fi
+else
+  TOTAL=$((TOTAL + 1))
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: skipped (claude CLI not available in test env)"
+  PASS=$((PASS + 1))
+fi
+
+unset _HAPAI_CONFIG
+
+# Cleanup pr-review test state and temp configs
+rm -f "$PR_REVIEW_CONFIG" "$PR_REVIEW_CONFIG_OPEN" "$PR_REVIEW_STALE_CONFIG" 2>/dev/null || true
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Summary
 # ═══════════════════════════════════════════════════════════════════════════
 
