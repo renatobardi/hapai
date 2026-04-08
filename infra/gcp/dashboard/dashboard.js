@@ -501,6 +501,14 @@ function showError(message) {
 // ─── Initialization ─────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Validate configuration first
+  if (!validateConfig()) {
+    return; // Configuration errors already logged by validateConfig()
+  }
+
+  // Handle OAuth redirect callback if present
   handleAuthCallback();
+
+  // Initialize authentication
   initAuth();
 });
