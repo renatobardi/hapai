@@ -9,4 +9,6 @@ These rules are deterministically enforced by hapai hooks. Violations are blocke
 - NEVER edit .env, lockfiles, or CI workflow files without explicit permission
 - ALWAYS create a feature branch before making changes
 - ALWAYS keep commits focused — avoid touching many files/packages in a single commit
+- ALWAYS use taxonomy prefix when creating branches: feat/, fix/, chore/, docs/, refactor/, test/, perf/, style/, ci/, build/, release/, hotfix/
+- ALWAYS follow trunk-based workflow: short-lived branches from main, merged back to main via PR — no long-lived branches
 <!-- hapai:end -->
