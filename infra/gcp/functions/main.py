@@ -5,9 +5,12 @@ Triggered by: Cloud Storage finalizeCreate event on hapai-audit-* buckets
 
 import json
 import logging
+import re
 from datetime import datetime
+from typing import Dict, List, Any
 from google.cloud import storage
 from google.cloud import bigquery
+from google.cloud.exceptions import GoogleCloudError
 
 # Initialize clients
 storage_client = storage.Client()
@@ -17,6 +20,11 @@ bigquery_client = bigquery.Client()
 PROJECT_ID = None  # Will be inferred from BigQuery client
 DATASET_ID = "hapai_dataset"
 TABLE_ID = "events"
+
+# Validation patterns
+VALID_PROJECT_ID_PATTERN = re.compile(r"^[a-z0-9\-]{6,30}$")
+VALID_BUCKET_PATTERN = re.compile(r"^[a-z0-9\-]{3,63}$")
+VALID_IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # BigQuery schema
 SCHEMA = [
@@ -30,6 +38,32 @@ SCHEMA = [
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def validate_identifier(identifier: str, identifier_type: str = "identifier") -> bool:
+    """Validate BigQuery identifiers (dataset, table names)"""
+    if not identifier or not isinstance(identifier, str):
+        logger.warning(f"Invalid {identifier_type}: not a string")
+        return False
+    if len(identifier) > 1024:
+        logger.warning(f"Invalid {identifier_type}: too long")
+        return False
+    if not VALID_IDENTIFIER_PATTERN.match(identifier):
+        logger.warning(f"Invalid {identifier_type}: invalid characters")
+        return False
+    return True
+
+
+def validate_bucket_name(bucket_name: str) -> bool:
+    """Validate Cloud Storage bucket name format"""
+    if not bucket_name or not isinstance(bucket_name, str):
+        logger.warning("Invalid bucket name: not a string")
+        return False
+    # Bucket names must be 3-63 chars, lowercase, alphanumeric, hyphens
+    if not VALID_BUCKET_PATTERN.match(bucket_name):
+        logger.warning(f"Invalid bucket name format: {bucket_name[:50]}")
+        return False
+    return True
 
 
 def ensure_dataset_and_table(project_id: str) -> str:
