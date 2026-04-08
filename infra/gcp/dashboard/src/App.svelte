@@ -5,20 +5,20 @@
   import Dashboard from './components/Dashboard.svelte'
   import LoadingState from './components/LoadingState.svelte'
   import HowItWorksPage from './components/HowItWorksPage.svelte'
-  let currentHash = $state(typeof window !== 'undefined' ? window.location.hash : '')
+  let currentHash = $state(typeof window !== 'undefined' ? window.location.hash : '#/')
   $effect(() => {
     if (typeof window === 'undefined') return
-    const onHash = () => { currentHash = window.location.hash }
-    window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    const handleHashChange = () => { currentHash = window.location.hash }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
   })
 </script>
 <div class="page">
   {#if $authStore.loading}
     <LoadingState message="Initializing…" />
   {:else}
-    <Header />
-    {#if currentHash === '#/docs'}
+    <Header {currentHash} />
+    {#if currentHash.startsWith('#/docs')}
       <HowItWorksPage />
     {:else if $authStore.user}
       <Dashboard />
