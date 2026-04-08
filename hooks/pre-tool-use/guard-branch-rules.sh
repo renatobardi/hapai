@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # hapai/hooks/pre-tool-use/guard-branch-rules.sh
-# Enforces branch naming conventions and origin rules.
-# Rule 1 (naming): branches must use allowed prefixes and kebab-case descriptions.
-# Rule 2 (origin): new branches must be created from a protected branch (main/master).
+# Enforces branch naming conventions and origin validation.
+# Rule 1 (prefix): branches must use allowed prefixes (feat, fix, chore, docs, etc.)
+# Rule 2 (description): branch description must be non-empty kebab-case after prefix/
+# Rule 3 (origin): new branches must be created from a protected branch (main/master)
 # Event: PreToolUse | Matcher: Bash | if: Bash(git *) | Timeout: 7s
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
