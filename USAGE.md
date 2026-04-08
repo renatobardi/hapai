@@ -396,6 +396,87 @@ Isso remove hooks do `settings.json` e o bloco `<!-- hapai:start/end -->` do CLA
 
 ---
 
+## Export para Outras Ferramentas
+
+hapai exporta as mesmas guardrails para 8 ferramentas AI. Os hooks (bloqueio real) são exclusivos do Claude Code, mas as regras em markdown funcionam como instrução para os outros:
+
+```bash
+# Exportar para ferramenta específica
+hapai export --target cursor        # .cursor/rules/hapai.mdc
+hapai export --target copilot       # .github/copilot-instructions.md
+hapai export --target windsurf      # .windsurf/rules/hapai.md
+hapai export --target devin         # AGENTS.md (append com markers)
+hapai export --target trae          # .trae/rules/hapai.md
+hapai export --target antigravity   # GEMINI.md + AGENTS.md
+hapai export --target universal     # AGENTS.md (padrão cross-tool)
+hapai export --target claude        # Valida instalação Claude Code
+
+# Exportar para TODAS de uma vez
+hapai export --all
+```
+
+Cada exporter gera o arquivo no formato correto da ferramenta (incluindo frontmatter quando necessário). O export é idempotente — rodar duas vezes não duplica conteúdo (usa markers `<!-- hapai:start/end -->`).
+
+| Ferramenta | Arquivo gerado | Formato |
+|-----------|---------------|---------|
+| Cursor | `.cursor/rules/hapai.mdc` | MDC com `alwaysApply: true` |
+| VS Code Copilot | `.github/copilot-instructions.md` | Markdown |
+| Windsurf | `.windsurf/rules/hapai.md` | MD com `trigger: always_on` |
+| Devin.ai | `AGENTS.md` | Markdown com markers hapai |
+| Trae | `.trae/rules/hapai.md` | MD com `alwaysApply: true` |
+| Antigravity | `GEMINI.md` + `AGENTS.md` | Markdown com markers hapai |
+| Universal | `AGENTS.md` | Padrão cross-tool |
+
+---
+
+## Observabilidade (Fase 4)
+
+Hooks que melhoram a experiência de desenvolvimento:
+
+```yaml
+# hapai.yaml
+observability:
+  require_tests:
+    enabled: true          # avisa se nenhum teste rodou na sessão
+    fail_open: true        # true = avisa, false = bloqueia
+
+  backup_transcripts:
+    enabled: true          # salva transcripts antes de compactação
+
+  notifications:
+    sound_enabled: true    # toca som quando Claude precisa de input
+
+  auto_allow_readonly:
+    enabled: true          # auto-aprova Read, Glob, Grep e comandos seguros
+```
+
+---
+
+## Inteligência de Sessão (Fase 5)
+
+Hooks que dão ao Claude consciência do contexto:
+
+```yaml
+# hapai.yaml
+intelligence:
+  production_warning:
+    enabled: true          # avisa quando prompt menciona prod/deploy/release
+    keywords: ["prod", "deploy", "rollback", "hotfix"]
+
+  load_context:
+    enabled: true          # carrega git status, TODOs e issues no início da sessão
+
+  audit_trail:
+    enabled: true          # loga TODA execução de tool em audit-trail.jsonl
+
+  cost_tracker:
+    enabled: true          # estima custo da sessão e avisa em thresholds
+    max_tool_calls: 200
+    max_cost_cents: 500
+```
+
+---
+
 ## Dúvidas Frequentes
 
 **P: Os hooks afetam a velocidade do Claude Code?**
@@ -404,11 +485,14 @@ R: Mínimo. Cada hook roda em <100ms. PreToolUse tem timeout de 7s, PostToolUse 
 **P: E se eu precisar temporariamente editar um .env?**
 R: Use `hapai kill` para desativar todos os hooks, faça a edição, e `hapai revive` para reativar. Ou edite `hapai.yaml` e adicione o arquivo à lista `unprotected`.
 
-**P: Funciona com Cursor e Copilot?**
-R: Os hooks são específicos do Claude Code. Mas `hapai export --target cursor` e `--target copilot` geram arquivos de regras para essas ferramentas (enforcement via instrução, não hooks).
+**P: Funciona com Cursor, Windsurf, Devin, Trae, Antigravity?**
+R: Os hooks (bloqueio real) são exclusivos do Claude Code. Mas `hapai export --all` gera arquivos de regras para todas as ferramentas. Isso instrui cada ferramenta a seguir as mesmas regras — enforcement probabilístico, mas melhor que nada.
 
 **P: Posso adicionar hooks customizados?**
 R: Sim. Crie um script `.sh` em `~/.hapai/hooks/pre-tool-use/` (ou `post-tool-use/`, `stop/`), torne executável, e registre no `~/.claude/settings.json`. Use `hooks/_lib.sh` como biblioteca.
 
 **P: O audit log cresce indefinidamente?**
 R: Configure `retention_days` no `hapai.yaml`. Para limpar manualmente: `> ~/.hapai/audit.jsonl`
+
+**P: O que é o AGENTS.md?**
+R: É um padrão cross-tool (agents.md) para instrução de agentes AI. Devin, Antigravity, VS Code Copilot e Trae lêem esse arquivo automaticamente. `hapai export --target universal` gera/atualiza esse arquivo.

@@ -408,6 +408,218 @@ output="$("$HAPAI_ROOT/bin/hapai" validate 2>&1 || true)"
 assert_contains "$output" "validate" "CLI validate runs"
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}Export tests${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+EXPORT_DIR="$(mktemp -d)"
+cd "$EXPORT_DIR"
+
+# Test: export cursor generates .cursor/rules/hapai.mdc
+bash "$HAPAI_ROOT/exporters/export-cursor.sh" > /dev/null 2>&1
+TOTAL=$((TOTAL + 1))
+if [[ -f ".cursor/rules/hapai.mdc" ]] && grep -q "alwaysApply: true" ".cursor/rules/hapai.mdc"; then
+  echo -e "  ${GREEN}✓${NC} Cursor export (.cursor/rules/hapai.mdc with frontmatter)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Cursor export failed"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: export copilot generates .github/copilot-instructions.md
+bash "$HAPAI_ROOT/exporters/export-copilot.sh" > /dev/null 2>&1
+TOTAL=$((TOTAL + 1))
+if [[ -f ".github/copilot-instructions.md" ]] && grep -q "Branch Protection" ".github/copilot-instructions.md"; then
+  echo -e "  ${GREEN}✓${NC} Copilot export (.github/copilot-instructions.md)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Copilot export failed"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: export windsurf generates .windsurf/rules/hapai.md
+bash "$HAPAI_ROOT/exporters/export-windsurf.sh" > /dev/null 2>&1
+TOTAL=$((TOTAL + 1))
+if [[ -f ".windsurf/rules/hapai.md" ]] && grep -q "trigger: always_on" ".windsurf/rules/hapai.md"; then
+  echo -e "  ${GREEN}✓${NC} Windsurf export (.windsurf/rules/hapai.md with trigger)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Windsurf export failed"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: export trae generates .trae/rules/hapai.md
+bash "$HAPAI_ROOT/exporters/export-trae.sh" > /dev/null 2>&1
+TOTAL=$((TOTAL + 1))
+if [[ -f ".trae/rules/hapai.md" ]] && grep -q "alwaysApply: true" ".trae/rules/hapai.md"; then
+  echo -e "  ${GREEN}✓${NC} Trae export (.trae/rules/hapai.md with alwaysApply)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Trae export failed"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: export devin generates/updates AGENTS.md with markers
+bash "$HAPAI_ROOT/exporters/export-devin.sh" > /dev/null 2>&1
+TOTAL=$((TOTAL + 1))
+if [[ -f "AGENTS.md" ]] && grep -q "<!-- hapai:start -->" "AGENTS.md" && grep -q "<!-- hapai:end -->" "AGENTS.md"; then
+  echo -e "  ${GREEN}✓${NC} Devin export (AGENTS.md with hapai markers)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Devin export failed"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: export devin is idempotent (run twice, only one block)
+bash "$HAPAI_ROOT/exporters/export-devin.sh" > /dev/null 2>&1
+TOTAL=$((TOTAL + 1))
+marker_count="$(grep -c "<!-- hapai:start -->" "AGENTS.md" 2>/dev/null || echo "0")"
+if [[ "$marker_count" -eq 1 ]]; then
+  echo -e "  ${GREEN}✓${NC} Devin export idempotent (1 block after 2 runs)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Devin export not idempotent ($marker_count blocks)"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: export antigravity generates GEMINI.md + AGENTS.md
+rm -f GEMINI.md AGENTS.md
+bash "$HAPAI_ROOT/exporters/export-antigravity.sh" > /dev/null 2>&1
+TOTAL=$((TOTAL + 1))
+if [[ -f "GEMINI.md" ]] && grep -q "<!-- hapai:start -->" "GEMINI.md" && [[ -f "AGENTS.md" ]]; then
+  echo -e "  ${GREEN}✓${NC} Antigravity export (GEMINI.md + AGENTS.md)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Antigravity export failed"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: all exports share common rules body
+TOTAL=$((TOTAL + 1))
+common_check=0
+grep -q "Branch Protection" ".cursor/rules/hapai.mdc" && \
+grep -q "Branch Protection" ".windsurf/rules/hapai.md" && \
+grep -q "Branch Protection" ".trae/rules/hapai.md" && \
+grep -q "Branch Protection" "AGENTS.md" && \
+grep -q "Branch Protection" "GEMINI.md" && \
+common_check=1
+if [[ $common_check -eq 1 ]]; then
+  echo -e "  ${GREEN}✓${NC} All exports share common rules body"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Exports have inconsistent rules"
+  FAIL=$((FAIL + 1))
+fi
+
+rm -rf "$EXPORT_DIR"
+cd "$MOCK_REPO"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}Config parser edge cases${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Test: config_get resolves correct section when multiple 'enabled' keys exist
+COMPLEX_CONFIG="$(mktemp)"
+cat > "$COMPLEX_CONFIG" << 'YAML'
+guardrails:
+  branch_protection:
+    enabled: true
+    protected: [main, master]
+  commit_hygiene:
+    enabled: false
+  file_protection:
+    enabled: true
+    protected:
+      - ".env"
+      - "*.lock"
+YAML
+
+# Test config_get in a fresh subshell with controlled config
+# We write a helper script to avoid quoting/escaping issues
+CONFIG_TEST_SCRIPT="$(mktemp)"
+cat > "$CONFIG_TEST_SCRIPT" << 'TESTEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export HAPAI_HOME="$1"
+export _HAPAI_CONFIG="$2"
+QUERY="$3"
+DEFAULT="$4"
+cd "$5"
+source hooks/_lib.sh
+_HAPAI_INPUT='{}'
+echo "$(config_get "$QUERY" "$DEFAULT")"
+TESTEOF
+chmod +x "$CONFIG_TEST_SCRIPT"
+
+CONFIG_LIST_SCRIPT="$(mktemp)"
+cat > "$CONFIG_LIST_SCRIPT" << 'TESTEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export HAPAI_HOME="$1"
+export _HAPAI_CONFIG="$2"
+QUERY="$3"
+cd "$4"
+source hooks/_lib.sh
+_HAPAI_INPUT='{}'
+config_get_list "$QUERY"
+TESTEOF
+chmod +x "$CONFIG_LIST_SCRIPT"
+
+# Test: config_get resolves correct section when multiple 'enabled' keys exist
+TOTAL=$((TOTAL + 1))
+result="$(bash "$CONFIG_TEST_SCRIPT" "$HAPAI_HOME" "$COMPLEX_CONFIG" "guardrails.commit_hygiene.enabled" "default" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if [[ "$result" == "false" ]]; then
+  echo -e "  ${GREEN}✓${NC} config_get returns correct value for nested duplicate keys"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} config_get returned '$result' instead of 'false'"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: config_get_list resolves correct list for nested key
+TOTAL=$((TOTAL + 1))
+result="$(bash "$CONFIG_LIST_SCRIPT" "$HAPAI_HOME" "$COMPLEX_CONFIG" "guardrails.branch_protection.protected" "$HAPAI_ROOT" 2>/dev/null | tr '\n' ',' || echo "error")"
+if echo "$result" | grep -q "main"; then
+  echo -e "  ${GREEN}✓${NC} config_get_list returns correct list for nested key"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} config_get_list returned '$result'"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: config_get returns default for missing key
+TOTAL=$((TOTAL + 1))
+result="$(bash "$CONFIG_TEST_SCRIPT" "$HAPAI_HOME" "$COMPLEX_CONFIG" "nonexistent.key.here" "mydefault" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if [[ "$result" == "mydefault" ]]; then
+  echo -e "  ${GREEN}✓${NC} config_get returns default for missing key"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} config_get returned '$result' instead of 'mydefault'"
+  FAIL=$((FAIL + 1))
+fi
+
+rm -f "$COMPLEX_CONFIG" "$CONFIG_TEST_SCRIPT" "$CONFIG_LIST_SCRIPT"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}CLI integration${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Test: hapai export --all generates files
+EXPORT_ALL_DIR="$(mktemp -d)"
+cd "$EXPORT_ALL_DIR"
+output="$("$HAPAI_ROOT/bin/hapai" export --all 2>&1 || true)"
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -q "Exported to" && [[ -f ".cursor/rules/hapai.mdc" ]] && [[ -f ".windsurf/rules/hapai.md" ]]; then
+  echo -e "  ${GREEN}✓${NC} hapai export --all generates all files"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} hapai export --all failed"
+  FAIL=$((FAIL + 1))
+fi
+
+rm -rf "$EXPORT_ALL_DIR"
+cd "$MOCK_REPO"
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Summary
 # ═══════════════════════════════════════════════════════════════════════════
 

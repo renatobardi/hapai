@@ -83,7 +83,7 @@ allow() {
 # ─── Configuration ──────────────────────────────────────────────────────────
 
 # Find hapai.yaml: project-local first, then global
-_HAPAI_CONFIG=""
+_HAPAI_CONFIG="${_HAPAI_CONFIG:-}"
 find_config() {
   local project_config=""
   # Try project-local config
