@@ -22,7 +22,7 @@ jobs:
       - name: Authenticate to Google Cloud (OIDC)
         uses: google-github-actions/auth@v1
         with:
-          workload_identity_provider: 'projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          workload_identity_provider: 'projects/355730096821/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'hapai-sync@hapai-oute.iam.gserviceaccount.com'
           token_format: 'access_token'
           access_token_lifetime: '600s'
