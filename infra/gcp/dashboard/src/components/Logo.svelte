@@ -44,4 +44,7 @@
   .logo-lg .dash:nth-child(3) { width: 40px; }
   .logo-lg .bar { height: 80px; width: 5px; background: var(--color-cyan); margin: 0 10px; }
   .logo-lg .text { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 56px; color: var(--color-near-black); letter-spacing: -0.03em; line-height: 1; }
+
+  .logo-lg.dark .dash { background: var(--color-white); }
+  .logo-lg.dark .text { color: var(--color-white); }
 </style>

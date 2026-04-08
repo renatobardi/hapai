@@ -1,7 +1,8 @@
 <script>
   import { signIn } from '../lib/firebase.js'
   import Logo from './Logo.svelte'
-  let loading = false; let error = ''
+  let loading = $state(false)
+  let error = $state('')
   async function go() { loading = true; error = ''; try { await signIn() } catch(e) { error = e.code === 'auth/popup-closed-by-user' ? '' : 'Sign in failed. Try again.' } finally { loading = false } }
 </script>
 <div class="gate">
