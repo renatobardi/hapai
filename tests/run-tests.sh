@@ -897,6 +897,98 @@ fi
 rm -f "$HAPAI_HOME/state/blocklist.json"
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-branch-rules.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+BRANCH_RULES_CONFIG="$(mktemp)"
+cat > "$BRANCH_RULES_CONFIG" << 'YAML'
+guardrails:
+  branch_protection:
+    enabled: true
+    protected: [main, master]
+  branch_rules:
+    enabled: true
+    require_from_protected: true
+    require_description: true
+    fail_open: false
+    allowed_prefixes:
+      - feat
+      - fix
+      - chore
+YAML
+
+BRANCH_RULES_CONFIG_OPEN="$(mktemp)"
+cat > "$BRANCH_RULES_CONFIG_OPEN" << 'YAML'
+guardrails:
+  branch_protection:
+    enabled: true
+    protected: [main, master]
+  branch_rules:
+    enabled: true
+    require_from_protected: false
+    require_description: true
+    fail_open: false
+    allowed_prefixes:
+      - feat
+      - fix
+      - chore
+YAML
+
+# Create a feature branch to test origin rule
+cd "$MOCK_REPO" && git checkout -b feat/old-work -q 2>/dev/null || git checkout feat/old-work -q 2>/dev/null
+
+# Non-Bash tool → allow
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}')"
+assert_allowed "$output" "branch-rules: ignores non-Bash tools"
+
+# Config disabled (default) → allow
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b bad-name"}}')"
+assert_allowed "$output" "branch-rules: allows all when disabled (default)"
+
+export _HAPAI_CONFIG="$BRANCH_RULES_CONFIG"
+
+# Non-creation command → allow
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/old-work"}}')"
+assert_allowed "$output" "branch-rules: ignores non-branch-creation commands"
+
+# Name without prefix → block
+cd "$MOCK_REPO" && git checkout main -q 2>/dev/null
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b my-feature"}}')"
+assert_blocked "$output" "branch-rules: blocks branch name without allowed prefix"
+
+# Name with prefix but empty description → block
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/"}}')"
+assert_blocked "$output" "branch-rules: blocks branch with prefix but no description"
+
+# Name with uppercase in description → block
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/MyFeature"}}')"
+assert_blocked "$output" "branch-rules: blocks branch with uppercase description"
+
+# Valid name from main → allow
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/add-login"}}')"
+assert_allowed "$output" "branch-rules: allows valid branch from main"
+
+# Valid name from main via git switch -c → allow
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git switch -c fix/null-deref"}}')"
+assert_allowed "$output" "branch-rules: allows git switch -c from main"
+
+# Valid name but from feature branch → block (origin rule)
+cd "$MOCK_REPO" && git checkout feat/old-work -q 2>/dev/null
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/new-feature"}}')"
+assert_blocked "$output" "branch-rules: blocks branch creation from a feature branch"
+assert_contains "$output" "main\|protected\|checkout main" "branch-rules: block message includes recovery instruction"
+
+# require_from_protected=false → allows from feature branch
+export _HAPAI_CONFIG="$BRANCH_RULES_CONFIG_OPEN"
+cd "$MOCK_REPO" && git checkout feat/old-work -q 2>/dev/null
+output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/new-feature"}}')"
+assert_allowed "$output" "branch-rules: allows from feature branch when require_from_protected=false"
+
+unset _HAPAI_CONFIG
+rm -f "$BRANCH_RULES_CONFIG" "$BRANCH_RULES_CONFIG_OPEN" 2>/dev/null || true
+cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Summary
 # ═══════════════════════════════════════════════════════════════════════════
 
