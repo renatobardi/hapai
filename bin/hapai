@@ -737,16 +737,26 @@ cmd_sync() {
     exit 1
   fi
 
-  # Check credentials
-  if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
-    log_error "GOOGLE_APPLICATION_CREDENTIALS environment variable is not set"
-    log_info "Set it to your service account key file:"
-    log_info "  export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json"
-    exit 1
-  fi
+  # Check credentials: support both OIDC (GitHub Actions) and service account keys (local)
+  local use_oidc=false
 
-  if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
-    log_error "GOOGLE_APPLICATION_CREDENTIALS file not found: $GOOGLE_APPLICATION_CREDENTIALS"
+  if [[ -n "${GOOGLE_IDENTITY_TOKEN:-}" ]]; then
+    # OIDC mode (GitHub Actions Workload Identity Federation)
+    use_oidc=true
+    log_info "Using OIDC (Workload Identity Federation)"
+  elif [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+    # Service account key mode (local development)
+    if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
+      log_error "GOOGLE_APPLICATION_CREDENTIALS file not found: $GOOGLE_APPLICATION_CREDENTIALS"
+      exit 1
+    fi
+    log_info "Using service account key: $GOOGLE_APPLICATION_CREDENTIALS"
+  else
+    log_error "No GCP credentials found. Choose one:"
+    log_info "  Local (service account key):"
+    log_info "    export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json"
+    log_info "  GitHub Actions (OIDC):"
+    log_info "    Use 'google-github-actions/auth@v1' with Workload Identity"
     exit 1
   fi
 

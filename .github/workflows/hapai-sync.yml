@@ -1,0 +1,72 @@
+name: hapai sync
+
+on:
+  schedule:
+    # Daily at 2 AM UTC (adjust to your timezone)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC token
+
+jobs:
+  sync:
+    name: Sync audit logs to GCP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (OIDC)
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: 'projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'hapai-sync@hapai-oute.iam.gserviceaccount.com'
+          token_format: 'access_token'
+          access_token_lifetime: '600s'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Run hapai sync
+        env:
+          HAPAI_SYNC_PROJECT_ID: 'hapai-oute'
+          HAPAI_SYNC_BUCKET: 'hapai-audit-bardi'
+        run: |
+          # Create hapai.yaml for this run
+          cat > hapai.yaml <<EOF
+          version: "1.0"
+          risk_tier: medium
+          gcp:
+            enabled: true
+            project_id: $HAPAI_SYNC_PROJECT_ID
+            bucket: $HAPAI_SYNC_BUCKET
+            region: us-east1
+            retention_days: 90
+          EOF
+
+          # Run sync (GOOGLE_IDENTITY_TOKEN is set by google-github-actions/auth)
+          ./bin/hapai sync
+
+      - name: Slack notification (optional)
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ hapai sync failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Repository: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
