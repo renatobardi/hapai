@@ -110,6 +110,8 @@ assert_allowed() {
 MOCK_REPO="$(mktemp -d)"
 cd "$MOCK_REPO"
 git init -q
+git config user.name "Test User"
+git config user.email "test@example.com"
 git commit --allow-empty -m "init" -q
 git checkout -b main -q 2>/dev/null || true
 
@@ -1099,6 +1101,108 @@ fi
 unset _HAPAI_CONFIG
 rm -f "$PR_REVIEW_CONFIG" "$PR_REVIEW_CONFIG_OPEN" "$PR_REVIEW_STALE_CONFIG" 2>/dev/null || true
 rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-branch-taxonomy.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+cd "$MOCK_REPO"
+git checkout main -q 2>/dev/null || true
+
+# Blocked: no prefix
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b my-feature"}}')"
+assert_blocked "$output" "Blocks branch with no prefix"
+
+# Blocked: uppercase prefix
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b Feature/login"}}')"
+assert_blocked "$output" "Blocks branch with uppercase prefix"
+
+# Blocked: prefix only, no description
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git switch -c fix"}}')"
+assert_blocked "$output" "Blocks branch with prefix but no description"
+
+# Blocked: invalid chars in description
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/My Feature"}}')"
+assert_blocked "$output" "Blocks branch with spaces in description"
+
+# Allowed: valid feat/ branch
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/add-login"}}')"
+assert_allowed "$output" "Allows feat/ branch"
+
+# Allowed: valid fix/ with git switch -c
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git switch -c fix/null-pointer"}}')"
+assert_allowed "$output" "Allows fix/ branch via switch -c"
+
+# Allowed: valid chore/ via git branch
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git branch chore/update-deps"}}')"
+assert_allowed "$output" "Allows chore/ branch via git branch"
+
+# Allowed: dots and numbers in description
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b release/v1.2.0"}}')"
+assert_allowed "$output" "Allows release/ branch with version number"
+
+# Not affected: checkout existing branch (no -b)
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout main"}}')"
+assert_allowed "$output" "Ignores checkout of existing branch"
+
+# Not affected: branch delete
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git branch -d old-branch"}}')"
+assert_allowed "$output" "Ignores git branch -d"
+
+# Not affected: non-Bash tool
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/test.sh"}}')"
+assert_allowed "$output" "Ignores non-Bash tools"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-git-workflow.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Workflow guard is disabled by default — tests use a temp config with it enabled
+WORKFLOW_CONFIG="$(mktemp)"
+cat > "$WORKFLOW_CONFIG" <<'YAML'
+version: "1.0"
+guardrails:
+  branch_protection:
+    enabled: true
+    protected: [main, master]
+    fail_open: false
+  git_workflow:
+    enabled: true
+    model: trunk
+    fail_open: false
+    trunk:
+      max_branch_age_days: 7
+      require_up_to_date: true
+YAML
+export _HAPAI_CONFIG="$WORKFLOW_CONFIG"
+
+cd "$MOCK_REPO"
+git checkout main -q 2>/dev/null || true
+git checkout -b feat/workflow-test -q 2>/dev/null || true
+
+# Blocked: plain merge without --ff-only or --squash
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge feat/some-feature"}}')"
+assert_blocked "$output" "Blocks plain merge in trunk-based workflow"
+
+# Allowed: merge with --ff-only
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge --ff-only feat/some-feature"}}')"
+assert_allowed "$output" "Allows --ff-only merge in trunk-based workflow"
+
+# Allowed: merge with --squash
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge --squash feat/some-feature"}}')"
+assert_allowed "$output" "Allows --squash merge in trunk-based workflow"
+
+# Not affected: non-git command
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm install"}}')"
+assert_allowed "$output" "Ignores non-git commands"
+
+# Not affected: disabled (default config)
+unset _HAPAI_CONFIG
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge feat/some-feature"}}')"
+assert_allowed "$output" "Allows all when git_workflow disabled (default)"
+
+# Cleanup
+rm -f "$WORKFLOW_CONFIG"
 cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════
