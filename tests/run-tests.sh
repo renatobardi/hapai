@@ -110,6 +110,8 @@ assert_allowed() {
 MOCK_REPO="$(mktemp -d)"
 cd "$MOCK_REPO"
 git init -q
+git config user.name "Test User"
+git config user.email "test@example.com"
 git commit --allow-empty -m "init" -q
 git checkout -b main -q 2>/dev/null || true
 
@@ -897,104 +899,310 @@ fi
 rm -f "$HAPAI_HOME/state/blocklist.json"
 
 # ═══════════════════════════════════════════════════════════════════════════
-echo -e "\n${BOLD}guard-branch-rules.sh${NC}"
+echo -e "\n${BOLD}guard-pr-review.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 
-BRANCH_RULES_CONFIG="$(mktemp)"
-cat > "$BRANCH_RULES_CONFIG" << 'YAML'
+PR_REVIEW_CONFIG="$(mktemp)"
+cat > "$PR_REVIEW_CONFIG" << 'YAML'
+guardrails:
+  pr_review:
+    enabled: true
+    fail_open: false
+    review_timeout_seconds: 300
+YAML
+
+PR_REVIEW_CONFIG_OPEN="$(mktemp)"
+cat > "$PR_REVIEW_CONFIG_OPEN" << 'YAML'
+guardrails:
+  pr_review:
+    enabled: true
+    fail_open: true
+    review_timeout_seconds: 300
+YAML
+
+cd "$MOCK_REPO" && git checkout -b feat/pr-review-test -q 2>/dev/null || git checkout feat/pr-review-test -q 2>/dev/null
+
+set_review_state() {
+  local status="$1" branch="${2:-feat/pr-review-test}"
+  echo "$status" > "$HAPAI_HOME/state/pr-review.status"
+  echo "$branch" > "$HAPAI_HOME/state/pr-review.branch"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HAPAI_HOME/state/pr-review.started_at"
+  echo '[]' > "$HAPAI_HOME/state/pr-review.issues"
+}
+
+# Non-Bash tool ignored
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}')"
+assert_allowed "$output" "pr-review: ignores non-Bash tools"
+
+# Disabled by default
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}')"
+assert_allowed "$output" "pr-review: allows all when disabled (default)"
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# status=clean → allow
+set_review_state "clean"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when status=clean"
+
+# Branch mismatch → allow
+set_review_state "issues" "feat/other-branch"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when review is for a different branch"
+
+# status=pending (not stale) → warn, not block
+set_review_state "pending"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when review is pending (warns)"
+assert_contains "$output" "running\|background\|pending\|shortly" "pr-review: pending message mentions review is running"
+
+# status=pending stale → reset and allow
+PR_REVIEW_STALE_CONFIG="$(mktemp)"
+cat > "$PR_REVIEW_STALE_CONFIG" << 'YAML'
+guardrails:
+  pr_review:
+    enabled: true
+    fail_open: false
+    review_timeout_seconds: 1
+YAML
+export _HAPAI_CONFIG="$PR_REVIEW_STALE_CONFIG"
+set_review_state "pending"
+if date -d "1 hour ago" +%Y-%m-%dT%H:%M:%SZ &>/dev/null 2>&1; then
+  echo "$(date -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)" > "$HAPAI_HOME/state/pr-review.started_at"
+else
+  echo "$(date -v-1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "2000-01-01T00:00:00Z")" > "$HAPAI_HOME/state/pr-review.started_at"
+fi
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: allows push when pending review is stale (timed out)"
+assert_contains "$output" "timed out\|timeout\|reset" "pr-review: stale message mentions timeout"
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+SAMPLE_ISSUES='[{"severity":"high","file":"src/app.ts","line":42,"message":"Potential null dereference"},{"severity":"low","file":"src/utils.ts","line":10,"message":"Unused variable"}]'
+
+# status=issues, fail_open=false → blocked
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_blocked "$output" "pr-review: blocks push when status=issues and fail_open=false"
+assert_contains "$output" "high\|issue" "pr-review: block message lists issues"
+
+# status=issues, fail_open=true → warn only
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG_OPEN"
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"}}')"
+assert_allowed "$output" "pr-review: warns but allows push when status=issues and fail_open=true"
+assert_contains "$output" "issue\|review" "pr-review: warn message mentions issues"
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# git merge blocked when issues
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge main"}}')"
+assert_blocked "$output" "pr-review: blocks git merge when status=issues"
+
+# gh pr merge blocked when issues
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh pr merge --squash"}}')"
+assert_blocked "$output" "pr-review: blocks gh pr merge when status=issues"
+
+# Non-push/merge ignored even with issues
+set_review_state "issues"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git status"}}')"
+assert_allowed "$output" "pr-review: ignores non-push/merge commands"
+
+unset _HAPAI_CONFIG
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}pr-review-trigger.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+
+# Non-Bash tool ignored
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/x"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: ignores non-Bash tools"
+
+# Disabled by default
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"gh pr create --title test"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: no-ops when disabled (default)"
+state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+TOTAL=$((TOTAL + 1))
+if [[ "$state_val" != "pending" ]]; then
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: state not set when disabled"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} pr-review-trigger: state should not be pending when disabled"
+  FAIL=$((FAIL + 1))
+fi
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# Plain git push (no -u) → not triggered
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/pr-review-test"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: plain git push (no -u) does not trigger"
+state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+TOTAL=$((TOTAL + 1))
+if [[ "$state_val" != "pending" ]]; then
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: state not set for plain push"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} pr-review-trigger: state should not be pending for plain push"
+  FAIL=$((FAIL + 1))
+fi
+
+# Failed command (exit_code=1) → not triggered
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"gh pr create --title test"},"tool_output":{"exit_code":1}}')"
+assert_allowed "$output" "pr-review-trigger: failed command (exit_code=1) does not trigger"
+state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+TOTAL=$((TOTAL + 1))
+if [[ "$state_val" != "pending" ]]; then
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: state not set on failed command"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} pr-review-trigger: state should not be pending on failure"
+  FAIL=$((FAIL + 1))
+fi
+
+# claude not in PATH → warns, not blocked
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+cd "$MOCK_REPO" && git checkout feat/pr-review-test -q 2>/dev/null || true
+output="$(PATH=/usr/bin:/bin run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"gh pr create --title test"},"tool_output":{"exit_code":0}}')"
+assert_allowed "$output" "pr-review-trigger: allows (warns) when claude CLI not found"
+assert_contains "$output" "claude\|not found\|skipped\|install" "pr-review-trigger: warns about missing claude CLI"
+
+# git push -u → sets state to pending (if claude available)
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+cd "$MOCK_REPO" && git checkout feat/pr-review-test -q 2>/dev/null || true
+if command -v claude &>/dev/null; then
+  output="$(run_hook_check "post-tool-use/pr-review-trigger.sh" '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"git push -u origin feat/pr-review-test"},"tool_output":{"exit_code":0}}')"
+  assert_allowed "$output" "pr-review-trigger: git push -u triggers review"
+  state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+  TOTAL=$((TOTAL + 1))
+  if [[ "$state_val" == "pending" ]]; then
+    echo -e "  ${GREEN}✓${NC} pr-review-trigger: state set to pending on git push -u"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${RED}✗${NC} pr-review-trigger: expected state=pending, got '$state_val'"
+    FAIL=$((FAIL + 1))
+  fi
+else
+  TOTAL=$((TOTAL + 1))
+  echo -e "  ${GREEN}✓${NC} pr-review-trigger: skipped (claude CLI not available in test env)"
+  PASS=$((PASS + 1))
+fi
+
+unset _HAPAI_CONFIG
+rm -f "$PR_REVIEW_CONFIG" "$PR_REVIEW_CONFIG_OPEN" "$PR_REVIEW_STALE_CONFIG" 2>/dev/null || true
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-branch-taxonomy.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+cd "$MOCK_REPO"
+git checkout main -q 2>/dev/null || true
+
+# Blocked: no prefix
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b my-feature"}}')"
+assert_blocked "$output" "Blocks branch with no prefix"
+
+# Blocked: uppercase prefix
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b Feature/login"}}')"
+assert_blocked "$output" "Blocks branch with uppercase prefix"
+
+# Blocked: prefix only, no description
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git switch -c fix"}}')"
+assert_blocked "$output" "Blocks branch with prefix but no description"
+
+# Blocked: invalid chars in description
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/My Feature"}}')"
+assert_blocked "$output" "Blocks branch with spaces in description"
+
+# Allowed: valid feat/ branch
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/add-login"}}')"
+assert_allowed "$output" "Allows feat/ branch"
+
+# Allowed: valid fix/ with git switch -c
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git switch -c fix/null-pointer"}}')"
+assert_allowed "$output" "Allows fix/ branch via switch -c"
+
+# Allowed: valid chore/ via git branch
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git branch chore/update-deps"}}')"
+assert_allowed "$output" "Allows chore/ branch via git branch"
+
+# Allowed: dots and numbers in description
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b release/v1.2.0"}}')"
+assert_allowed "$output" "Allows release/ branch with version number"
+
+# Not affected: checkout existing branch (no -b)
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout main"}}')"
+assert_allowed "$output" "Ignores checkout of existing branch"
+
+# Not affected: branch delete
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git branch -d old-branch"}}')"
+assert_allowed "$output" "Ignores git branch -d"
+
+# Not affected: non-Bash tool
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/test.sh"}}')"
+assert_allowed "$output" "Ignores non-Bash tools"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-git-workflow.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Workflow guard is disabled by default — tests use a temp config with it enabled
+WORKFLOW_CONFIG="$(mktemp)"
+cat > "$WORKFLOW_CONFIG" <<'YAML'
+version: "1.0"
 guardrails:
   branch_protection:
     enabled: true
     protected: [main, master]
-  branch_rules:
-    enabled: true
-    require_from_protected: true
-    require_description: true
     fail_open: false
-    allowed_prefixes:
-      - feat
-      - fix
-      - chore
-YAML
-
-BRANCH_RULES_CONFIG_OPEN="$(mktemp)"
-cat > "$BRANCH_RULES_CONFIG_OPEN" << 'YAML'
-guardrails:
-  branch_protection:
+  git_workflow:
     enabled: true
-    protected: [main, master]
-  branch_rules:
-    enabled: true
-    require_from_protected: false
-    require_description: true
+    model: trunk
     fail_open: false
-    allowed_prefixes:
-      - feat
-      - fix
-      - chore
+    trunk:
+      max_branch_age_days: 7
+      require_up_to_date: true
 YAML
+export _HAPAI_CONFIG="$WORKFLOW_CONFIG"
 
-# Create a feature branch to test origin rule
-cd "$MOCK_REPO" && git checkout -b feat/old-work -q 2>/dev/null || git checkout feat/old-work -q 2>/dev/null
+cd "$MOCK_REPO"
+git checkout main -q 2>/dev/null || true
+git checkout -b feat/workflow-test -q 2>/dev/null || true
 
-# Non-Bash tool → allow
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}')"
-assert_allowed "$output" "branch-rules: ignores non-Bash tools"
+# Blocked: plain merge without --ff-only or --squash
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge feat/some-feature"}}')"
+assert_blocked "$output" "Blocks plain merge in trunk-based workflow"
 
-# Config explicitly disabled → allow
-BRANCH_RULES_DISABLED="$(mktemp)"
-cat > "$BRANCH_RULES_DISABLED" << 'YAML'
-guardrails:
-  branch_rules:
-    enabled: false
-YAML
-export _HAPAI_CONFIG="$BRANCH_RULES_DISABLED"
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b bad-name"}}')"
-assert_allowed "$output" "branch-rules: allows all when disabled"
+# Allowed: merge with --ff-only
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge --ff-only feat/some-feature"}}')"
+assert_allowed "$output" "Allows --ff-only merge in trunk-based workflow"
+
+# Allowed: merge with --squash
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge --squash feat/some-feature"}}')"
+assert_allowed "$output" "Allows --squash merge in trunk-based workflow"
+
+# Not affected: non-git command
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm install"}}')"
+assert_allowed "$output" "Ignores non-git commands"
+
+# Not affected: disabled (default config)
 unset _HAPAI_CONFIG
-rm -f "$BRANCH_RULES_DISABLED"
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge feat/some-feature"}}')"
+assert_allowed "$output" "Allows all when git_workflow disabled (default)"
 
-export _HAPAI_CONFIG="$BRANCH_RULES_CONFIG"
-
-# Non-creation command → allow
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/old-work"}}')"
-assert_allowed "$output" "branch-rules: ignores non-branch-creation commands"
-
-# Name without prefix → block
-cd "$MOCK_REPO" && git checkout main -q 2>/dev/null
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b my-feature"}}')"
-assert_blocked "$output" "branch-rules: blocks branch name without allowed prefix"
-
-# Name with prefix but empty description → block
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/"}}')"
-assert_blocked "$output" "branch-rules: blocks branch with prefix but no description"
-
-# Name with uppercase in description → block
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/MyFeature"}}')"
-assert_blocked "$output" "branch-rules: blocks branch with uppercase description"
-
-# Valid name from main → allow
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/add-login"}}')"
-assert_allowed "$output" "branch-rules: allows valid branch from main"
-
-# Valid name from main via git switch -c → allow
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git switch -c fix/null-deref"}}')"
-assert_allowed "$output" "branch-rules: allows git switch -c from main"
-
-# Valid name but from feature branch → block (origin rule)
-cd "$MOCK_REPO" && git checkout feat/old-work -q 2>/dev/null
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/new-feature"}}')"
-assert_blocked "$output" "branch-rules: blocks branch creation from a feature branch"
-assert_contains "$output" "main\|protected\|checkout main" "branch-rules: block message includes recovery instruction"
-
-# require_from_protected=false → allows from feature branch
-export _HAPAI_CONFIG="$BRANCH_RULES_CONFIG_OPEN"
-cd "$MOCK_REPO" && git checkout feat/old-work -q 2>/dev/null
-output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b feat/new-feature"}}')"
-assert_allowed "$output" "branch-rules: allows from feature branch when require_from_protected=false"
-
-unset _HAPAI_CONFIG
-rm -f "$BRANCH_RULES_CONFIG" "$BRANCH_RULES_CONFIG_OPEN" 2>/dev/null || true
+# Cleanup
+rm -f "$WORKFLOW_CONFIG"
 cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -64,11 +64,16 @@ guardrails:
     enabled: true
     fail_open: true  # warn but don't block
 
-  branch_rules:
+  pr_review:
+    enabled: false               # opt-in: requires 'claude' CLI installed and authenticated
+    model: "claude-haiku-4-5-20251001"  # model used for background review agent
+    fail_open: false             # false = deny push on issues; true = warn only
+    review_timeout_seconds: 300  # treat a pending review as stale after 5 minutes
+    max_diff_chars: 8000         # truncate diff sent to the model (token cost guard)
+    base_branch: ""              # base branch for diff (auto-detect main/master if empty)
+
+  branch_taxonomy:
     enabled: true
-    require_from_protected: true  # git checkout -b must happen from main/master
-    require_description: true     # kebab-case description required after prefix/
-    fail_open: false
     allowed_prefixes:
       - feat
       - fix
@@ -82,6 +87,16 @@ guardrails:
       - build
       - release
       - hotfix
+    require_description: true   # require text after prefix/ (kebab-case)
+    fail_open: false             # false = block; true = warn only
+
+  git_workflow:
+    enabled: false               # disabled by default — opt in per project
+    model: trunk                 # trunk | gitflow
+    fail_open: true              # true = warn (recommended for gradual adoption)
+    trunk:
+      max_branch_age_days: 7     # warn if branch is older than N days on commit
+      require_up_to_date: true   # warn if branch is behind main before push
 
 # ─── Automation (PostToolUse — run after execution) ─────────────────────────
 
