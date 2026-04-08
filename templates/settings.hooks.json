@@ -31,6 +31,11 @@
             "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-blast-radius.sh",
             "timeout": 7,
             "if": "Bash(git commit*)"
+          },
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-pr-review.sh",
+            "timeout": 7
           }
         ]
       },
@@ -78,6 +83,16 @@
             "type": "command",
             "command": "bash __HAPAI_HOOKS__/post-tool-use/audit-trail.sh",
             "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/post-tool-use/pr-review-trigger.sh",
+            "timeout": 5
           }
         ]
       }
