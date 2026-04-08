@@ -156,6 +156,49 @@ jobs:
 
 ---
 
+## Phase 2.5: Cloud Function Deployment
+
+Deploy the Cloud Function that processes audit logs from Cloud Storage to BigQuery:
+
+```bash
+gcloud functions deploy load-audit-logs \
+  --gen2 \
+  --runtime=python312 \
+  --region=us-east1 \
+  --source=infra/gcp/functions \
+  --entry-point=load_audit_logs \
+  --trigger-http \
+  --allow-unauthenticated \
+  --project=hapai-oute
+```
+
+**Function Details:**
+- Reads JSONL from Cloud Storage bucket
+- Loads records into BigQuery table
+- Auto-creates dataset/table if missing
+- 90-day retention via time partitioning
+- HTTP endpoint for manual testing:
+  ```bash
+  curl https://us-east1-hapai-oute.cloudfunctions.net/load-audit-logs
+  ```
+
+**Eventarc Trigger (Optional, Advanced):**
+To automatically trigger on new files, create an Eventarc trigger:
+```bash
+gcloud eventarc triggers create load-audit-trigger \
+  --location=us-east1 \
+  --destination-run-service=load-audit-logs \
+  --destination-run-region=us-east1 \
+  --event-filters="type=google.cloud.storage.object.v1.finalized" \
+  --event-filters="bucket=hapai-audit-bardi" \
+  --service-account="hapai-sync@hapai-oute.iam.gserviceaccount.com" \
+  --project=hapai-oute
+```
+
+For now, the function can be triggered manually or via scheduled Cloud Scheduler job.
+
+---
+
 ## Phase 3: Configuration
 
 Update your `hapai.yaml`:
