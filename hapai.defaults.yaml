@@ -79,7 +79,7 @@ guardrails:
       - build
       - release
       - hotfix
-    require_description: true   # require text after prefix/ (kebab-case)
+    require_description: true   # require text after prefix/ (kebab-case: lowercase, hyphens, dots/numbers allowed)
     fail_open: false             # false = block; true = warn only
 
   git_workflow:

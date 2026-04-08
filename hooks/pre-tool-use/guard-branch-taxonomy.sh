@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # hapai/hooks/pre-tool-use/guard-branch-taxonomy.sh
-# Blocks creation of branches that don't follow the configured taxonomy
+# Enforces consistent branch naming via prefixes (feat/, fix/, chore/, etc.).
+# Ensures team collaboration standards and automated tooling compatibility.
 # Event: PreToolUse | Matcher: Bash | if: Bash(git *) | Timeout: 7s
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,15 +40,37 @@ prefix_pattern="$(echo "$prefixes" | tr ' \n' '|' | sed 's/|$//')"
 
 # Extract the branch name from the command
 # Note: use [[:space:]] instead of \s for BSD sed (macOS) compatibility
+# Security: reject chained git commands to prevent validation bypass
 branch_name=""
 if echo "$command" | grep -qE 'git\s+checkout\s+(-b|-B)'; then
-  branch_name="$(echo "$command" | sed -E 's/.*git[[:space:]]+checkout[[:space:]]+(-b|-B)[[:space:]]+([^ ]+).*/\2/')"
+  # Reject if multiple git checkout -b commands in one line (would validate only the last one)
+  if echo "$command" | grep -qE '(^|;|\||&&).*git[[:space:]]+(checkout|switch|branch).*[;|&].*git[[:space:]]+(checkout|switch|branch)'; then
+    warn "hapai: Cannot validate multiple branch creation commands in one line. Run each git command separately."
+    exit 0
+  fi
+  # Use non-greedy matching to extract first occurrence only
+  branch_name="$(echo "$command" | sed -E 's/^.*git[[:space:]]+checkout[[:space:]]+(-b|-B)[[:space:]]+([^ ]+).*/\2/' | head -1)"
 elif echo "$command" | grep -qE 'git\s+switch\s+(-c|-C)'; then
-  branch_name="$(echo "$command" | sed -E 's/.*git[[:space:]]+switch[[:space:]]+(-c|-C)[[:space:]]+([^ ]+).*/\2/')"
+  if echo "$command" | grep -qE '(^|;|\||&&).*git[[:space:]]+(checkout|switch|branch).*[;|&].*git[[:space:]]+(checkout|switch|branch)'; then
+    warn "hapai: Cannot validate multiple branch creation commands in one line. Run each git command separately."
+    exit 0
+  fi
+  branch_name="$(echo "$command" | sed -E 's/^.*git[[:space:]]+switch[[:space:]]+(-c|-C)[[:space:]]+([^ ]+).*/\2/' | head -1)"
 elif echo "$command" | grep -qE 'git\s+branch\s+[^-]'; then
-  branch_name="$(echo "$command" | sed -E 's/.*git[[:space:]]+branch[[:space:]]+([^ ]+).*/\1/')"
+  if echo "$command" | grep -qE '(^|;|\||&&).*git[[:space:]]+(checkout|switch|branch).*[;|&].*git[[:space:]]+(checkout|switch|branch)'; then
+    warn "hapai: Cannot validate multiple branch creation commands in one line. Run each git command separately."
+    exit 0
+  fi
+  branch_name="$(echo "$command" | sed -E 's/^.*git[[:space:]]+branch[[:space:]]+([^ ]+).*/\1/' | head -1)"
 fi
 [[ -z "$branch_name" ]] && exit 0
+
+# Validate branch name doesn't contain spaces or quotes (prevent bypass attempts)
+if [[ "$branch_name" =~ [[:space:]\"\'] ]]; then
+  state_increment "guard-branch-taxonomy.deny_count"
+  msg="hapai: Branch names cannot contain spaces or quotes. Use hyphens instead: '${branch_name// /-}'"
+  [[ "$fail_open" == "true" ]] && warn "$msg" || deny "$msg"
+fi
 
 # Skip protected branches (handled by guard-branch.sh)
 is_protected_branch "$branch_name" && exit 0

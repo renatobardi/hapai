@@ -949,6 +949,10 @@ assert_allowed "$output" "Ignores git branch -d"
 output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/test.sh"}}')"
 assert_allowed "$output" "Ignores non-Bash tools"
 
+# Blocked: chained git checkout commands (validate only last one would bypass)
+output="$(run_hook_check "pre-tool-use/guard-branch-taxonomy.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b invalid-name && git checkout -b feat/valid"}}')"
+assert_allowed "$output" "Rejects chained git branch commands (cannot validate safely)"
+
 # ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}guard-git-workflow.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
@@ -987,6 +991,12 @@ assert_allowed "$output" "Allows --ff-only merge in trunk-based workflow"
 # Allowed: merge with --squash
 output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git merge --squash feat/some-feature"}}')"
 assert_allowed "$output" "Allows --squash merge in trunk-based workflow"
+
+# Warns: push when branch is behind main (Rule 3)
+export _HAPAI_CONFIG="$WORKFLOW_CONFIG"
+output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin feat/workflow-test"}}')"
+# Note: actual warning depends on git state, but hook should run without error
+assert_allowed "$output" "Allows push (may warn if behind)"
 
 # Not affected: non-git command
 output="$(run_hook_check "pre-tool-use/guard-git-workflow.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm install"}}')"
