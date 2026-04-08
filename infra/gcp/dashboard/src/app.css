@@ -1,0 +1,31 @@
+/* hapai Design System — BMW-inspired */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --color-blue:        #1c69d4;
+  --color-blue-dark:   #1557b0;
+  --color-black:       #000000;
+  --color-near-black:  #262626;
+  --color-meta-gray:   #757575;
+  --color-light-gray:  #f0f0f0;
+  --color-off-white:   #f9f9f9;
+  --color-white:       #ffffff;
+  --color-deny:        #c0392b;
+  --color-warn:        #e67e22;
+  --color-allow:       #27ae60;
+  --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px;
+  --space-6: 48px; --space-8: 64px;
+  --font: 'Helvetica Neue', Arial, sans-serif;
+  --weight-light: 300; --weight-normal: 400; --weight-bold: 700; --weight-black: 900;
+}
+html, body {
+  font-family: var(--font); font-weight: var(--weight-normal);
+  color: var(--color-near-black); background: var(--color-white);
+  font-size: 14px; line-height: 1.4; -webkit-font-smoothing: antialiased;
+}
+button { font-family: var(--font); border-radius: 0; cursor: pointer; border: none; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 0; font-size: 11px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.06em; }
+.badge-deny  { background: var(--color-deny);  color: #fff; }
+.badge-warn  { background: var(--color-warn);  color: #fff; }
+.badge-allow { background: var(--color-allow); color: #fff; }
+.card { background: var(--color-white); border: 1px solid var(--color-light-gray); padding: var(--space-3); }
+.card-title { font-size: 11px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-meta-gray); margin-bottom: var(--space-2); }

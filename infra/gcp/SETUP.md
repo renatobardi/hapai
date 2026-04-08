@@ -268,49 +268,32 @@ dig hapai.oute.pro
 
 ---
 
-## Phase 5: Dashboard OAuth2 Configuration
+## Phase 5: Dashboard Authentication Configuration
 
-### 5.1 Create Google OAuth2 Credentials
+The dashboard uses **GitHub OAuth** via Firebase Authentication. No manual OAuth configuration needed—use GitHub Secrets in the deployment workflow instead.
 
-1. Go to: **Google Cloud Console** → **APIs & Services** → **Credentials**
-2. Click: **Create Credentials** → **OAuth 2.0 Client IDs**
-3. Choose: **Web application**
-4. Add authorized JavaScript origin:
-   ```
-   https://hapai.oute.pro
-   http://localhost:8000
-   ```
-5. Add authorized redirect URI:
-   ```
-   https://hapai.oute.pro/
-   http://localhost:8000/
-   ```
-6. Copy the **Client ID**
+### 5.1 Get Firebase Configuration
 
-### 5.2 Update Dashboard with OAuth2 Client ID
+1. Go to: **Firebase Console** → Your Project → **Project Settings**
+2. Under **Your apps**, select the web app (or create one)
+3. Copy these values from the **SDK config**:
+   - `apiKey`
+   - `appId`
+   - `projectId`
 
-Edit `infra/gcp/dashboard/dashboard.js`:
+### 5.2 Configure Deployment Secrets
 
-```javascript
-const CONFIG = {
-  clientId: "YOUR_GOOGLE_OAUTH_CLIENT_ID", // ← Replace with actual Client ID
-  scopes: [
-    "https://www.googleapis.com/auth/cloud-platform",
-    "https://www.googleapis.com/auth/bigquery",
-  ],
-  projectId: "hapai-oute", // ← Replace with your GCP project ID
-};
-```
+The dashboard builds automatically when you merge to `main`. The GitHub Actions workflow needs these secrets configured:
 
-Commit and push:
+1. Go to: **GitHub** → **Settings** → **Secrets and variables** → **Actions**
+2. Add these secrets:
+   - `VITE_FIREBASE_API_KEY` ← Firebase API Key from 5.1
+   - `VITE_FIREBASE_APP_ID` ← Firebase App ID from 5.1
+   - `VITE_BQ_PROXY_URL` ← Your Cloud Function URL (e.g., `https://your-region-gcp-project.cloudfunctions.net/bq-query`)
 
-```bash
-git add infra/gcp/dashboard/dashboard.js
-git commit -m "setup: configure oauth2 credentials"
-git push
-```
+The workflow (`.github/workflows/deploy-dashboard.yml`) uses these to build the dashboard with GitHub OAuth enabled.
 
-The GitHub Actions workflow will automatically deploy to GitHub Pages.
+**Note:** The `VITE_FIREBASE_API_KEY` is intentionally public—Firebase SDKs require public API keys for web apps. This is secure; users cannot access your Firebase project's data without proper authentication.
 
 ---
 
@@ -340,10 +323,10 @@ bq query --use_legacy_sql=false '
 
 ### 6.3 Visit Dashboard
 
-Open: https://hapai.oute.pro
+Open: https://hapai.oute.pro or https://renatobardi.github.io/hapai
 
-1. Click "Sign in with Google"
-2. Authorize access to BigQuery
+1. Click "Sign in with GitHub"
+2. Authorize the application via GitHub
 3. You should see your audit log data visualized in charts
 
 ---

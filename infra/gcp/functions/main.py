@@ -17,7 +17,7 @@ storage_client = storage.Client()
 bigquery_client = bigquery.Client()
 
 # Configuration
-PROJECT_ID = None  # Will be inferred from BigQuery client
+PROJECT_ID = bigquery_client.project
 DATASET_ID = "hapai_dataset"
 TABLE_ID = "events"
 
@@ -222,3 +222,145 @@ def load_audit_logs(request):
     Real trigger is Eventarc on Cloud Storage.
     """
     return {"status": "ok", "message": "Cloud Function is running"}
+
+
+# ─── BigQuery Query Proxy ──────────────────────────────────────────────────────
+
+import firebase_admin
+from firebase_admin import auth as firebase_auth
+import functions_framework
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
+
+_ALLOWED_ORIGINS = {
+    "https://hapai.oute.pro",
+    "https://renatobardi.github.io",
+}
+
+def _get_table_ref(table_name: str) -> str:
+    """Get parameterized table reference using current project ID"""
+    return f"`{PROJECT_ID}.{DATASET_ID}.{table_name}`"
+
+
+_QUERY_TEMPLATES = {
+    "stats": """
+        SELECT
+          COUNTIF(event = 'deny')  AS denials,
+          COUNTIF(event = 'warn')  AS warnings
+        FROM {table_ref}
+        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+    """,
+    "timeline": """
+        SELECT
+          FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day,
+          event,
+          CAST(COUNT(*) AS INT64)           AS count
+        FROM {table_ref}
+        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+        GROUP BY day, event
+        ORDER BY day
+    """,
+    "hooks": """
+        SELECT
+          hook,
+          CAST(COUNT(*) AS INT64) AS blocks
+        FROM {table_ref}
+        WHERE event = 'deny'
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+        GROUP BY hook
+        ORDER BY blocks DESC
+        LIMIT 10
+    """,
+    "denials": """
+        SELECT
+          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', ts) AS ts,
+          event, hook, tool, result
+        FROM {table_ref}
+        WHERE event IN ('deny', 'warn')
+        ORDER BY ts DESC
+        LIMIT 50
+    """,
+    "tools": """
+        SELECT
+          tool,
+          CAST(COUNT(*) AS INT64) AS count
+        FROM {table_ref}
+        WHERE event = 'deny'
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+        GROUP BY tool
+        ORDER BY count DESC
+    """,
+    "projects": """
+        SELECT
+          project,
+          CAST(COUNT(*) AS INT64) AS count
+        FROM {table_ref}
+        WHERE event = 'deny'
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+          AND project IS NOT NULL
+        GROUP BY project
+        ORDER BY count DESC
+        LIMIT 10
+    """,
+    "trends": """
+        SELECT
+          FORMAT_DATE('%Y-%m-%d', DATE(ts))      AS day,
+          CAST(COUNTIF(event = 'deny') AS INT64) AS denies
+        FROM {table_ref}
+        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+        GROUP BY day
+        ORDER BY day
+    """,
+}
+
+
+def get_query(query_name: str) -> str:
+    """Get a query template with project ID substituted"""
+    template = _QUERY_TEMPLATES.get(query_name)
+    if not template:
+        return None
+    return template.format(table_ref=_get_table_ref(TABLE_ID))
+
+
+@functions_framework.http
+def bq_query(request):
+    """
+    HTTP endpoint: validates Firebase ID token, runs a named BigQuery query.
+    Frontend sends: POST { "query_name": "stats" }
+    Authorization: Bearer <firebase-id-token>
+    """
+    origin = request.headers.get("Origin", "")
+    allowed_origin = origin if origin in _ALLOWED_ORIGINS else next(iter(_ALLOWED_ORIGINS))
+    cors = {"Access-Control-Allow-Origin": allowed_origin}
+
+    if request.method == "OPTIONS":
+        return ("", 204, {
+            **cors,
+            "Access-Control-Allow-Headers": "Authorization, Content-Type",
+            "Access-Control-Allow-Methods": "POST",
+        })
+
+    auth_header = request.headers.get("Authorization", "") or ""
+    if not auth_header.startswith("Bearer "):
+        return ({"error": "Unauthorized"}, 401, cors)
+
+    id_token = auth_header[len("Bearer "):]
+    try:
+        firebase_auth.verify_id_token(id_token)
+    except Exception as e:
+        logger.warning(f"Token validation failed: {e}")
+        return ({"error": "Invalid token"}, 401, cors)
+
+    body = request.get_json(silent=True) or {}
+    query_name = body.get("query_name")
+    query = get_query(query_name)
+    if not query:
+        return ({"error": f"Unknown query: {query_name}"}, 400, cors)
+
+    try:
+        rows = [dict(row) for row in bigquery_client.query(query).result()]
+        return (rows, 200, cors)
+    except Exception as e:
+        logger.error(f"BigQuery query '{query_name}' failed: {e}", exc_info=True)
+        return ({"error": "Query failed"}, 500, cors)
