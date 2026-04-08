@@ -140,6 +140,54 @@ hooks:
     stop: 10
     pre_compact: 10
 
+# ─── Hook Flows (sequential chains with conditional gates) ──────────────────
+# Enable this to use flow-dispatcher.sh instead of individual hooks.
+# Set flows.active to the name of the flow you want to run.
+
+flows:
+  enabled: false          # set true to activate flow-dispatcher
+  active: pre_commit_review
+
+  pre_commit_review:
+    event: PreToolUse
+    matcher: "Bash(git commit*)"
+    steps:
+      - hook: guard-branch
+        gate: block         # deny stops the chain
+      - hook: guard-commit-msg
+        gate: block
+      - hook: guard-blast-radius
+        gate: warn          # deny becomes a warning, chain continues
+
+  write_safety:
+    event: PreToolUse
+    matcher: "Write|Edit|MultiEdit"
+    steps:
+      - hook: guard-files
+        gate: block
+      - hook: guard-uncommitted
+        gate: warn
+
+# ─── Blocklist (temporary pattern blocks) ───────────────────────────────────
+# Managed via: hapai block <pattern> --for <duration> --type <type>
+
+blocklist:
+  enabled: true
+
+# ─── Cooldown (escalate fail_open to fail_closed after repeated denials) ────
+# After threshold denials in window_minutes, hook enters cooldown for cooldown_minutes.
+
+cooldown:
+  enabled: false
+  guard-blast-radius:
+    threshold: 3
+    window_minutes: 5
+    cooldown_minutes: 20
+  guard-uncommitted:
+    threshold: 5
+    window_minutes: 10
+    cooldown_minutes: 30
+
 # ─── Export targets ─────────────────────────────────────────────────────────
 
 export:

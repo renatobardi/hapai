@@ -38,6 +38,23 @@ ensure_jq() {
     log_error "jq is required but not installed. Install with: brew install jq"
     exit 1
   fi
+
+  # Verify jq version is 1.6 or higher (required for walk/1 function)
+  local jq_version
+  jq_version="$(jq --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+  if [[ -z "$jq_version" ]]; then
+    log_warn "Could not determine jq version. Minimum 1.6 required. Continuing anyway..."
+    return 0
+  fi
+
+  # Simple version check: 1.6 or higher
+  local major minor
+  major="${jq_version%%.*}"
+  minor="${jq_version##*.}"
+  if [[ "$major" -lt 1 ]] || { [[ "$major" -eq 1 ]] && [[ "$minor" -lt 6 ]]; }; then
+    log_error "jq version $jq_version found, but 1.6+ is required. Upgrade with: brew upgrade jq"
+    exit 1
+  fi
 }
 
 # ─── INSTALL ────────────────────────────────────────────────────────────────
@@ -384,13 +401,37 @@ cmd_revive() {
     if [[ -f "$killed_file" ]]; then
       local target="${killed_file%.hapai-killed}"
       if [[ -f "$target" ]]; then
-        # Target was recreated after kill — backup the new one, then merge
+        # Target was recreated after kill — merge hapai hooks back in while preserving user additions
         local new_backup="${target}.pre-revive.$(date +%Y%m%d%H%M%S)"
         cp "$target" "$new_backup"
-        log_warn "Existing $target backed up to $new_backup before restoring killed version."
+        log_warn "Existing $target backed up to $new_backup."
+
+        # Merge: restore hapai hooks from killed_file, preserve non-hapai hooks from target
+        local merged
+        merged="$(jq -s '
+          .[0] as $killed |
+          .[1] as $current |
+          ($current.commands // [] | map(select(.command | contains("hapai") | not))) as $non_hapai |
+          ($killed.commands // [] | map(select(.command | contains("hapai")))) as $hapai |
+          ($current.comments // []) as $comments |
+          {commands: ($hapai + $non_hapai), comments: $comments}
+        ' "$killed_file" "$target" 2>/dev/null)"
+
+        if [[ -n "$merged" ]]; then
+          echo "$merged" > "$target" 2>/dev/null || {
+            log_error "Failed to write merged settings. Kept backup at $new_backup."
+            continue
+          }
+          log_ok "Restored hapai hooks. Preserved other tool hooks. Backup: $new_backup"
+        else
+          log_error "Failed to merge. Keeping backup at $new_backup. Restore manually if needed."
+          continue
+        fi
+      else
+        # Target doesn't exist, safe to just restore
+        mv "$killed_file" "$target"
+        log_ok "Restored: $target"
       fi
-      mv "$killed_file" "$target"
-      log_ok "Restored: $target"
     fi
   done
 
@@ -477,6 +518,11 @@ cmd_audit() {
   local lines="${1:-20}"
   local audit_file="$HAPAI_HOME/audit.jsonl"
 
+  # Validate lines is a positive integer (defense against invalid flag injection)
+  if [[ ! "$lines" =~ ^[0-9]+$ ]] || [[ "$lines" -eq 0 ]]; then
+    lines=20
+  fi
+
   if [[ ! -f "$audit_file" ]]; then
     log_info "No audit log yet."
     return
@@ -500,6 +546,152 @@ cmd_audit() {
 
     printf "  ${color}%-6s${NC} %s %-20s %-12s %s\n" "$result" "$ts" "$hook" "$tool" "$reason"
   done
+}
+
+# ─── BLOCKLIST ──────────────────────────────────────────────────────────────
+
+# Parse duration string to seconds: "30m" → 1800, "2h" → 7200, "1d" → 86400
+# KEEP IN SYNC with hooks/_lib.sh:_parse_duration (identical copy for CLI context)
+_parse_cli_duration() {
+  local spec="$1"
+  local num="${spec%[mhds]}"
+  local unit="${spec: -1}"
+  [[ ! "$num" =~ ^[0-9]+$ ]] && echo "1800" && return
+  case "$unit" in
+    m) echo $((num * 60)) ;;
+    h) echo $((num * 3600)) ;;
+    d) echo $((num * 86400)) ;;
+    s) echo "$num" ;;
+    *) echo $((num * 60)) ;;
+  esac
+}
+
+_timestamp_future_cli() {
+  local seconds="$1"
+  local epoch_now epoch_then
+  epoch_now="$(date -u +%s)"
+  epoch_then=$((epoch_now + seconds))
+  if date -d "@${epoch_then}" &>/dev/null 2>&1; then
+    date -u -d "@${epoch_then}" +"%Y-%m-%dT%H:%M:%SZ"
+  else
+    date -u -r "$epoch_then" +"%Y-%m-%dT%H:%M:%SZ"
+  fi
+}
+
+cmd_block() {
+  ensure_jq
+  local pattern="" type="general" duration="30m" reason=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --type|-t)   shift; type="${1:-general}" ;;
+      --for|-f)    shift; duration="${1:-30m}" ;;
+      --reason|-r) shift; reason="${1:-}" ;;
+      *)           [[ -z "$pattern" ]] && pattern="$1" ;;
+    esac
+    shift
+  done
+
+  if [[ -z "$pattern" ]]; then
+    log_error "Usage: hapai block <pattern> [--type branch|file|command] [--for 30m|2h|1d] [--reason \"text\"]"
+    exit 1
+  fi
+
+  local blocklist_file="${HAPAI_HOME}/state/blocklist.json"
+  local duration_seconds expires_at
+
+  duration_seconds="$(_parse_cli_duration "$duration")"
+  expires_at="$(_timestamp_future_cli "$duration_seconds")"
+
+  mkdir -p "${HAPAI_HOME}/state" 2>/dev/null || true
+  [[ ! -f "$blocklist_file" ]] && echo "[]" > "$blocklist_file"
+
+  local updated
+  updated="$(jq \
+    --arg pat "$pattern" --arg typ "$type" \
+    --arg exp "$expires_at" --arg rsn "${reason:0:200}" \
+    '[.[] | select(.pattern != $pat or .type != $typ)] +
+     [{pattern: $pat, type: $typ, expires_at: $exp, reason: $rsn}]' \
+    "$blocklist_file")"
+  echo "$updated" > "$blocklist_file"
+
+  log_ok "Blocked: ${BOLD}${pattern}${NC} (type: $type) until $expires_at"
+  [[ -n "$reason" ]] && log_info "Reason: $reason"
+}
+
+cmd_unblock() {
+  ensure_jq
+  local pattern="${1:-}"
+
+  if [[ -z "$pattern" ]]; then
+    log_error "Usage: hapai unblock <pattern>"
+    exit 1
+  fi
+
+  local blocklist_file="${HAPAI_HOME}/state/blocklist.json"
+  [[ ! -f "$blocklist_file" ]] && log_info "No active blocks." && return
+
+  local updated
+  updated="$(jq --arg pat "$pattern" '[.[] | select(.pattern != $pat)]' "$blocklist_file")"
+  echo "$updated" > "$blocklist_file"
+  log_ok "Unblocked: $pattern"
+}
+
+cmd_blocklist() {
+  ensure_jq
+  local blocklist_file="${HAPAI_HOME}/state/blocklist.json"
+
+  if [[ ! -f "$blocklist_file" ]]; then
+    log_info "No active blocks."
+    return
+  fi
+
+  # Clean expired entries first
+  local now_epoch
+  now_epoch="$(date -u +%s)"
+  local cleaned
+  cleaned="$(jq --argjson now "$now_epoch" \
+    '[.[] | select((.expires_at | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) > $now)]' \
+    "$blocklist_file" 2>/dev/null)" || cleaned="[]"
+  echo "$cleaned" > "$blocklist_file"
+
+  local count
+  count="$(echo "$cleaned" | jq 'length')"
+
+  if [[ "$count" -eq 0 ]]; then
+    log_info "No active blocks."
+    return
+  fi
+
+  echo -e "${BOLD}hapai blocklist${NC} ($count active)"
+  echo "─────────────────────────────────"
+
+  echo "$cleaned" | jq -r '.[] | [.pattern, .type, .expires_at, .reason] | @tsv' | \
+  while IFS=$'\t' read -r pat typ exp rsn; do
+    printf "  ${YELLOW}●${NC} %-30s %-10s expires: %s" "$pat" "$typ" "$exp"
+    [[ -n "$rsn" ]] && printf "  (%s)" "$rsn"
+    echo ""
+  done
+}
+
+cmd_list_hooks() {
+  echo -e "${BOLD}hapai list-hooks${NC}"
+  echo "─────────────────────────────────"
+
+  local found=0
+  for hook_dir in "${HAPAI_HOME}/hooks" ".claude/hooks/hapai"; do
+    [[ ! -d "$hook_dir" ]] && continue
+    found=1
+    echo -e "${CYAN}${hook_dir}${NC}"
+    find "$hook_dir" -name "*.sh" -not -name "_lib.sh" -type f | sort | while read -r f; do
+      local name
+      name="$(basename "$f" .sh)"
+      local label="built-in"
+      echo -e "  ${GREEN}✓${NC} $name  ${YELLOW}[$label]${NC}"
+    done
+  done
+
+  [[ $found -eq 0 ]] && log_warn "No hooks installed. Run 'hapai install' first."
 }
 
 # ─── EXPORT ─────────────────────────────────────────────────────────────────
@@ -598,32 +790,44 @@ ${BOLD}Commands:${NC}
   audit [N]                      Show last N audit entries (default: 20)
   export --target <target>       Export guardrails for a specific tool
   export --all                   Export to ALL supported tools at once
+  block <pattern> [--type branch|file|command] [--for 30m|2h|1d] [--reason "text"]
+  unblock <pattern>              Remove from temporary blocklist
+  blocklist                      Show active blocks with expiry times
+  list-hooks                     List installed hooks (built-in + community)
 
 ${BOLD}Supported export targets:${NC}
   claude, cursor, copilot, windsurf, devin, trae, antigravity, universal
 
 ${BOLD}Examples:${NC}
-  hapai install --global         Install for all projects
-  hapai install --project        Install for current project
-  hapai validate                 Check everything is working
-  hapai kill                     Panic button — disable all hooks
-  hapai export --target cursor   Generate .cursor/rules/hapai.mdc
-  hapai export --target windsurf Generate .windsurf/rules/hapai.md
-  hapai export --all             Export to Cursor, Copilot, Windsurf, Devin, Trae, Antigravity
+  hapai install --global              Install for all projects
+  hapai install --project             Install for current project
+  hapai validate                      Check everything is working
+  hapai kill                          Panic button — disable all hooks
+  hapai block main --type branch --for 2h --reason "CI broken"
+  hapai block ".env.prod" --type file --for 1d
+  hapai blocklist                     Show all active blocks
+  hapai unblock main
+  hapai list-hooks                    Show installed hooks
+  hapai export --target cursor        Generate .cursor/rules/hapai.mdc
+  hapai export --all                  Export to all supported tools
 
 ${BOLD}Docs:${NC} https://github.com/renatobardi/hapai
 EOF
 }
 
 case "${1:-help}" in
-  install)    shift; cmd_install "$@" ;;
-  uninstall)  shift; cmd_uninstall "$@" ;;
-  validate)   cmd_validate ;;
-  kill)       cmd_kill ;;
-  revive)     cmd_revive ;;
-  status)     cmd_status ;;
-  audit)      shift; cmd_audit "${1:-20}" ;;
-  export)     shift; cmd_export "$@" ;;
+  install)      shift; cmd_install "$@" ;;
+  uninstall)    shift; cmd_uninstall "$@" ;;
+  validate)     cmd_validate ;;
+  kill)         cmd_kill ;;
+  revive)       cmd_revive ;;
+  status)       cmd_status ;;
+  audit)        shift; cmd_audit "${1:-20}" ;;
+  export)       shift; cmd_export "$@" ;;
+  block)        shift; cmd_block "$@" ;;
+  unblock)      shift; cmd_unblock "$@" ;;
+  blocklist)    cmd_blocklist ;;
+  list-hooks)   cmd_list_hooks ;;
   help|--help|-h) cmd_help ;;
   version|--version|-v) echo "hapai v${HAPAI_VERSION}" ;;
   *)

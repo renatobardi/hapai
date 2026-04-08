@@ -31,6 +31,12 @@ fi
 
 filename="$(basename "$resolved_path")"
 
+# Check temporary blocklist (e.g. hapai block ".env.prod" --type file)
+if blocklist_check "$resolved_path" "file" 2>/dev/null || blocklist_check "$filename" "file" 2>/dev/null; then
+  state_increment "guard-files.deny_count"
+  deny "hapai: Write blocked — '$filename' is in the temporary blocklist. Run 'hapai unblock $filename' to remove."
+fi
+
 # Check unprotected list first (explicit overrides)
 while IFS= read -r pattern; do
   [[ -z "$pattern" ]] && continue

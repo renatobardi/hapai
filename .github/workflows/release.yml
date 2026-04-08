@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: bash tests/run-tests.sh
+
+      - name: Build tarballs
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist
+
+          # Universal tarball (same content for all platforms — pure bash)
+          tar -czf "dist/hapai-${VERSION}.tar.gz" \
+            bin/ hooks/ templates/ exporters/ \
+            hapai.defaults.yaml install.sh README.md
+
+          # Platform-labeled copies for Homebrew formula
+          cp "dist/hapai-${VERSION}.tar.gz" "dist/hapai-${VERSION}-darwin.tar.gz"
+          cp "dist/hapai-${VERSION}.tar.gz" "dist/hapai-${VERSION}-linux.tar.gz"
+
+          # Compute SHA256 checksums
+          sha256sum dist/*.tar.gz > dist/checksums.txt || \
+            shasum -a 256 dist/*.tar.gz > dist/checksums.txt
+
+          echo "--- Checksums ---"
+          cat dist/checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "hapai ${{ steps.version.outputs.version }}"
+          body: |
+            ## hapai ${{ steps.version.outputs.version }}
+
+            ### Install
+
+            **Universal (curl):**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/renatobardi/hapai/${{ steps.version.outputs.version }}/install.sh | bash
+            ```
+
+            **Homebrew:**
+            ```bash
+            brew tap renatobardi/hapai
+            brew install hapai
+            ```
+
+            **Manual:**
+            Download the tarball below, extract, and run `install.sh`.
+
+            ### Activate in your project
+            ```bash
+            hapai install --project   # current project
+            hapai install --global    # all projects
+            ```
+          files: |
+            dist/hapai-${{ steps.version.outputs.version }}.tar.gz
+            dist/hapai-${{ steps.version.outputs.version }}-darwin.tar.gz
+            dist/hapai-${{ steps.version.outputs.version }}-linux.tar.gz
+            dist/checksums.txt
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+
+      - name: Update Homebrew formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256="$(grep "hapai-${VERSION}\.tar\.gz$" dist/checksums.txt | awk '{print $1}')"
+          URL="https://github.com/renatobardi/hapai/archive/${VERSION}.tar.gz"
+
+          bash scripts/update-brew-formula.sh "$VERSION" "$SHA256" "$URL"
+        continue-on-error: true  # don't fail release if brew update fails

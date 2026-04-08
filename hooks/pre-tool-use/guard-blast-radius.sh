@@ -35,6 +35,11 @@ max_files="$(config_get "guardrails.blast_radius.max_files" "10")"
 max_packages="$(config_get "guardrails.blast_radius.max_packages" "2")"
 fail_open="$(config_get "guardrails.blast_radius.fail_open" "true")"
 
+# Cooldown: if repeated warnings occurred, escalate to fail_closed temporarily
+if cooldown_active "guard-blast-radius" 2>/dev/null; then
+  fail_open="false"
+fi
+
 warnings=""
 
 # Check file count
@@ -64,6 +69,7 @@ fi
 # If warnings exist, act on them
 if [[ -n "$warnings" ]]; then
   state_increment "guard-blast-radius.warn_count"
+  cooldown_record "guard-blast-radius" 2>/dev/null || true
 
   if [[ "$fail_open" == "true" ]]; then
     warn "$warnings Consider splitting into smaller, focused commits."

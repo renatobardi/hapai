@@ -17,6 +17,10 @@ HAPAI_AUDIT_LOG="${HAPAI_HOME}/audit.jsonl"
 HAPAI_STATE_DIR="${HAPAI_HOME}/state"
 
 # ─── Ensure directories exist ──────────────────────────────────────────────
+# IMPORTANT: mkdir guards (|| true) are REQUIRED because the ERR trap is not yet installed.
+# If mkdir fails without || true, and ERR trap isn't set, bash would exit non-zero
+# but the trap (which exits 0 on error to fail-open) wouldn't fire yet.
+# The ERR trap is installed at the end of this file (see below).
 mkdir -p "$HAPAI_HOME" "$HAPAI_STATE_DIR" 2>/dev/null || true
 
 # ─── Input/Output ───────────────────────────────────────────────────────────
@@ -389,6 +393,381 @@ state_increment() {
   echo "$next"
 }
 
+# ─── Flow Engine ────────────────────────────────────────────────────────────
+
+# Parse flow steps from YAML — returns JSON objects (one per line)
+# Handles YAML sequences of mappings under flows.<name>.steps
+# Usage: config_get_flow_steps "pre_commit_review"
+config_get_flow_steps() {
+  local flow_name="$1"
+
+  if [[ -z "$_HAPAI_CONFIG" ]]; then
+    find_config
+  fi
+
+  [[ -z "$_HAPAI_CONFIG" || ! -f "$_HAPAI_CONFIG" ]] && return
+
+  local segments=(flows "$flow_name" steps)
+  local depth=3
+  local match_depth=0
+  local indent_at_0=-1 indent_at_1=-1 indent_at_2=-1 indent_at_3=-1 indent_at_4=-1
+  local in_steps=0
+  local step_indent=-1
+  local current_hook=""
+  local current_gate="block"
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+
+    local stripped="${line#"${line%%[![:space:]]*}"}"
+    local indent=0
+    while [[ ${#stripped} -lt ${#line} && "${line:$indent:1}" == " " ]]; do
+      indent=$((indent + 1))
+    done
+
+    if [[ $in_steps -eq 1 ]]; then
+      # Left the steps block — flush last step and stop
+      if [[ $indent -le $step_indent && "$stripped" != -* ]]; then
+        if [[ -n "$current_hook" ]]; then
+          jq -cn --arg hook "$current_hook" --arg gate "$current_gate" \
+            '{hook: $hook, gate: $gate}' 2>/dev/null || true
+        fi
+        break
+      fi
+
+      # New step: - hook: <name>
+      if [[ "$stripped" =~ ^-[[:space:]]+hook:[[:space:]]+(.+)$ ]]; then
+        if [[ -n "$current_hook" ]]; then
+          jq -cn --arg hook "$current_hook" --arg gate "$current_gate" \
+            '{hook: $hook, gate: $gate}' 2>/dev/null || true
+        fi
+        current_hook="${BASH_REMATCH[1]}"
+        # Strip surrounding quotes (both double and single) and trailing spaces
+        # First remove trailing spaces
+        current_hook="${current_hook%"${current_hook##*[^[:space:]]}"}"
+        # Then remove quotes: leading " ' and trailing " '
+        current_hook="${current_hook#\"}" ; current_hook="${current_hook%\"}"
+        current_hook="${current_hook#\'}" ; current_hook="${current_hook%\'}"
+        current_gate="block"
+        continue
+      fi
+
+      # gate: value (indented under the - hook: item)
+      if [[ "$stripped" =~ ^gate:[[:space:]]+([a-z]+) ]]; then
+        current_gate="${BASH_REMATCH[1]}"
+        continue
+      fi
+
+      continue
+    fi
+
+    # Navigation: find flows.<name>.steps
+    local line_key=""
+    if [[ "$stripped" =~ ^([a-zA-Z_][a-zA-Z0-9_-]*)[[:space:]]*: ]]; then
+      line_key="${BASH_REMATCH[1]}"
+    fi
+    [[ -z "$line_key" ]] && continue
+
+    if [[ $match_depth -gt 0 ]]; then
+      local parent_indent
+      parent_indent="$(_get_indent_at $match_depth)"
+      if [[ $indent -le $parent_indent ]]; then
+        match_depth=0
+        local i
+        for ((i=1; i<=4; i++)); do
+          local lvl_indent
+          lvl_indent="$(_get_indent_at $i)"
+          if [[ $lvl_indent -ge 0 && $indent -gt $lvl_indent ]]; then
+            match_depth=$i
+          else
+            break
+          fi
+        done
+      fi
+    fi
+
+    local expected_key="${segments[$match_depth]:-}"
+    if [[ "$line_key" == "$expected_key" ]]; then
+      if [[ $match_depth -eq $((depth - 1)) ]]; then
+        in_steps=1
+        step_indent=$indent
+      else
+        match_depth=$((match_depth + 1))
+        _set_indent_at $match_depth $indent
+      fi
+    fi
+  done < "$_HAPAI_CONFIG"
+
+  # Flush last step (EOF inside steps block)
+  if [[ -n "$current_hook" ]]; then
+    jq -cn --arg hook "$current_hook" --arg gate "$current_gate" \
+      '{hook: $hook, gate: $gate}' 2>/dev/null || true
+  fi
+}
+
+# Flow execution globals — used by flow-dispatcher.sh
+_FLOW_DENIED=0
+_FLOW_WARNED=0
+_FLOW_WARNINGS=""
+
+# Execute one flow step with gate semantics.
+# Sets _FLOW_DENIED=1 on hard denial (gate=block + hook exited 2).
+# Sets _FLOW_WARNED=1 and appends to _FLOW_WARNINGS on warn/gate=warn.
+# Always returns 0 (never triggers ERR trap on caller).
+# Usage: flow_run_step "<hook_path>" "<gate: block|warn|skip>"
+flow_run_step() {
+  local hook_path="$1"
+  local gate="${2:-block}"
+
+  [[ ! -f "$hook_path" ]] && return 0
+
+  local tmp_out tmp_err
+  tmp_out="$(mktemp 2>/dev/null)" || tmp_out="/tmp/hapai_flow_out_$$"
+  tmp_err="$(mktemp 2>/dev/null)" || tmp_err="/tmp/hapai_flow_err_$$"
+
+  local exit_code=0
+  echo "$_HAPAI_INPUT" | bash "$hook_path" >"$tmp_out" 2>"$tmp_err" || exit_code=$?
+
+  local hook_out hook_err
+  hook_out="$(cat "$tmp_out" 2>/dev/null)"
+  hook_err="$(cat "$tmp_err" 2>/dev/null)"
+  rm -f "$tmp_out" "$tmp_err" 2>/dev/null || true
+
+  if [[ $exit_code -eq 2 ]]; then
+    case "$gate" in
+      block)
+        echo "$hook_err" >&2
+        _FLOW_DENIED=1
+        ;;
+      warn)
+        _FLOW_WARNED=1
+        [[ -n "$hook_err" ]] && _FLOW_WARNINGS="${_FLOW_WARNINGS}${hook_err} "
+        ;;
+    esac
+  else
+    # Hook allowed — collect any warnings it emitted
+    if [[ -n "$hook_out" ]]; then
+      local ctx
+      ctx="$(echo "$hook_out" | jq -r '.hookSpecificOutput.additionalContext // empty' 2>/dev/null)"
+      if [[ -n "$ctx" ]]; then
+        _FLOW_WARNED=1
+        _FLOW_WARNINGS="${_FLOW_WARNINGS}${ctx} "
+      fi
+    fi
+  fi
+
+  return 0
+}
+
+# ─── Advanced State: Blocklist ───────────────────────────────────────────────
+
+_HAPAI_BLOCKLIST="${HAPAI_STATE_DIR}/blocklist.json"
+
+# Parse duration string to seconds: "30m" → 1800, "2h" → 7200, "1d" → 86400
+_parse_duration() {
+  local spec="$1"
+  # Strip non-alphanumeric trailing chars
+  local num="${spec%[mhds]}"
+  local unit="${spec: -1}"
+  # Ensure num is a valid integer
+  [[ ! "$num" =~ ^[0-9]+$ ]] && echo "1800" && return
+  case "$unit" in
+    m) echo $((num * 60)) ;;
+    h) echo $((num * 3600)) ;;
+    d) echo $((num * 86400)) ;;
+    s) echo "$num" ;;
+    *) echo $((num * 60)) ;; # assume minutes
+  esac
+}
+
+# Compute ISO 8601 UTC timestamp N seconds in the future (cross-platform)
+_timestamp_future() {
+  local seconds="$1"
+  local epoch_now epoch_then
+  epoch_now="$(date -u +%s 2>/dev/null)" || epoch_now=0
+  epoch_then=$((epoch_now + seconds))
+  # Try GNU date (Linux), fall back to BSD date (macOS)
+  if date -d "@${epoch_then}" &>/dev/null 2>&1; then
+    date -u -d "@${epoch_then}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null
+  else
+    date -u -r "$epoch_then" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null
+  fi
+}
+
+# Remove expired entries from blocklist.json
+# Early-exit optimization: skip if blocklist is empty (no I/O in hot path)
+blocklist_clean() {
+  [[ ! -f "$_HAPAI_BLOCKLIST" ]] && return 0
+
+  # Quick check: if blocklist is empty, skip processing (suppress output with >/dev/null)
+  if jq -e 'length == 0' "$_HAPAI_BLOCKLIST" 2>/dev/null >/dev/null; then
+    return 0
+  fi
+
+  local now_epoch
+  now_epoch="$(date -u +%s 2>/dev/null)" || return 0
+
+  local cleaned
+  cleaned="$(jq -r --argjson now "$now_epoch" \
+    '[.[] | select(
+       (.expires_at | if . == "" then true
+        else (strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) > $now
+        end)
+     )]' "$_HAPAI_BLOCKLIST" 2>/dev/null)" || return 0
+
+  echo "$cleaned" > "$_HAPAI_BLOCKLIST" 2>/dev/null || true
+}
+
+# Add a pattern to the temporary blocklist.
+# Usage: blocklist_add "main" "branch" "1800" "CI is broken"
+blocklist_add() {
+  local pattern="$1"
+  local type="${2:-general}"
+  local duration_seconds="${3:-1800}"
+  local reason="${4:-}"
+
+  local expires_at
+  expires_at="$(_timestamp_future "$duration_seconds")"
+
+  # Initialize file if needed
+  if [[ ! -f "$_HAPAI_BLOCKLIST" ]]; then
+    echo "[]" > "$_HAPAI_BLOCKLIST" 2>/dev/null || return 0
+  fi
+
+  # Remove any existing entry for same pattern+type, then append new
+  local updated
+  updated="$(jq -r \
+    --arg pat "$pattern" --arg typ "$type" \
+    --arg exp "$expires_at" --arg rsn "${reason:0:200}" \
+    '[.[] | select(.pattern != $pat or .type != $typ)] +
+     [{pattern: $pat, type: $typ, expires_at: $exp, reason: $rsn}]' \
+    "$_HAPAI_BLOCKLIST" 2>/dev/null)" || return 0
+
+  echo "$updated" > "$_HAPAI_BLOCKLIST" 2>/dev/null || true
+}
+
+# Check if a pattern is in the active blocklist.
+# Returns 0 (shell true) if blocked, 1 if not blocked.
+# Auto-removes expired entries.
+# Usage: blocklist_check "main" "branch" && deny "branch is blocked"
+blocklist_check() {
+  local pattern="$1"
+  local type="${2:-general}"
+
+  [[ ! -f "$_HAPAI_BLOCKLIST" ]] && return 1
+
+  blocklist_clean 2>/dev/null || true
+
+  local is_blocked
+  is_blocked="$(jq -r \
+    --arg pat "$pattern" --arg typ "$type" \
+    'any(.[]; .pattern == $pat and .type == $typ)' \
+    "$_HAPAI_BLOCKLIST" 2>/dev/null)" || return 1
+
+  [[ "$is_blocked" == "true" ]] && return 0 || return 1
+}
+
+# ─── Advanced State: Cooldown ────────────────────────────────────────────────
+
+_HAPAI_COOLDOWN_DIR="${HAPAI_STATE_DIR}/cooldown"
+mkdir -p "$_HAPAI_COOLDOWN_DIR" 2>/dev/null || true
+
+# Check if a hook is in cooldown (aggressive mode).
+# Returns 0 (shell true) if in cooldown, 1 if not.
+# Usage: cooldown_active "guard-blast-radius" && fail_open="false"
+cooldown_active() {
+  local hook_name="$1"
+
+  # Validate hook_name contains only safe characters (path traversal defense)
+  [[ ! "$hook_name" =~ ^[a-zA-Z0-9_-]+$ ]] && return 1
+
+  local cooldown_file="${_HAPAI_COOLDOWN_DIR}/${hook_name}.json"
+
+  [[ ! -f "$cooldown_file" ]] && return 1
+
+  local cooldown_until now_epoch until_epoch
+  cooldown_until="$(jq -r '.cooldown_until // empty' "$cooldown_file" 2>/dev/null)"
+  [[ -z "$cooldown_until" ]] && return 1
+
+  # Validate cooldown_until is ISO 8601 format (injection defense)
+  [[ ! "$cooldown_until" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] && return 1
+
+  now_epoch="$(date -u +%s 2>/dev/null)" || return 1
+  if until_epoch="$(date -d "$cooldown_until" +%s 2>/dev/null)" && [[ -n "$until_epoch" ]]; then
+    : # GNU date (Linux)
+  elif until_epoch="$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$cooldown_until" +%s 2>/dev/null)" && [[ -n "$until_epoch" ]]; then
+    : # BSD date (macOS)
+  else
+    until_epoch=0
+  fi
+
+  [[ "$now_epoch" -lt "$until_epoch" ]] && return 0 || return 1
+}
+
+# Record a denial for cooldown tracking.
+# If denials in window_minutes exceed threshold, enters cooldown for cooldown_minutes.
+# Config: cooldown.<hook>.threshold / window_minutes / cooldown_minutes
+# Usage: cooldown_record "guard-blast-radius"
+cooldown_record() {
+  local hook_name="$1"
+
+  # Validate hook_name contains only safe characters (path traversal defense)
+  [[ ! "$hook_name" =~ ^[a-zA-Z0-9_-]+$ ]] && return 0
+
+  local cooldown_file="${_HAPAI_COOLDOWN_DIR}/${hook_name}.json"
+
+  local enabled
+  enabled="$(config_get "cooldown.enabled" "true")"
+  [[ "$enabled" != "true" ]] && return 0
+
+  local threshold window_min cooldown_min
+  threshold="$(config_get "cooldown.${hook_name}.threshold" "5")"
+  window_min="$(config_get "cooldown.${hook_name}.window_minutes" "10")"
+  cooldown_min="$(config_get "cooldown.${hook_name}.cooldown_minutes" "30")"
+
+  # Ensure numeric
+  [[ ! "$threshold" =~ ^[0-9]+$ ]] && threshold=5
+  [[ ! "$window_min" =~ ^[0-9]+$ ]] && window_min=10
+  [[ ! "$cooldown_min" =~ ^[0-9]+$ ]] && cooldown_min=30
+
+  local now_epoch
+  now_epoch="$(date -u +%s 2>/dev/null)" || return 0
+  local window_start=$((now_epoch - window_min * 60))
+
+  # Load existing state or start fresh
+  local existing_denials="[]"
+  if [[ -f "$cooldown_file" ]]; then
+    existing_denials="$(jq -r '.recent_denials // []' "$cooldown_file" 2>/dev/null)" || existing_denials="[]"
+  fi
+
+  # Append now, purge entries outside window
+  local now_iso
+  now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)" || now_iso="unknown"
+
+  local updated_denials count
+  updated_denials="$(echo "$existing_denials" | jq -r \
+    --arg now "$now_iso" --argjson ws "$window_start" \
+    '[.[] | select(
+       (strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) > $ws
+     )] + [$now]' 2>/dev/null)" || return 0
+
+  count="$(echo "$updated_denials" | jq -r 'length' 2>/dev/null)" || count=0
+
+  local cooldown_until=""
+  if [[ "$count" -ge "$threshold" ]]; then
+    cooldown_until="$(_timestamp_future $((cooldown_min * 60)))"
+    updated_denials="[]"  # reset after entering cooldown
+  fi
+
+  jq -n \
+    --arg hook "$hook_name" \
+    --argjson denials "$updated_denials" \
+    --arg until "$cooldown_until" \
+    '{hook: $hook, recent_denials: $denials, cooldown_until: $until}' \
+    > "$cooldown_file" 2>/dev/null || true
+}
+
 # ─── Git Helpers ────────────────────────────────────────────────────────────
 
 # Get current git branch name
@@ -421,4 +800,8 @@ _hapai_error_handler() {
   exit 0
 }
 
+# Install error trap: on any unexpected error, fail-open (exit 0) to never block the host tool.
+# NOTE: This trap is installed at the END of the module (after all module-level code runs).
+# Module-level code that could fail (e.g., mkdir -p) must have || true guards to avoid
+# exiting before the trap is installed. See mkdir at top of file.
 trap '_hapai_error_handler' ERR

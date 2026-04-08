@@ -29,6 +29,12 @@ enabled="$(config_get "guardrails.branch_protection.enabled" "true")"
 
 # Get current branch
 branch="$(git_current_branch)"
+
+# Check temporary blocklist (e.g. hapai block "main" --type branch)
+if blocklist_check "$branch" "branch" 2>/dev/null; then
+  state_increment "guard-branch.deny_count"
+  deny "hapai: Branch '$branch' is in the temporary blocklist. Run 'hapai unblock $branch' to remove."
+fi
 [[ -z "$branch" ]] && exit 0
 
 # Check if branch is protected

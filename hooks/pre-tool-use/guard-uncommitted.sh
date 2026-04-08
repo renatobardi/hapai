@@ -55,7 +55,13 @@ if [[ $has_changes -eq 1 ]]; then
   fail_open="$(config_get "guardrails.uncommitted_changes.fail_open" "true")"
   filename="$(basename "$file_path")"
 
+  # Cooldown: escalate to fail_closed after repeated warnings
+  if cooldown_active "guard-uncommitted" 2>/dev/null; then
+    fail_open="false"
+  fi
+
   if [[ "$fail_open" == "true" ]]; then
+    cooldown_record "guard-uncommitted" 2>/dev/null || true
     warn "hapai: File '$filename' has uncommitted changes. Consider committing before AI modifies it."
   else
     state_increment "guard-uncommitted.deny_count"

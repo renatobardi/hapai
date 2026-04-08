@@ -620,6 +620,283 @@ rm -rf "$EXPORT_ALL_DIR"
 cd "$MOCK_REPO"
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}Blocklist (advanced state)${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+BLOCKLIST_TEST_SCRIPT="$(mktemp)"
+cat > "$BLOCKLIST_TEST_SCRIPT" << 'TESTEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export HAPAI_HOME="$1"
+ACTION="$2"
+PAT="$3"
+TYPE="${4:-general}"
+cd "$5"
+source hooks/_lib.sh
+_HAPAI_INPUT='{}'
+find_config
+case "$ACTION" in
+  add)   blocklist_add "$PAT" "$TYPE" "60" "test block" ;;
+  check) blocklist_check "$PAT" "$TYPE" && echo "blocked" || echo "free" ;;
+  clean) blocklist_clean ;;
+esac
+TESTEOF
+chmod +x "$BLOCKLIST_TEST_SCRIPT"
+
+# Test: blocklist_add + blocklist_check returns blocked
+bash "$BLOCKLIST_TEST_SCRIPT" "$HAPAI_HOME" "add" "test-branch" "branch" "$HAPAI_ROOT" 2>/dev/null
+TOTAL=$((TOTAL + 1))
+result="$(bash "$BLOCKLIST_TEST_SCRIPT" "$HAPAI_HOME" "check" "test-branch" "branch" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if [[ "$result" == "blocked" ]]; then
+  echo -e "  ${GREEN}✓${NC} blocklist_check returns blocked after blocklist_add"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} blocklist_check returned '$result' (expected 'blocked')"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: unknown pattern is not blocked
+TOTAL=$((TOTAL + 1))
+result="$(bash "$BLOCKLIST_TEST_SCRIPT" "$HAPAI_HOME" "check" "unknown-branch" "branch" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if [[ "$result" == "free" ]]; then
+  echo -e "  ${GREEN}✓${NC} blocklist_check returns free for unknown pattern"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} blocklist_check returned '$result' (expected 'free')"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: expired entry is cleaned and returns free
+EXPIRED_BLOCKLIST_SCRIPT="$(mktemp)"
+cat > "$EXPIRED_BLOCKLIST_SCRIPT" << 'TESTEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export HAPAI_HOME="$1"
+cd "$2"
+source hooks/_lib.sh
+_HAPAI_INPUT='{}'
+find_config
+# Add with -1 second duration (already expired)
+blocklist_add "expired-branch" "branch" "-1" "should be gone"
+blocklist_check "expired-branch" "branch" && echo "blocked" || echo "free"
+TESTEOF
+chmod +x "$EXPIRED_BLOCKLIST_SCRIPT"
+TOTAL=$((TOTAL + 1))
+result="$(bash "$EXPIRED_BLOCKLIST_SCRIPT" "$HAPAI_HOME" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if [[ "$result" == "free" ]]; then
+  echo -e "  ${GREEN}✓${NC} blocklist_check returns free for expired entry"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} expired blocklist entry not cleaned (returned '$result')"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: guard-branch blocks blocklisted branch
+cd "$MOCK_REPO"
+git checkout main -q 2>/dev/null || true
+# The blocklist state is in $HAPAI_HOME/state/blocklist.json (already has test-branch)
+# Add main to blocklist
+bash "$BLOCKLIST_TEST_SCRIPT" "$HAPAI_HOME" "add" "main" "branch" "$HAPAI_ROOT" 2>/dev/null
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m \"test\""}}')"
+assert_blocked "$output" "guard-branch blocks blocklisted branch"
+
+# Cleanup blocklist
+rm -f "$HAPAI_HOME/state/blocklist.json"
+rm -f "$BLOCKLIST_TEST_SCRIPT" "$EXPIRED_BLOCKLIST_SCRIPT"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}Cooldown (advanced state)${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+COOLDOWN_TEST_SCRIPT="$(mktemp)"
+cat > "$COOLDOWN_TEST_SCRIPT" << 'TESTEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export HAPAI_HOME="$1"
+export _HAPAI_CONFIG="$2"
+ACTION="$3"
+HOOK="${4:-guard-blast-radius}"
+cd "$5"
+source hooks/_lib.sh
+_HAPAI_INPUT='{}'
+case "$ACTION" in
+  record) cooldown_record "$HOOK" ;;
+  active) cooldown_active "$HOOK" && echo "in_cooldown" || echo "normal" ;;
+esac
+TESTEOF
+chmod +x "$COOLDOWN_TEST_SCRIPT"
+
+# Enable cooldown in test config with threshold=2 for testing
+COOLDOWN_CONFIG="$(mktemp)"
+cat > "$COOLDOWN_CONFIG" << 'YAML'
+cooldown:
+  enabled: true
+  guard-blast-radius:
+    threshold: 2
+    window_minutes: 10
+    cooldown_minutes: 5
+YAML
+
+# Record 2 denials → should enter cooldown
+bash "$COOLDOWN_TEST_SCRIPT" "$HAPAI_HOME" "$COOLDOWN_CONFIG" "record" "guard-blast-radius" "$HAPAI_ROOT" 2>/dev/null
+bash "$COOLDOWN_TEST_SCRIPT" "$HAPAI_HOME" "$COOLDOWN_CONFIG" "record" "guard-blast-radius" "$HAPAI_ROOT" 2>/dev/null
+
+TOTAL=$((TOTAL + 1))
+result="$(bash "$COOLDOWN_TEST_SCRIPT" "$HAPAI_HOME" "$COOLDOWN_CONFIG" "active" "guard-blast-radius" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if [[ "$result" == "in_cooldown" ]]; then
+  echo -e "  ${GREEN}✓${NC} cooldown_active returns true after threshold exceeded"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} cooldown not triggered after threshold (returned '$result')"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: hook not in cooldown returns normal
+TOTAL=$((TOTAL + 1))
+result="$(bash "$COOLDOWN_TEST_SCRIPT" "$HAPAI_HOME" "$COOLDOWN_CONFIG" "active" "guard-files" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if [[ "$result" == "normal" ]]; then
+  echo -e "  ${GREEN}✓${NC} cooldown_active returns normal for hook with no denials"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} unexpected cooldown state (returned '$result')"
+  FAIL=$((FAIL + 1))
+fi
+
+# Cleanup
+rm -f "$COOLDOWN_CONFIG" "$COOLDOWN_TEST_SCRIPT"
+rm -rf "$HAPAI_HOME/state/cooldown"
+mkdir -p "$HAPAI_HOME/state/cooldown"
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}Flow dispatcher${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Test: dispatcher exits cleanly when flows.enabled=false (default)
+cd "$MOCK_REPO"
+output="$(run_hook_check "pre-tool-use/flow-dispatcher.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m \"test\""}}')"
+assert_allowed "$output" "Flow dispatcher exits cleanly when flows.enabled=false"
+
+# Test: flow with enabled=true and gate=block denies on step failure
+FLOW_CONFIG="$(mktemp)"
+cat > "$FLOW_CONFIG" << 'YAML'
+flows:
+  enabled: true
+  active: test_flow
+  test_flow:
+    event: PreToolUse
+    matcher: "Bash(git commit*)"
+    steps:
+      - hook: guard-branch
+        gate: block
+YAML
+
+FLOW_TEST_SCRIPT="$(mktemp)"
+cat > "$FLOW_TEST_SCRIPT" << 'TESTEOF'
+#!/usr/bin/env bash
+export HAPAI_HOME="$1"
+export _HAPAI_CONFIG="$2"
+INPUT="$3"
+HAPAI_HOOK_ROOT="$4/hooks"
+ec=0
+echo "$INPUT" | bash "$4/hooks/pre-tool-use/flow-dispatcher.sh" >/tmp/flow_out 2>&1 || ec=$?
+echo "$ec" > /tmp/flow_exit
+cat /tmp/flow_out
+TESTEOF
+chmod +x "$FLOW_TEST_SCRIPT"
+
+# Flow with guard-branch step + commit on main = should deny (exit 2)
+cd "$MOCK_REPO"
+git checkout main -q 2>/dev/null || true
+bash "$FLOW_TEST_SCRIPT" "$HAPAI_HOME" "$FLOW_CONFIG" \
+  '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m \"test\""}}' \
+  "$HAPAI_ROOT" 2>/dev/null || true
+TOTAL=$((TOTAL + 1))
+flow_exit="$(cat /tmp/flow_exit 2>/dev/null || echo "0")"
+if [[ "$flow_exit" -eq 2 ]]; then
+  echo -e "  ${GREEN}✓${NC} Flow gate=block propagates deny from guard-branch"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} Flow gate=block did not propagate deny (exit=$flow_exit)"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: flow config_get_flow_steps parses steps correctly
+FLOW_STEPS_SCRIPT="$(mktemp)"
+cat > "$FLOW_STEPS_SCRIPT" << 'TESTEOF'
+#!/usr/bin/env bash
+export HAPAI_HOME="$1"
+export _HAPAI_CONFIG="$2"
+cd "$3"
+source hooks/_lib.sh
+_HAPAI_INPUT='{}'
+config_get_flow_steps "test_flow"
+TESTEOF
+chmod +x "$FLOW_STEPS_SCRIPT"
+
+TOTAL=$((TOTAL + 1))
+result="$(bash "$FLOW_STEPS_SCRIPT" "$HAPAI_HOME" "$FLOW_CONFIG" "$HAPAI_ROOT" 2>/dev/null || echo "error")"
+if echo "$result" | jq -e '.hook == "guard-branch"' &>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} config_get_flow_steps parses flow steps correctly"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} config_get_flow_steps returned: $result"
+  FAIL=$((FAIL + 1))
+fi
+
+rm -f "$FLOW_CONFIG" "$FLOW_TEST_SCRIPT" "$FLOW_STEPS_SCRIPT" /tmp/flow_out /tmp/flow_exit 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}CLI block/unblock/blocklist${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Test: hapai block creates entry
+output="$(HAPAI_HOME="$HAPAI_HOME" "$HAPAI_ROOT/bin/hapai" block "feature/bad" --type branch --for 30m --reason "test" 2>&1 || true)"
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -q "Blocked" && [[ -f "$HAPAI_HOME/state/blocklist.json" ]]; then
+  echo -e "  ${GREEN}✓${NC} hapai block creates blocklist entry"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} hapai block failed (output: $output)"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: hapai blocklist shows entry
+output="$(HAPAI_HOME="$HAPAI_HOME" "$HAPAI_ROOT/bin/hapai" blocklist 2>&1 || true)"
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -q "feature/bad"; then
+  echo -e "  ${GREEN}✓${NC} hapai blocklist shows active blocks"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} hapai blocklist did not show entry (output: $output)"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: hapai unblock removes entry
+output="$(HAPAI_HOME="$HAPAI_HOME" "$HAPAI_ROOT/bin/hapai" unblock "feature/bad" 2>&1 || true)"
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -q "Unblocked"; then
+  echo -e "  ${GREEN}✓${NC} hapai unblock removes entry"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} hapai unblock failed (output: $output)"
+  FAIL=$((FAIL + 1))
+fi
+
+# Test: hapai list-hooks runs without error
+output="$(HAPAI_HOME="$HAPAI_HOME" "$HAPAI_ROOT/bin/hapai" list-hooks 2>&1 || true)"
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -q "list-hooks"; then
+  echo -e "  ${GREEN}✓${NC} hapai list-hooks runs without error"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} hapai list-hooks failed (output: $output)"
+  FAIL=$((FAIL + 1))
+fi
+
+# Cleanup
+rm -f "$HAPAI_HOME/state/blocklist.json"
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Summary
 # ═══════════════════════════════════════════════════════════════════════════
 

@@ -6,6 +6,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash __HAPAI_HOOKS__/pre-tool-use/flow-dispatcher.sh",
+            "timeout": 7
+          },
+          {
+            "type": "command",
             "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-branch.sh",
             "timeout": 7,
             "if": "Bash(git *)"
