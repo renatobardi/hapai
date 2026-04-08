@@ -110,6 +110,8 @@ assert_allowed() {
 MOCK_REPO="$(mktemp -d)"
 cd "$MOCK_REPO"
 git init -q
+git config user.name "Test User"
+git config user.email "test@example.com"
 git commit --allow-empty -m "init" -q
 git checkout -b main -q 2>/dev/null || true
 
