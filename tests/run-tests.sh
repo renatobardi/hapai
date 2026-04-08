@@ -941,9 +941,18 @@ cd "$MOCK_REPO" && git checkout -b feat/old-work -q 2>/dev/null || git checkout 
 output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}')"
 assert_allowed "$output" "branch-rules: ignores non-Bash tools"
 
-# Config disabled (default) → allow
+# Config explicitly disabled → allow
+BRANCH_RULES_DISABLED="$(mktemp)"
+cat > "$BRANCH_RULES_DISABLED" << 'YAML'
+guardrails:
+  branch_rules:
+    enabled: false
+YAML
+export _HAPAI_CONFIG="$BRANCH_RULES_DISABLED"
 output="$(run_hook_check "pre-tool-use/guard-branch-rules.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git checkout -b bad-name"}}')"
-assert_allowed "$output" "branch-rules: allows all when disabled (default)"
+assert_allowed "$output" "branch-rules: allows all when disabled"
+unset _HAPAI_CONFIG
+rm -f "$BRANCH_RULES_DISABLED"
 
 export _HAPAI_CONFIG="$BRANCH_RULES_CONFIG"
 
