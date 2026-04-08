@@ -4,13 +4,27 @@
   import AuthGate from './components/AuthGate.svelte'
   import Dashboard from './components/Dashboard.svelte'
   import LoadingState from './components/LoadingState.svelte'
+  import HowItWorksPage from './components/HowItWorksPage.svelte'
+  let currentHash = $state(typeof window !== 'undefined' ? window.location.hash : '')
+  $effect(() => {
+    if (typeof window === 'undefined') return
+    const onHash = () => { currentHash = window.location.hash }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  })
 </script>
 <div class="page">
   {#if $authStore.loading}
     <LoadingState message="Initializing…" />
   {:else}
     <Header />
-    {#if $authStore.user}<Dashboard />{:else}<AuthGate />{/if}
+    {#if currentHash === '#/docs'}
+      <HowItWorksPage />
+    {:else if $authStore.user}
+      <Dashboard />
+    {:else}
+      <AuthGate />
+    {/if}
   {/if}
 </div>
 <style>

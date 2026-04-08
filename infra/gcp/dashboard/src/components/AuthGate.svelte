@@ -1,11 +1,12 @@
 <script>
   import { signIn } from '../lib/firebase.js'
+  import Logo from './Logo.svelte'
   let loading = false; let error = ''
   async function go() { loading = true; error = ''; try { await signIn() } catch(e) { error = e.code === 'auth/popup-closed-by-user' ? '' : 'Sign in failed. Try again.' } finally { loading = false } }
 </script>
 <div class="gate">
   <div class="inner">
-    <div class="logo">hapai</div>
+    <Logo size="lg" />
     <p class="desc">Deterministic guardrails analytics for AI coding assistants.</p>
     <button class="btn" on:click={go} disabled={loading}>
       {#if loading}Signing in…{:else}
@@ -20,7 +21,6 @@
 <style>
   .gate { flex: 1; display: flex; align-items: center; justify-content: center; padding: var(--space-8) var(--space-3); }
   .inner { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); max-width: 320px; width: 100%; text-align: center; }
-  .logo { font-size: 56px; font-weight: var(--weight-black); color: var(--color-near-black); letter-spacing: -0.03em; line-height: 1; }
   .desc { font-size: 14px; font-weight: var(--weight-light); color: var(--color-meta-gray); line-height: 1.5; }
   .btn { display: flex; align-items: center; justify-content: center; gap: var(--space-1); width: 100%; background: var(--color-near-black); color: #fff; padding: 14px 24px; font-size: 14px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.06em; transition: background 150ms; }
   .btn:hover:not(:disabled) { background: var(--color-blue); }

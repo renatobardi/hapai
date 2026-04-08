@@ -1,33 +1,48 @@
 <script>
   import { authStore } from '../stores/auth.js'
   import { signIn, signOut } from '../lib/firebase.js'
-  let signingIn = false
+  import Logo from './Logo.svelte'
+  let signingIn = $state(false)
+  let currentHash = $state(typeof window !== 'undefined' ? window.location.hash : '')
+  $effect(() => {
+    if (typeof window === 'undefined') return
+    const onHash = () => { currentHash = window.location.hash }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  })
   async function handleSignIn() { signingIn = true; try { await signIn() } catch(e){} finally { signingIn = false } }
 </script>
 <header>
   <div class="brand">
-    <span class="wordmark">hapai</span>
+    <Logo size="sm" />
     <span class="subtitle">Guardrails Analytics</span>
   </div>
+  <nav class="nav">
+    <a href="#/" class="nav-link" class:active={currentHash === '' || currentHash === '#/'}>Dashboard</a>
+    <a href="#/docs" class="nav-link" class:active={currentHash === '#/docs'}>How it works</a>
+  </nav>
   <div class="actions">
     {#if !$authStore.loading && $authStore.user}
       <div class="user">
         {#if $authStore.user.photoURL}<img src={$authStore.user.photoURL} alt="" class="avatar" />{/if}
         <span class="username">{$authStore.user.displayName || $authStore.user.email}</span>
       </div>
-      <button class="btn-secondary" on:click={signOut}>Sign out</button>
+      <button class="btn-secondary" onclick={signOut}>Sign out</button>
     {:else if !$authStore.loading}
-      <button class="btn-primary" on:click={handleSignIn} disabled={signingIn}>
+      <button class="btn-primary" onclick={handleSignIn} disabled={signingIn}>
         {signingIn ? 'Signing in…' : 'Sign in with GitHub'}
       </button>
     {/if}
   </div>
 </header>
 <style>
-  header { background: var(--color-black); height: 56px; padding: 0 var(--space-3); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .brand { display: flex; align-items: baseline; gap: var(--space-2); }
-  .wordmark { font-size: 18px; font-weight: var(--weight-black); color: var(--color-white); letter-spacing: -0.01em; }
+  header { background: var(--color-black); height: 56px; padding: 0 var(--space-3); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: relative; }
+  .brand { display: flex; align-items: center; gap: var(--space-2); }
   .subtitle { font-size: 12px; font-weight: var(--weight-light); color: var(--color-meta-gray); }
+  .nav { display: flex; align-items: center; gap: var(--space-3); position: absolute; left: 50%; transform: translateX(-50%); }
+  .nav-link { font-size: 12px; font-weight: var(--weight-bold); color: var(--color-meta-gray); text-decoration: none; text-transform: uppercase; letter-spacing: 0.05em; transition: color 150ms; }
+  .nav-link:hover { color: var(--color-white); }
+  .nav-link.active { color: var(--color-white); }
   .actions { display: flex; align-items: center; gap: var(--space-2); }
   .user { display: flex; align-items: center; gap: var(--space-1); }
   .avatar { width: 28px; height: 28px; border-radius: 0; display: block; }
