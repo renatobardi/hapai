@@ -1,5 +1,69 @@
 # hapai Changelog
 
+## v1.4.1 (2026-04-08) — Node.js 24 Ready
+
+### ✅ Delivered
+
+**GitHub Actions Modernization**
+- Upgraded all workflows to Node.js 24 (from deprecated Node.js 20)
+- Set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` environment variable
+- Updated workflows: ci.yml, deploy-dashboard.yml, hapai-sync.yml, release.yml
+- Prevents future CI failures from Node.js 20 removal (September 2026)
+
+### 📝 Commits
+- `91beb18` — fix: add Node.js 24 environment variable to GitHub Actions workflows (#7)
+
+---
+
+## v1.4.0 (2026-04-08) — Modern Dashboard Redesign
+
+### ✅ Delivered
+
+**Frontend Modernization**
+- Rewritten dashboard in **Svelte 5** (from vanilla JS)
+- Vite build system (production-optimized)
+- Modern BMW-inspired design system (minimalist, professional)
+- Responsive grid layouts, improved UX
+
+**Authentication Update**
+- Switched from Google OAuth to **GitHub OAuth** via Firebase Auth
+- Simplified OAuth flow (no Google Cloud Console setup required)
+- Better developer experience for GitHub-based teams
+
+**Backend Improvements**
+- Dynamic project ID in BigQuery queries (multi-project support)
+- Parameterized query templates (prevents hardcoded references)
+- Fixed GitHub Pages environment configuration (removed problematic URL field)
+- Upgraded deploy-pages action to v4 (fixes artifact lookup issues)
+
+**Build & Deployment**
+- Updated `.github/workflows/deploy-dashboard.yml` for Svelte build
+- Node.js 20 setup with npm cache
+- Environment variables for Firebase config
+- Automatic deployment to GitHub Pages on main push
+
+**Documentation**
+- Updated `infra/gcp/SETUP.md` with GitHub OAuth setup (Phase 5)
+- Documented GitHub Secrets workflow for CI/CD
+- Clarified Firebase API key security (intentionally public for web SDKs)
+- Updated dashboard test procedures (GitHub Auth)
+
+### 🔐 Security Fixes
+
+1. ✅ Parameterized BigQuery queries (prevents hardcoded project references)
+2. ✅ Removed environment URL field (fixes GitHub Pages deploy-pages v4 compatibility)
+3. ✅ Svelte 5 uses safe DOM creation (prevents XSS in denial table rendering)
+4. ✅ Updated documentation to prevent user setup failures
+
+### 📝 Commits
+
+- `c922ca6` — feat: redesign dashboard with Svelte + BMW design system + GitHub Auth
+- `76ea0f6` — fix: address code review issues on PR #6
+- `c3c98af` — Merge pull request #6 (Svelte redesign)
+- `926b1d7` — fix: upgrade deploy-pages action to v4 to fix artifact lookup
+
+---
+
 ## v1.3.1 (2026-04-08) — OIDC + Cloud Dashboard Complete
 
 ### ✅ Delivered

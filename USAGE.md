@@ -114,6 +114,32 @@ guardrails:
   uncommitted_changes:
     enabled: true
     fail_open: true
+
+  # Branch taxonomy: enforce naming conventions (v1.3+)
+  branch_taxonomy:
+    enabled: true
+    allowed_prefixes: [feat, fix, chore, docs, refactor, test, perf, style, ci, build]
+    require_description: true   # require text after prefix/ (kebab-case)
+    fail_open: false            # false = block, true = warn only
+
+  # Branch rules: validate description + origin (v1.3+)
+  branch_rules:
+    enabled: true
+    fail_open: false
+
+  # PR review: mandatory background code review on all PRs (v1.3+)
+  pr_review:
+    enabled: false  # requires 'claude' CLI installed and authenticated
+    model: "claude-haiku-4-5-20251001"
+    fail_open: false
+    review_timeout_seconds: 300
+    max_diff_chars: 8000
+
+  # Git workflow: trunk-based or GitFlow enforcement (v1.3+)
+  git_workflow:
+    enabled: false  # disabled by default — opt in per project
+    model: trunk    # trunk | gitflow
+    fail_open: true
 ```
 
 ### Configurando automação (opcional)
@@ -499,58 +525,126 @@ R: É um padrão cross-tool (agents.md) para instrução de agentes AI. Devin, A
 
 ---
 
-## Cloud Dashboard — Análise em Tempo Real (v1.3)
+## Cloud Dashboard — Análise em Tempo Real (v1.4)
 
 ### Overview
 
 O Dashboard hapai visualiza seus audit logs em um painel interativo em **GitHub Pages** com:
 - Timeline de denials/warnings (últimos 30 dias)
 - Top hooks que bloquearam mais
-- Tabela de eventos recentes com detalhes
+- Tabela de eventos recentes com detalhes (sortável)
 - Distribuição por tool e por projeto
 - Trends de deny rate
 
-Arquitetura:
-1. `hapai sync` — sobe logs de auditoria para Cloud Storage
-2. Cloud Function — processa e carrega dados no BigQuery
-3. GitHub Pages — Dashboard vanilla JS consulta BigQuery via OAuth2
+**Tecnologia:**
+- **Frontend:** Svelte 5 + Vite (moderna, otimizada)
+- **Autenticação:** GitHub OAuth via Firebase Auth
+- **Backend:** Cloud Function (Python 3.12)
+- **Dados:** BigQuery (analytics)
+- **Deploy:** GitHub Pages (automático via Actions)
+
+### Arquitetura
+
+```
+hapai audit logs (local)
+    ↓
+GitHub Actions (OIDC keyless auth)
+    ↓
+Cloud Storage bucket (gs://hapai-audit-{username})
+    ↓
+Cloud Function (triggered on upload)
+    ↓
+BigQuery dataset (hapai_dataset.events)
+    ↓
+Analytics Dashboard (GitHub Pages + Svelte)
+    ↓
+https://{owner}.github.io/{repo}/
+```
 
 ### Setup Rápido
 
-1. **Prepare GCP infrastructure:**
+1. **Setup GCP infrastructure (first time only):**
    ```bash
    cd infra/gcp
-   bash SETUP.md  # Seguir todas as fases (Phase 1-5)
+   # Seguir infra/gcp/SETUP.md — todas as 6 fases
+   # Cria: Workload Identity, Cloud Function, BigQuery, OIDC
    ```
 
-2. **Configure seu projeto:**
+2. **Configure GitHub Actions secrets:**
+   Go to **GitHub Settings** → **Secrets and variables** → **Actions**
+   
+   Add these secrets:
+   - `VITE_FIREBASE_API_KEY` — Firebase SDK key
+   - `VITE_FIREBASE_APP_ID` — Firebase app ID
+   - `VITE_BQ_PROXY_URL` — Cloud Function URL
+
+3. **Deploy dashboard (automatic):**
    ```bash
-   # Crie hapai.yaml na raiz do seu projeto
-   cat > hapai.yaml <<EOF
-   gcp:
-     enabled: true
-     project_id: hapai-oute
-     bucket: hapai-audit-username
-     region: us-east1
-   EOF
+   git push origin main  # Triggers workflow
+   # .github/workflows/deploy-dashboard.yml builds and deploys
    ```
 
-3. **Teste local sync:**
-   ```bash
-   export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json
-   hapai sync --dry-run    # Preview
-   hapai sync              # Upload real
-   ```
+4. **Dashboard is live at:**
+   - `https://{owner}.github.io/{repo}/`
+   - Example: `https://renatobardi.github.io/hapai/`
 
-4. **Configure cron para sync automático:**
-   ```bash
-   crontab -e
-   # Adicionar: 0 2 * * * GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json /usr/local/bin/hapai sync
-   ```
+5. **Sign in with GitHub:**
+   Click "Sign in with GitHub" button
+   Dashboard loads and syncs audit logs from BigQuery
 
-5. **Visit dashboard:**
-   - Local: http://localhost:8000 (se rodar servidor local)
-   - Production: https://hapai.oute.pro (custom domain)
+### Cloud Logging — Sync Audit Logs (Optional)
+
+If you want to monitor guardrails across your team with real-time analytics:
+
+**Enable in hapai.yaml:**
+```yaml
+gcp:
+  enabled: true
+  project_id: your-gcp-project
+  bucket: hapai-audit-{username}
+  region: us-east1
+  retention_days: 90
+```
+
+**Trigger sync:**
+```bash
+# Manual
+hapai sync
+
+# Automatic: GitHub Actions (OIDC)
+# .github/workflows/hapai-sync.yml runs daily @ 2 AM UTC
+```
+
+**Monitor in BigQuery:**
+```bash
+bq query 'SELECT * FROM hapai_dataset.events ORDER BY ts DESC LIMIT 100'
+```
+
+### Dashboard Features
+
+- **Timeline**: Daily denial/warning counts
+- **Top Blocking Hooks**: Which guardrails are most active
+- **Recent Events**: Live feed of all denials/warnings
+- **Tool Distribution**: Which tools trigger guards
+- **Project Breakdown**: Per-project statistics
+- **Deny Rate Trends**: Historical analysis
+
+### Troubleshooting
+
+**Dashboard shows "Sign in with GitHub" but no data:**
+- Ensure BigQuery has data: `bq query 'SELECT COUNT(*) FROM hapai_dataset.events'`
+- Check Cloud Function logs: `gcloud functions logs read bq-query --gen2 --limit 20`
+- Verify Firebase config in GitHub Actions secrets
+
+**Cloud Function 404 errors:**
+- Ensure Cloud Function URL is correct in `VITE_BQ_PROXY_URL`
+- Check function is deployed: `gcloud functions list --gen2`
+- View logs: `gcloud functions logs read bq-query --gen2`
+
+**No data in BigQuery:**
+- Trigger Cloud Function manually: `gcloud scheduler jobs run hapai-sync-trigger --location=us-east1`
+- Check Cloud Storage for uploaded files: `gsutil ls gs://hapai-audit-{username}/ --recursive`
+- View Cloud Function logs for errors
 
 ### Comandos do Dashboard
 

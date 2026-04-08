@@ -167,38 +167,99 @@ flows:
 - Testado em macOS + Ubuntu via CI/CD matrix
 - Release workflow automático (tag → GitHub Release → Brew update)
 
-## Backlog (v1.3+)
+## v1.3 — Cloud Dashboard + OIDC (Completed) ✅
 
-### Dashboard Web (GCP) ⬜
-- Cloud Storage: audit log upload (`hapai sync`)
-- Cloud Functions: trigger load-audit-log para BigQuery
-- BigQuery: analytics dataset `hapai_dataset.events`
-- GitHub Pages: static SPA com Canvas-flavored Markdown
-- Custom domain: hapai.oute.pro via CNAME
-- Zero always-on compute (serverless)
+### Cloud Infrastructure ✅
+- **Cloud Storage:** Keyless audit log uploads (`hapai sync`)
+- **OIDC:** Workload Identity Federation (GitHub Actions → GCP)
+- **Cloud Functions:** Python 3.12, gen2 runtime, BigQuery processor
+- **BigQuery:** Analytics dataset `hapai_dataset.events` with partition pruning
+- **Cloud Scheduler:** Daily sync @ 2 AM UTC
+- **GitHub Pages:** Static dashboard deployment
 
-### Hook Marketplace (v1.4) ⬜
+### Dashboard (Vanilla JS) ✅
+- Canvas.js charts (timeline, hooks, distributions)
+- Google OAuth via Firebase Auth
+- Real-time analytics (denials, warnings, trends)
+- Responsive grid layout
+- Table with sortable columns
+
+### Code Review v1.3 ✅
+- Fixed security issues (input validation, path traversal)
+- Verified OIDC token validation
+- Checked BigQuery schema and partition pruning
+- Validated Cloud Function error handling
+
+### Documentation ✅
+- `infra/gcp/SETUP.md` — 6-phase setup guide (GCP, Cloud Function, BigQuery, Dashboard)
+- Architecture diagrams and flow documentation
+
+---
+
+## v1.4 — Modern Dashboard + Extended Guardrails (Completed) ✅
+
+### Dashboard Redesign ✅
+- **Framework:** Svelte 5 + Vite (production-optimized)
+- **Design:** BMW-inspired minimalist aesthetic
+- **Authentication:** GitHub OAuth (Firebase Auth)
+- **Components:** Modular, reusable Svelte components
+- **Build:** npm ci + Vite build to `_site/`
+- **Deployment:** Automatic GitHub Pages deployment
+
+### Extended Guardrails ✅
+- **Branch Taxonomy:** Enforce naming conventions (feat/, fix/, chore/, etc.)
+- **Branch Rules:** Validate branch description + origin
+- **PR Review:** Background code review enforcement (optional)
+- **Git Workflow:** Trunk-based or GitFlow enforcement (optional)
+
+### Security Fixes ✅
+1. Parameterized BigQuery queries (dynamic project ID)
+2. Removed problematic GitHub Pages environment URL
+3. Svelte safe DOM creation (prevents XSS)
+4. Updated documentation for GitHub OAuth workflow
+
+### Code Review v1.4 ✅
+- Fixed 4 critical issues (hardcoded project, auth mismatch, env URL, setup docs)
+- Verified XSS prevention in new Svelte components
+- Validated dynamic query parameterization
+
+### Node.js 24 Ready ✅
+- Upgraded all GitHub Actions workflows to Node.js 24
+- Set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` env variable
+- Proactive migration from deprecated Node.js 20
+
+---
+
+## Backlog (v1.5+)
+
+### Hook Marketplace (v1.5) ⬜
 - Public registry: `renatobardi/hapai-marketplace`
 - Community hooks: guard-secrets, guard-api-keys, auto-issue-link, etc
 - CLI: `hapai search`, `hapai install-hook`, `hapai publish`
 - Validation: metadata header + sha256 check
 
+### Enhanced Analytics ⬜
+- Custom metrics and alerts via GCP Monitoring
+- Multi-account support (multiple GCP projects)
+- Slack/email notifications
+- Historical trend analysis
+
 ---
 
-## Números Finais (v1.2)
+## Números Finais (v1.4)
 
 | Métrica | Valor |
 |---------|-------|
-| Hooks | 19 (core) + 1 dispatcher (flow) |
+| Hooks | 19 (core) + 1 dispatcher (flow) + 4 new guards |
 | Eventos cobertos | 8 (PreToolUse, PostToolUse, Stop, PreCompact, Notification, PermissionRequest, UserPromptSubmit, SessionStart) |
+| Guardrails | 10 (5 core + 5 extended) |
 | Exporters | 8 (+ CLI multi-tool) |
-| CLI Commands | 20+ (install, kill, revive, block/unblock/blocklist, list-hooks, export, audit, validate, etc) |
-| Testes | 68 (adicionados 13 para v1.2) |
-| Commits | 20+ |
-| Security Issues Fixed | 31 total (19 v1.0 + 12 v1.2) |
+| CLI Commands | 20+ |
+| Testes | 110+ |
+| Security Issues Fixed | 35+ (19 v1.0 + 12 v1.2 + 4 v1.4) |
 | Dependências | 1 (jq) |
-| Linguagem | Bash puro |
-| Instalação | curl\|bash + brew install |
+| Linguagem | Bash (hooks) + Python (Cloud Function) + Svelte (Dashboard) |
+| Instalação | curl\|bash + brew install + GitHub Actions deploy |
 
 ## Timeline
 
@@ -208,6 +269,12 @@ flows:
 | 2026-04-07 | Code review v1.0 — 19 issues corrigidas |
 | 2026-04-07 | v1.1 — Export 8 tools, CI/CD, hardening |
 | 2026-04-08 | Implementação v1.2 — Hook Chains, State Avançado, Installer, Brew |
-| 2026-04-08 | Code review v1.2 — 12 issues corrigidas (security hardening) |
+| 2026-04-08 | Code review v1.2 — 12 issues corrigidas |
 | 2026-04-08 | v1.2.0 Release — Published to GitHub + Homebrew |
-| 2026-04-08 | Próximo: v1.3 — Dashboard Web (GCP + GitHub Pages) |
+| 2026-04-08 | v1.3.0 — Cloud Dashboard infrastructure (GCP + GitHub Pages) |
+| 2026-04-08 | v1.3.1 — OIDC + Cloud Function + BigQuery complete |
+| 2026-04-08 | Code review v1.3 — Security & validation fixes |
+| 2026-04-08 | v1.4.0 — Svelte 5 Dashboard redesign + Extended guardrails |
+| 2026-04-08 | Code review v1.4 — 4 critical issues fixed |
+| 2026-04-08 | v1.4.1 — Node.js 24 upgrade (all workflows) |
+| 2026-04-08 | Documentation update — README, CHANGELOG, USAGE, ROADMAP |
