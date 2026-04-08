@@ -139,7 +139,7 @@ def load_jsonl_to_bigquery(
 def load_audit_from_gcs(event, context):
     """
     Cloud Function entry point.
-    Triggered by: gs://hapai-audit-*/**.jsonl
+    Triggered by: gs://hapai-audit-*/**.jsonl (Eventarc/Cloud Storage)
     """
     logger.info(f"Received event: {json.dumps(event)}")
 
@@ -179,3 +179,12 @@ def load_audit_from_gcs(event, context):
     except Exception as e:
         logger.error(f"Error processing {file_path}: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
+
+
+def load_audit_logs(request):
+    """
+    HTTP entry point for Cloud Functions.
+    For testing/health checks only.
+    Real trigger is Eventarc on Cloud Storage.
+    """
+    return {"status": "ok", "message": "Cloud Function is running"}
