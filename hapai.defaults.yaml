@@ -64,6 +64,32 @@ guardrails:
     enabled: true
     fail_open: true  # warn but don't block
 
+  branch_taxonomy:
+    enabled: true
+    allowed_prefixes:
+      - feat
+      - fix
+      - chore
+      - docs
+      - refactor
+      - test
+      - perf
+      - style
+      - ci
+      - build
+      - release
+      - hotfix
+    require_description: true   # require text after prefix/ (kebab-case)
+    fail_open: false             # false = block; true = warn only
+
+  git_workflow:
+    enabled: false               # disabled by default — opt in per project
+    model: trunk                 # trunk | gitflow
+    fail_open: true              # true = warn (recommended for gradual adoption)
+    trunk:
+      max_branch_age_days: 7     # warn if branch is older than N days on commit
+      require_up_to_date: true   # warn if branch is behind main before push
+
 # ─── Automation (PostToolUse — run after execution) ─────────────────────────
 
 automation:

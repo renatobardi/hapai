@@ -11,6 +11,18 @@
           },
           {
             "type": "command",
+            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-branch-taxonomy.sh",
+            "timeout": 7,
+            "if": "Bash(git *)"
+          },
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-git-workflow.sh",
+            "timeout": 7,
+            "if": "Bash(git *)"
+          },
+          {
+            "type": "command",
             "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-branch.sh",
             "timeout": 7,
             "if": "Bash(git *)"
