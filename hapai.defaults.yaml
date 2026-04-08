@@ -64,6 +64,25 @@ guardrails:
     enabled: true
     fail_open: true  # warn but don't block
 
+  branch_rules:
+    enabled: true
+    require_from_protected: true  # git checkout -b must happen from main/master
+    require_description: true     # kebab-case description required after prefix/
+    fail_open: false
+    allowed_prefixes:
+      - feat
+      - fix
+      - chore
+      - docs
+      - refactor
+      - test
+      - perf
+      - style
+      - ci
+      - build
+      - release
+      - hotfix
+
 # ─── Automation (PostToolUse — run after execution) ─────────────────────────
 
 automation:
