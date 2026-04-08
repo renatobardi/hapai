@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # hapai/hooks/pre-tool-use/guard-pr-review.sh
 # Blocks git push / gh pr merge / git merge when a PR review found unresolved issues.
 # On block, automatically triggers a fresh background review so the user can fix and retry.

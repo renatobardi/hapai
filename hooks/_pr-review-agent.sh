@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # hapai/hooks/_pr-review-agent.sh
 # Background worker: runs Claude Haiku on the PR diff and writes review results to state.
 # Called by pr-review-trigger.sh and guard-pr-review.sh — NOT a hook itself.
@@ -55,6 +56,12 @@ if [[ -z "$base_branch" ]]; then
   base_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||')"
 fi
 if [[ -z "$base_branch" ]]; then
+  base_branch="main"
+fi
+
+# Validate base_branch before using in git command (prevent injection)
+if ! [[ "$base_branch" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+  audit_log "error" "PR review agent: invalid base branch name, defaulting to main"
   base_branch="main"
 fi
 

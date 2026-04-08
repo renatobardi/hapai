@@ -79,6 +79,6 @@ state_set "pr-review.agent_pid" "$agent_pid"
 disown "$agent_pid" 2>/dev/null || true
 
 audit_log "allow" "PR review triggered for branch $branch (pid=$agent_pid)"
-warn "hapai: PR review started in background (claude-haiku). Subsequent pushes will be blocked until the review completes."
+warn "hapai: PR review started in background (claude-haiku). Subsequent pushes will be gated until the review completes."
 
 exit 0
