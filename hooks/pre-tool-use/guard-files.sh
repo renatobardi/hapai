@@ -34,7 +34,7 @@ filename="$(basename "$resolved_path")"
 # Check unprotected list first (explicit overrides)
 while IFS= read -r pattern; do
   [[ -z "$pattern" ]] && continue
-  # shellcheck disable=SC2053
+  # Use quotes to allow bash pattern matching safely (glob expansion from pattern)
   if [[ "$filename" == $pattern ]]; then
     allow
   fi

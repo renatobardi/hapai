@@ -18,9 +18,9 @@ enabled="$(config_get "observability.notifications.sound_enabled" "false")"
 sound_cmd="$(config_get "observability.notifications.sound_command" "")"
 
 if [[ -n "$sound_cmd" ]]; then
-  # User-configured command (run directly, no eval — split on spaces)
-  # shellcheck disable=SC2086
-  $sound_cmd &>/dev/null &
+  # User-configured command — quote to prevent command injection
+  # Do NOT use eval; if more complex commands needed, use proper parsing
+  "$sound_cmd" &>/dev/null &
 elif [[ "$(uname -s)" == "Darwin" ]]; then
   # macOS — use system ping sound
   afplay /System/Library/Sounds/Ping.aiff &>/dev/null &

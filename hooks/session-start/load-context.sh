@@ -49,11 +49,14 @@ fi
 
 # 4. hapai state summary
 deny_total=0
+# Use nullglob to handle case where no *.deny_count files exist
+shopt -s nullglob 2>/dev/null || true
 for f in "$HAPAI_STATE_DIR/"*.deny_count; do
   [[ -f "$f" ]] || continue
   val="$(cat "$f" 2>/dev/null || echo 0)"
   deny_total=$((deny_total + val))
 done
+shopt -u nullglob 2>/dev/null || true
 [[ $deny_total -gt 0 ]] && context_parts+=("hapai: $deny_total total blocks across sessions")
 
 # Build context message

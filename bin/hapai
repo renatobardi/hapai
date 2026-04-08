@@ -68,8 +68,16 @@ cmd_install() {
   fi
 
   # 1. Copy hooks
-  mkdir -p "$hooks_dest"
-  cp -r "$HAPAI_ROOT/hooks/"* "$hooks_dest/" 2>/dev/null || true
+  mkdir -p "$hooks_dest" || {
+    log_error "Cannot create directory: $hooks_dest (check permissions)"
+    exit 1
+  }
+
+  if ! cp -r "$HAPAI_ROOT/hooks/"* "$hooks_dest/" 2>/dev/null; then
+    log_error "Failed to copy hooks to $hooks_dest"
+    exit 1
+  fi
+
   # chmod +x on all .sh files (find instead of globstar which needs shopt -s globstar)
   find "$hooks_dest" -name "*.sh" -type f -exec chmod +x {} + 2>/dev/null || true
   log_ok "Hooks copied to $hooks_dest"
@@ -146,17 +154,21 @@ cmd_install() {
     inject_content="$(cat "$HAPAI_ROOT/templates/claude.md.inject")"
 
     if grep -q "<!-- hapai:start -->" "$claude_md_file" 2>/dev/null; then
-      # Upsert: replace existing block
-      local temp_file
-      temp_file="$(mktemp)"
-      awk '
-        /<!-- hapai:start -->/ { skip=1; next }
-        /<!-- hapai:end -->/ { skip=0; next }
-        !skip { print }
-      ' "$claude_md_file" > "$temp_file"
-      echo "" >> "$temp_file"
-      echo "$inject_content" >> "$temp_file"
-      mv "$temp_file" "$claude_md_file"
+      # Upsert: replace existing block (validate end marker exists for safety)
+      if grep -q "<!-- hapai:end -->" "$claude_md_file" 2>/dev/null; then
+        local temp_file
+        temp_file="$(mktemp)"
+        awk '
+          /<!-- hapai:start -->/ { skip=1; next }
+          /<!-- hapai:end -->/ { skip=0; next }
+          !skip { print }
+        ' "$claude_md_file" > "$temp_file"
+        echo "" >> "$temp_file"
+        echo "$inject_content" >> "$temp_file"
+        mv "$temp_file" "$claude_md_file"
+      else
+        log_warn "CLAUDE.md has hapai:start but missing hapai:end — skipping injection"
+      fi
       log_ok "CLAUDE.md updated (hapai block replaced)"
     else
       # Append
@@ -228,15 +240,20 @@ cmd_uninstall() {
   # Remove CLAUDE.md injection
   for md_file in "$HOME/.claude/CLAUDE.md" "CLAUDE.md"; do
     if [[ -f "$md_file" ]] && grep -q "<!-- hapai:start -->" "$md_file" 2>/dev/null; then
-      local temp_file
-      temp_file="$(mktemp)"
-      awk '
-        /<!-- hapai:start -->/ { skip=1; next }
-        /<!-- hapai:end -->/ { skip=0; next }
-        !skip { print }
-      ' "$md_file" > "$temp_file"
-      mv "$temp_file" "$md_file"
-      log_ok "Removed hapai block from $md_file"
+      # Validate both markers exist before using awk
+      if grep -q "<!-- hapai:end -->" "$md_file" 2>/dev/null; then
+        local temp_file
+        temp_file="$(mktemp)"
+        awk '
+          /<!-- hapai:start -->/ { skip=1; next }
+          /<!-- hapai:end -->/ { skip=0; next }
+          !skip { print }
+        ' "$md_file" > "$temp_file"
+        mv "$temp_file" "$md_file"
+        log_ok "Removed hapai block from $md_file"
+      else
+        log_warn "$md_file has hapai:start but missing hapai:end — skipping"
+      fi
     fi
   done
 

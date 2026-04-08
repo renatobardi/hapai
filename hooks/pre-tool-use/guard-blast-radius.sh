@@ -26,9 +26,9 @@ enabled="$(config_get "guardrails.blast_radius.enabled" "true")"
 # Check if we're in a git repo
 git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 
-# Count staged files
+# Count staged files (trim whitespace from line count)
 staged_files="$(git diff --cached --name-only 2>/dev/null)"
-file_count="$(echo "$staged_files" | grep -c '.' 2>/dev/null || echo "0")"
+file_count="$(echo "$staged_files" | grep -c '.' 2>/dev/null | tr -d ' ' || echo "0")"
 
 # Get thresholds from config
 max_files="$(config_get "guardrails.blast_radius.max_files" "10")"
@@ -46,14 +46,17 @@ fi
 # Count unique top-level directories (packages/, apps/, etc.)
 if [[ -n "$staged_files" ]]; then
   package_dirs="$(echo "$staged_files" | grep -oE '^(packages|apps|modules|services)/[^/]+' 2>/dev/null | sort -u)"
-  package_count="$(echo "$package_dirs" | grep -c '.' 2>/dev/null || echo "0")"
 
-  if [[ "$package_count" -gt "$max_packages" ]]; then
-    package_list="$(echo "$package_dirs" | tr '\n' ', ' | sed 's/,$//')"
-    if [[ -n "$warnings" ]]; then
-      warnings="$warnings Also touches $package_count packages ($package_list)."
-    else
-      warnings="⚠️ Blast radius: commit touches $package_count packages ($package_list) (threshold: $max_packages)."
+  if [[ -n "$package_dirs" ]]; then
+    package_count="$(echo "$package_dirs" | wc -l | tr -d ' ')"
+
+    if [[ "$package_count" -gt "$max_packages" ]]; then
+      package_list="$(echo "$package_dirs" | tr '\n' ', ' | sed 's/,$//')"
+      if [[ -n "$warnings" ]]; then
+        warnings="$warnings Also touches $package_count packages ($package_list)."
+      else
+        warnings="⚠️ Blast radius: commit touches $package_count packages ($package_list) (threshold: $max_packages)."
+      fi
     fi
   fi
 fi

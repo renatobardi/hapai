@@ -27,6 +27,11 @@ fi
 # Get transcript size
 transcript_lines="$(wc -l < "$transcript_path" 2>/dev/null | tr -d ' ')"
 transcript_bytes="$(wc -c < "$transcript_path" 2>/dev/null | tr -d ' ')"
+
+# Ensure values are numeric and non-empty
+[[ -z "$transcript_lines" || ! "$transcript_lines" =~ ^[0-9]+$ ]] && transcript_lines="0"
+[[ -z "$transcript_bytes" || ! "$transcript_bytes" =~ ^[0-9]+$ ]] && transcript_bytes="0"
+
 transcript_kb=$((transcript_bytes / 1024))
 
 # Rough cost estimation based on Claude Code pricing model:
@@ -51,11 +56,20 @@ state_set "cost-tracker.last_session_calls" "$tool_calls"
 state_set "cost-tracker.last_session_tokens" "$estimated_tokens"
 state_set "cost-tracker.last_session_cost_cents" "$estimated_cents"
 
-# Accumulate total across sessions
-total_calls="$(state_get "cost-tracker.total_calls" "0")"
-total_cost="$(state_get "cost-tracker.total_cost_cents" "0")"
-state_set "cost-tracker.total_calls" "$((total_calls + tool_calls))"
-state_set "cost-tracker.total_cost_cents" "$((total_cost + estimated_cents))"
+# Accumulate total across sessions (use temp file + mv for atomicity against race conditions)
+_atomic_increment() {
+  local key="$1" delta="$2"
+  local state_file="${HAPAI_STATE_DIR}/${key}"
+  local current="$(state_get "$key" "0")"
+  local new_val=$((current + delta))
+  # Atomic write: write to temp file, then mv (mv is atomic on same filesystem)
+  local temp_file="${state_file}.tmp.$$"
+  echo "$new_val" > "$temp_file" 2>/dev/null || return
+  mv "$temp_file" "$state_file" 2>/dev/null || return
+}
+
+_atomic_increment "cost-tracker.total_calls" "$tool_calls"
+_atomic_increment "cost-tracker.total_cost_cents" "$estimated_cents"
 
 # Check thresholds
 warnings=""

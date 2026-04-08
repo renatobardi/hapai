@@ -27,10 +27,13 @@ enabled="$(config_get "guardrails.commit_hygiene.enabled" "true")"
 # Handles: -m "message", -m 'message', heredoc $(cat <<'EOF' ... EOF)
 commit_msg=""
 
-# Try -m "..." or -m '...' (greedy match for the message content)
+# Try -m "..." or -m '...' (extract up to closing quote)
 if echo "$command" | grep -qE '\-m\s+'; then
-  # Extract everything after -m (the message argument)
-  commit_msg="$(echo "$command" | sed -n "s/.*-m\s*[\"']\(.*\)/\1/p" | head -1)"
+  if [[ "$command" =~ -m\ \"([^\"]+)\" ]]; then
+    commit_msg="${BASH_REMATCH[1]}"
+  elif [[ "$command" =~ -m\ \'([^\']+)\' ]]; then
+    commit_msg="${BASH_REMATCH[1]}"
+  fi
 fi
 
 # If heredoc pattern, extract the body
@@ -38,7 +41,7 @@ if echo "$command" | grep -qE 'cat\s+<<'; then
   commit_msg="$(echo "$command" | sed -n '/cat.*<<.*EOF/,/EOF/p' | grep -v 'EOF' | grep -v 'cat')"
 fi
 
-# Fallback: if no message extracted, scan the full command (less precise)
+# Fallback: if no message extracted, scan the full command (less precise but matches git behavior)
 if [[ -z "$commit_msg" ]]; then
   commit_msg="$command"
 fi

@@ -44,9 +44,8 @@ for pattern in "${RM_PATTERNS[@]}"; do
 done
 
 # ─── Git destructive operations (allows --force-with-lease as safe alternative) ─
+# Note: Lookahead/lookbehind not supported in grep -E. Use explicit checks below instead.
 GIT_DESTRUCTIVE_PATTERNS=(
-  'git\s+push\s+.*(-f\b|--force\b)(?!.*-with-lease)'
-  'git\s+push\s+.*--force\s'
   'git\s+reset\s+--hard'
   'git\s+clean\s+(-[a-zA-Z]*f|--force)'
   'git\s+checkout\s+--\s+\.'

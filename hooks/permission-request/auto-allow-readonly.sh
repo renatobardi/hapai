@@ -31,7 +31,7 @@ if [[ "$tool_name" == "Bash" ]]; then
   [[ -z "$command" ]] && exit 0
 
   # Extract the first command (before any pipe/chain)
-  first_cmd="$(echo "$command" | sed -E 's/\s*[|;&].*//' | sed 's/^\s*//' | awk '{print $1}')"
+  first_cmd="$(echo "$command" | sed -E 's/\s*[|;&].*//' | sed 's/^\s*//' | awk -F' ' '{print $1}')"
 
   # List of safe read-only commands
   case "$first_cmd" in
@@ -42,7 +42,7 @@ if [[ "$tool_name" == "Bash" ]]; then
       ;;
     git)
       # Allow read-only git commands
-      git_subcmd="$(echo "$command" | awk '{print $2}')"
+      git_subcmd="$(echo "$command" | awk -F' ' '{print $2}')"
       case "$git_subcmd" in
         log|status|diff|show|branch|tag|remote|stash\ list|rev-parse|describe|shortlog|blame)
           jq -n '{hookSpecificOutput: {hookEventName: "PermissionRequest", permissionDecision: "allow"}}'
@@ -58,7 +58,7 @@ if [[ "$tool_name" == "Bash" ]]; then
       ;;
     npm|pnpm|yarn|bun)
       # Allow read-only package manager commands
-      subcmd="$(echo "$command" | awk '{print $2}')"
+      subcmd="$(echo "$command" | awk -F' ' '{print $2}')"
       case "$subcmd" in
         list|ls|outdated|view|info|show|why|audit|pack\ --dry-run)
           jq -n '{hookSpecificOutput: {hookEventName: "PermissionRequest", permissionDecision: "allow"}}'

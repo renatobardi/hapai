@@ -28,7 +28,12 @@ file_path="$(get_field '.tool_input.file_path')"
 [[ -z "$file_path" ]] && exit 0
 
 # Resolve to relative path from git root for accurate matching
-git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+git_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [[ -z "$git_root" ]]; then
+  # Cannot determine git root — either not in a repo or corrupt state
+  # Default to allowing (not in a git context, or too risky to block)
+  exit 0
+fi
 rel_file=""
 
 # If file_path is absolute, make it relative to git root

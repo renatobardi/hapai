@@ -39,6 +39,8 @@ audit_log "backup" "Transcript saved: $backup_file ($lines lines, ${size}B)"
 
 # Cleanup old backups (keep last N days based on config)
 retention_days="$(config_get "observability.backup_transcripts.retention_days" "30")"
-find "$backup_dir" -name "*.jsonl" -mtime +"$retention_days" -delete 2>/dev/null || true
+# Use find with proper quoting and -print0 for safety (avoid -delete for portability)
+find "$backup_dir" -name "*.jsonl" -mtime +"${retention_days}" -type f -print0 2>/dev/null | \
+  xargs -0 rm -f 2>/dev/null || true
 
 exit 0

@@ -102,9 +102,21 @@ find_config() {
   fi
 }
 
-# YAML indent tracking helpers (used by config_get and config_get_list)
-_get_indent_at() { eval "echo \$indent_at_$1"; }
-_set_indent_at() { eval "indent_at_$1=$2"; }
+# YAML indent tracking helpers (sanitized to prevent eval injection)
+# Only accept numeric indices to prevent code injection
+_get_indent_at() {
+  local idx="$1"
+  # Validate idx is numeric only — prevent eval injection
+  [[ ! "$idx" =~ ^[0-9]+$ ]] && echo "-1" && return
+  eval "echo \$indent_at_$idx"
+}
+_set_indent_at() {
+  local idx="$1" val="$2"
+  # Validate idx and val are safe — prevent eval injection
+  [[ ! "$idx" =~ ^[0-9]+$ ]] && return
+  [[ ! "$val" =~ ^-?[0-9]+$ ]] && return
+  eval "indent_at_$idx=$val"
+}
 
 # Read a config value from hapai.yaml — context-aware YAML parser.
 # Walks the dot-separated key path through YAML indentation levels.
@@ -326,6 +338,7 @@ audit_log() {
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")"
 
   # Safe JSON construction via jq (handles all special chars, tabs, control chars)
+  # Pass reason directly to jq --arg to handle escaping (jq will limit length internally)
   {
     jq -n -c \
       --arg ts "$timestamp" \
@@ -333,7 +346,7 @@ audit_log() {
       --arg hook "$hook_name" \
       --arg tool "$tool_name" \
       --arg result "$result" \
-      --arg reason "$(echo "$reason" | head -c 500)" \
+      --arg reason "${reason:0:500}" \
       --arg project "$project_dir" \
       '{ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
   } >> "$HAPAI_AUDIT_LOG" 2>/dev/null || true
