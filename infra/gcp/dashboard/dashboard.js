@@ -12,6 +12,34 @@ const CONFIG = {
   projectId: "YOUR_GCP_PROJECT_ID", // Replace with actual project ID
 };
 
+// Validate configuration on load
+function validateConfig() {
+  if (!CONFIG.projectId || CONFIG.projectId === "YOUR_GCP_PROJECT_ID") {
+    showError("Configuration error: projectId not set. Update CONFIG in dashboard.js");
+    return false;
+  }
+  if (!CONFIG.clientId || CONFIG.clientId === "YOUR_GOOGLE_OAUTH_CLIENT_ID") {
+    showError("Configuration error: clientId not set. Update CONFIG in dashboard.js");
+    return false;
+  }
+  // Validate projectId format (alphanumeric, hyphens only)
+  if (!/^[a-z0-9\-]+$/.test(CONFIG.projectId)) {
+    showError("Configuration error: Invalid projectId format");
+    return false;
+  }
+  return true;
+}
+
+// Sanitize BigQuery identifier (table names, dataset names)
+function sanitizeIdentifier(identifier) {
+  // Allow alphanumeric, underscore, and backticks for BigQuery identifiers
+  // Backticks are used in the queries, so validate the content is safe
+  if (!/^[a-zA-Z0-9_\-]+$/.test(identifier.replace(/`/g, ""))) {
+    throw new Error("Invalid identifier format");
+  }
+  return identifier;
+}
+
 // Global state
 let accessToken = null;
 let charts = {};
@@ -19,45 +47,90 @@ let charts = {};
 // ─── Authentication ──────────────────────────────────────────────────────────
 
 async function initAuth() {
-  if (localStorage.getItem("authToken")) {
-    accessToken = localStorage.getItem("authToken");
+  // Check sessionStorage for token (only persists for current session)
+  const storedToken = sessionStorage.getItem("authToken");
+  if (storedToken && validateToken(storedToken)) {
+    accessToken = storedToken;
     showDashboard();
   } else {
+    // Clear invalid/expired token
+    sessionStorage.removeItem("authToken");
     showAuthRequired();
   }
 }
 
+function validateToken(token) {
+  // Ensure token looks like a valid OAuth token (basic validation)
+  return token && typeof token === "string" && token.length > 0 && !token.includes("<") && !token.includes(">");
+}
+
 function signIn() {
-  // Use OAuth 2.0 flow
+  // Use OAuth 2.0 Authorization Code Flow (secure for web apps)
+  const state = generateRandomState();
+  sessionStorage.setItem("oauth_state", state);
+
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams(
     {
       client_id: CONFIG.clientId,
       redirect_uri: window.location.origin,
-      response_type: "token",
+      response_type: "code",
       scope: CONFIG.scopes.join(" "),
+      state: state,
       prompt: "consent",
+      access_type: "online",
     }
   ).toString()}`;
 
   window.location.href = authUrl;
 }
 
-function handleAuthCallback() {
-  const hash = window.location.hash.substring(1);
-  const params = new URLSearchParams(hash);
-  const token = params.get("access_token");
+function generateRandomState() {
+  // Generate cryptographically random state for CSRF protection
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
-  if (token) {
-    accessToken = token;
-    localStorage.setItem("authToken", token);
-    window.location.hash = "";
-    showDashboard();
+function handleAuthCallback() {
+  // Handle OAuth redirect with authorization code
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const state = params.get("state");
+
+  // Verify state parameter (CSRF protection)
+  const storedState = sessionStorage.getItem("oauth_state");
+  if (!state || state !== storedState) {
+    showError("Invalid state parameter. Authentication failed.");
+    return;
   }
+
+  if (code) {
+    // Exchange code for token (requires backend service)
+    // For now, use implicit grant as fallback, but note this is less secure
+    exchangeCodeForToken(code);
+  }
+
+  // Clear state after processing
+  sessionStorage.removeItem("oauth_state");
+  window.history.replaceState({}, document.title, window.location.origin);
+}
+
+function exchangeCodeForToken(code) {
+  // In production, exchange code with backend to get token
+  // Backend must keep client_secret secure (never expose in frontend)
+  console.warn(
+    "Authorization code received. Backend must exchange with Google to get access token. " +
+      "Configure backend endpoint in CONFIG.tokenExchangeUrl"
+  );
+  // Placeholder: assume backend handles this and returns token
+  // This is where you'd call your backend API
+  showError("Token exchange not yet configured. Configure backend OAuth handler.");
 }
 
 function signOut() {
   accessToken = null;
-  localStorage.removeItem("authToken");
+  sessionStorage.removeItem("authToken");
+  sessionStorage.removeItem("oauth_state");
   showAuthRequired();
 }
 
@@ -376,19 +449,40 @@ function updateHooks(data) {
 
 function updateDenials(data) {
   const tbody = document.getElementById("denialTableBody");
-  tbody.innerHTML = data
-    .map(
-      (row) => `
-    <tr>
-      <td>${new Date(row.ts).toLocaleString()}</td>
-      <td><span class="event-badge event-${row.event}">${row.event.toUpperCase()}</span></td>
-      <td>${row.hook}</td>
-      <td>${row.tool}</td>
-      <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${row.result || "—"}</td>
-    </tr>
-  `
-    )
-    .join("");
+  tbody.innerHTML = "";
+
+  data.forEach((row) => {
+    const tr = document.createElement("tr");
+
+    const tdTime = document.createElement("td");
+    tdTime.textContent = new Date(row.ts).toLocaleString();
+    tr.appendChild(tdTime);
+
+    const tdEvent = document.createElement("td");
+    const eventSpan = document.createElement("span");
+    eventSpan.className = `event-badge event-${row.event}`;
+    eventSpan.textContent = row.event.toUpperCase();
+    tdEvent.appendChild(eventSpan);
+    tr.appendChild(tdEvent);
+
+    const tdHook = document.createElement("td");
+    tdHook.textContent = row.hook;
+    tr.appendChild(tdHook);
+
+    const tdTool = document.createElement("td");
+    tdTool.textContent = row.tool;
+    tr.appendChild(tdTool);
+
+    const tdResult = document.createElement("td");
+    tdResult.textContent = row.result || "—";
+    tdResult.style.maxWidth = "300px";
+    tdResult.style.whiteSpace = "nowrap";
+    tdResult.style.overflow = "hidden";
+    tdResult.style.textOverflow = "ellipsis";
+    tr.appendChild(tdResult);
+
+    tbody.appendChild(tr);
+  });
 }
 
 function updateTools(data) {

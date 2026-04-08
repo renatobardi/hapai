@@ -70,7 +70,29 @@ def ensure_dataset_and_table(project_id: str) -> str:
     """
     Ensure BigQuery dataset and table exist with proper schema.
     Returns the full table ID.
+
+    Args:
+        project_id: GCP project ID
+
+    Returns:
+        Full BigQuery table ID (project.dataset.table)
+
+    Raises:
+        ValueError: If project_id or identifiers are invalid
+        GoogleCloudError: If BigQuery API calls fail
     """
+    # Validate project_id
+    if not project_id or not isinstance(project_id, str):
+        raise ValueError("Invalid project_id: must be a non-empty string")
+    if not VALID_PROJECT_ID_PATTERN.match(project_id):
+        raise ValueError(f"Invalid project_id format: {project_id}")
+
+    # Validate identifiers
+    if not validate_identifier(DATASET_ID, "dataset"):
+        raise ValueError(f"Invalid dataset ID: {DATASET_ID}")
+    if not validate_identifier(TABLE_ID, "table"):
+        raise ValueError(f"Invalid table ID: {TABLE_ID}")
+
     dataset_ref = f"{project_id}.{DATASET_ID}"
     table_ref = f"{dataset_ref}.{TABLE_ID}"
 
@@ -78,25 +100,43 @@ def ensure_dataset_and_table(project_id: str) -> str:
     try:
         bigquery_client.get_dataset(dataset_ref)
         logger.info(f"Dataset {dataset_ref} exists")
-    except Exception as e:
-        logger.info(f"Creating dataset {dataset_ref}: {e}")
-        dataset = bigquery.Dataset(dataset_ref)
-        dataset.location = "US"
-        bigquery_client.create_dataset(dataset, timeout=30)
+    except GoogleCloudError as e:
+        if "NotFound" in str(e):
+            logger.info(f"Creating dataset {dataset_ref}")
+            try:
+                dataset = bigquery.Dataset(dataset_ref)
+                dataset.location = "US"
+                bigquery_client.create_dataset(dataset, timeout=30)
+                logger.info(f"Created dataset {dataset_ref}")
+            except GoogleCloudError as create_error:
+                logger.error(f"Failed to create dataset: {create_error}")
+                raise
+        else:
+            logger.error(f"Error accessing dataset: {e}")
+            raise
 
     # Check and create table if needed
     try:
         bigquery_client.get_table(table_ref)
         logger.info(f"Table {table_ref} exists")
-    except Exception as e:
-        logger.info(f"Creating table {table_ref}: {e}")
-        table = bigquery.Table(table_ref, schema=SCHEMA)
-        table.time_partitioning = bigquery.TimePartitioning(
-            type_=bigquery.TimePartitioningType.DAY,
-            field="ts",
-            expiration_ms=90 * 24 * 3600 * 1000,  # 90 days
-        )
-        bigquery_client.create_table(table, timeout=30)
+    except GoogleCloudError as e:
+        if "NotFound" in str(e):
+            logger.info(f"Creating table {table_ref}")
+            try:
+                table = bigquery.Table(table_ref, schema=SCHEMA)
+                table.time_partitioning = bigquery.TimePartitioning(
+                    type_=bigquery.TimePartitioningType.DAY,
+                    field="ts",
+                    expiration_ms=90 * 24 * 3600 * 1000,  # 90 days
+                )
+                bigquery_client.create_table(table, timeout=30)
+                logger.info(f"Created table {table_ref}")
+            except GoogleCloudError as create_error:
+                logger.error(f"Failed to create table: {create_error}")
+                raise
+        else:
+            logger.error(f"Error accessing table: {e}")
+            raise
 
     return table_ref
 
