@@ -376,19 +376,40 @@ function updateHooks(data) {
 
 function updateDenials(data) {
   const tbody = document.getElementById("denialTableBody");
-  tbody.innerHTML = data
-    .map(
-      (row) => `
-    <tr>
-      <td>${new Date(row.ts).toLocaleString()}</td>
-      <td><span class="event-badge event-${row.event}">${row.event.toUpperCase()}</span></td>
-      <td>${row.hook}</td>
-      <td>${row.tool}</td>
-      <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${row.result || "—"}</td>
-    </tr>
-  `
-    )
-    .join("");
+  tbody.innerHTML = "";
+
+  data.forEach((row) => {
+    const tr = document.createElement("tr");
+
+    const tdTime = document.createElement("td");
+    tdTime.textContent = new Date(row.ts).toLocaleString();
+    tr.appendChild(tdTime);
+
+    const tdEvent = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = `event-badge event-${row.event}`;
+    badge.textContent = row.event.toUpperCase();
+    tdEvent.appendChild(badge);
+    tr.appendChild(tdEvent);
+
+    const tdHook = document.createElement("td");
+    tdHook.textContent = row.hook;
+    tr.appendChild(tdHook);
+
+    const tdTool = document.createElement("td");
+    tdTool.textContent = row.tool;
+    tr.appendChild(tdTool);
+
+    const tdResult = document.createElement("td");
+    tdResult.textContent = row.result || "—";
+    tdResult.style.maxWidth = "300px";
+    tdResult.style.whiteSpace = "nowrap";
+    tdResult.style.overflow = "hidden";
+    tdResult.style.textOverflow = "ellipsis";
+    tr.appendChild(tdResult);
+
+    tbody.appendChild(tr);
+  });
 }
 
 function updateTools(data) {
