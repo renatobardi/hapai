@@ -135,16 +135,20 @@ config_get() {
   while IFS= read -r line; do
     # Skip empty lines and comments
     [[ -z "$line" ]] && continue
-    echo "$line" | grep -qE '^\s*#' && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
     # Calculate indentation (number of leading spaces)
     local stripped="${line#"${line%%[![:space:]]*}"}"
-    local indent=$(( ${#line} - ${#stripped} ))
+    # Count leading spaces: remove from the beginning until first non-space
+    local indent=0
+    while [[ ${#stripped} -lt ${#line} && "${line:$indent:1}" == " " ]]; do
+      indent=$((indent + 1))
+    done
 
     # Extract key from this line
     local line_key=""
-    if echo "$stripped" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:'; then
-      line_key="$(echo "$stripped" | sed 's/[[:space:]]*:.*//')"
+    if [[ "$stripped" =~ ^([a-zA-Z_][a-zA-Z0-9_-]*)[[:space:]]*: ]]; then
+      line_key="${BASH_REMATCH[1]}"
     fi
 
     [[ -z "$line_key" ]] && continue
@@ -175,7 +179,16 @@ config_get() {
       if [[ $match_depth -eq $((depth - 1)) ]]; then
         # Found the leaf key in the correct context!
         local value
-        value="$(echo "$stripped" | sed 's/^[^:]*:[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/" | tr -d '[:space:]')"
+        # Extract value: remove "key: " prefix, strip trailing comments, unquote
+        value="$(echo "$stripped" | sed 's/^[^:]*:[[:space:]]*//' | sed 's/[[:space:]]*#.*//')"
+        # Remove surrounding quotes (either single or double)
+        if [[ "$value" =~ ^\"(.*)\"$ ]]; then
+          value="${BASH_REMATCH[1]}"
+        elif [[ "$value" =~ ^\'(.*)\'$ ]]; then
+          value="${BASH_REMATCH[1]}"
+        fi
+        # Trim trailing whitespace only (don't strip all spaces)
+        value="${value%"${value##*[^[:space:]]}"}"
         if [[ -n "$value" && "$value" != "[]" && "$value" != "{}" ]]; then
           echo "$value"
           return
@@ -217,26 +230,39 @@ config_get_list() {
 
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
-    echo "$line" | grep -qE '^\s*#' && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
     local stripped="${line#"${line%%[![:space:]]*}"}"
-    local indent=$(( ${#line} - ${#stripped} ))
+    # Count leading spaces: remove from the beginning until first non-space
+    local indent=0
+    while [[ ${#stripped} -lt ${#line} && "${line:$indent:1}" == " " ]]; do
+      indent=$((indent + 1))
+    done
 
     # If we're reading list items from the target key
     if [[ $in_target -eq 1 ]]; then
       if [[ $indent -le $target_indent ]]; then
         return
       fi
-      if echo "$stripped" | grep -qE '^-\s+'; then
-        echo "$stripped" | sed 's/^-[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/"
+      if [[ "$stripped" =~ ^-[[:space:]] ]]; then
+        local item_value="${stripped#-[[:space:]]}"
+        # Remove trailing comments
+        item_value="${item_value%% #*}"
+        # Unquote
+        if [[ "$item_value" =~ ^\"(.*)\"$ ]]; then
+          item_value="${BASH_REMATCH[1]}"
+        elif [[ "$item_value" =~ ^\'(.*)\'$ ]]; then
+          item_value="${BASH_REMATCH[1]}"
+        fi
+        echo "$item_value"
       fi
       continue
     fi
 
     # Extract key from this line
     local line_key=""
-    if echo "$stripped" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:'; then
-      line_key="$(echo "$stripped" | sed 's/[[:space:]]*:.*//')"
+    if [[ "$stripped" =~ ^([a-zA-Z_][a-zA-Z0-9_-]*)[[:space:]]*: ]]; then
+      line_key="${BASH_REMATCH[1]}"
     fi
     [[ -z "$line_key" ]] && continue
 

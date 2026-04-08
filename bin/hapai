@@ -491,11 +491,15 @@ SUPPORTED_TARGETS="claude cursor copilot windsurf devin trae antigravity univers
 
 cmd_export() {
   local target="${1:-claude}"
-  shift 2>/dev/null || true
 
   case "$target" in
-    --target) target="${1:-claude}" ;;
-    --all)    target="all" ;;
+    --target)
+      shift
+      target="${1:-claude}"
+      ;;
+    --all)
+      target="all"
+      ;;
   esac
 
   if [[ "$target" == "all" ]]; then

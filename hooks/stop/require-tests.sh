@@ -32,22 +32,23 @@ fi
 # The transcript is JSONL — search for Bash tool_input.command containing test commands
 found_test=0
 for cmd in "${test_commands[@]}"; do
-  if grep -q "\"command\".*${cmd}" "$transcript_path" 2>/dev/null; then
+  if grep -qF "$cmd" "$transcript_path" 2>/dev/null; then
     found_test=1
     break
   fi
 done
 
-if [[ $found_test -eq 0 ]]; then
-  fail_open="$(config_get "observability.require_tests.fail_open" "true")"
-  state_increment "require-tests.warn_count"
-
-  if [[ "$fail_open" == "true" ]]; then
-    warn "hapai: No tests were run during this session. Consider running tests before finishing."
-  else
-    deny "hapai: Session blocked — no tests were run. Run your test suite before completing."
-  fi
+if [[ $found_test -eq 1 ]]; then
+  audit_log "allow" "Tests detected in session"
+  exit 0
 fi
 
-audit_log "allow" "Tests detected in session"
-exit 0
+# No tests found
+fail_open="$(config_get "observability.require_tests.fail_open" "true")"
+state_increment "require-tests.warn_count"
+
+if [[ "$fail_open" == "true" ]]; then
+  warn "hapai: No tests were run during this session. Consider running tests before finishing."
+else
+  deny "hapai: Session blocked — no tests were run. Run your test suite before completing."
+fi

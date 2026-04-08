@@ -18,9 +18,10 @@ transcript_path="$(get_field '.transcript_path')"
 [[ -z "$transcript_path" || ! -f "$transcript_path" ]] && exit 0
 
 # Count tool calls in transcript
+# Search for "type":"tool_use" to avoid false positives in strings/comments
 tool_calls=0
 if [[ -f "$transcript_path" ]]; then
-  tool_calls="$(grep -c '"tool_use"' "$transcript_path" 2>/dev/null || echo "0")"
+  tool_calls="$(grep -c '"type"[[:space:]]*:[[:space:]]*"tool_use"' "$transcript_path" 2>/dev/null || echo "0")"
 fi
 
 # Get transcript size
