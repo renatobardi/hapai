@@ -1,5 +1,19 @@
 # hapai Changelog
 
+## v1.4.3 (2026-04-09) — HowItWorksPage Template Syntax Fix
+
+### ✅ Delivered
+
+- Fixed `ReferenceError: file is not defined` crash when navigating to `#/docs`
+- Root cause: `{file}` strings inside YAML code blocks in `HowItWorksPage.svelte` were interpreted by the Svelte compiler as JavaScript template expressions
+- Fix: replaced with HTML entities `&#123;file&#125;` which render as `{file}` visually but are not processed by Svelte
+
+### 📝 Commits
+
+- `73d0f19` — fix: escape curly braces in HowItWorksPage code blocks to prevent Svelte template errors (#22)
+
+---
+
 ## v1.4.2 (2026-04-09) — Dashboard UX Fixes
 
 ### ✅ Delivered
