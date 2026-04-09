@@ -1,8 +1,8 @@
 <script>
   import { authStore } from '../stores/auth.js'
   import { signIn, signOut } from '../lib/firebase.js'
+  import { route, navigate } from '../stores/route.js'
   import Logo from './Logo.svelte'
-  let { currentHash = '#/' } = $props()
   let signingIn = $state(false)
   async function handleSignIn() { signingIn = true; try { await signIn() } catch(e){} finally { signingIn = false } }
 </script>
@@ -12,8 +12,10 @@
     <span class="subtitle">Guardrails Analytics</span>
   </div>
   <nav class="nav">
-    <a href="#/" class="nav-link" class:active={currentHash === '' || currentHash === '#/' || !currentHash.startsWith('#/docs')}>Dashboard</a>
-    <a href="#/docs" class="nav-link" class:active={currentHash.startsWith('#/docs')}>How it works</a>
+    {#if $authStore.user}
+      <a href="#/" class="nav-link" class:active={$route === '' || $route === '#/' || !$route.startsWith('#/docs')} onclick={(e) => { e.preventDefault(); navigate('#/') }}>Dashboard</a>
+    {/if}
+    <a href="#/docs" class="nav-link" class:active={$route.startsWith('#/docs')} onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>How it works</a>
   </nav>
   <div class="actions">
     {#if !$authStore.loading && $authStore.user}
@@ -35,7 +37,7 @@
   header { background: var(--color-black); height: 80px; padding: 0 var(--space-3); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: relative; }
   .brand { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
   .subtitle { font-size: 18px; font-weight: var(--weight-light); color: #e8e8e8; line-height: 1; }
-  .nav { display: flex; align-items: center; gap: var(--space-3); position: absolute; left: 50%; transform: translateX(-50%); }
+  .nav { display: flex; align-items: center; gap: var(--space-3); }
   .nav-link { font-size: 12px; font-weight: var(--weight-bold); color: var(--color-meta-gray); text-decoration: none; text-transform: uppercase; letter-spacing: 0.05em; transition: color 150ms; }
   .nav-link:hover { color: var(--color-white); }
   .nav-link.active { color: var(--color-white); }
