@@ -13,7 +13,9 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/launch.json
 infra/gcp/dashboard/.env
 
-# Dashboard build output
+# Dashboard build output and dependencies
 _site/
+infra/gcp/dashboard/node_modules/
