@@ -246,19 +246,20 @@ def _get_table_ref(table_name: str) -> str:
 _QUERY_TEMPLATES = {
     "stats": """
         SELECT
-          COUNTIF(event = 'deny')  AS denials,
-          COUNTIF(event = 'warn')  AS warnings
+          COUNTIF(result = 'deny')  AS denials,
+          COUNTIF(result = 'warn')  AS warnings
         FROM {table_ref}
         WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
     """,
     "timeline": """
         SELECT
           FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day,
-          event,
+          result                            AS event,
           CAST(COUNT(*) AS INT64)           AS count
         FROM {table_ref}
         WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-        GROUP BY day, event
+          AND result IN ('allow', 'deny', 'warn')
+        GROUP BY day, result
         ORDER BY day
     """,
     "hooks": """
@@ -266,7 +267,7 @@ _QUERY_TEMPLATES = {
           hook,
           CAST(COUNT(*) AS INT64) AS blocks
         FROM {table_ref}
-        WHERE event = 'deny'
+        WHERE result = 'deny'
           AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
         GROUP BY hook
         ORDER BY blocks DESC
@@ -277,7 +278,7 @@ _QUERY_TEMPLATES = {
           FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', ts) AS ts,
           event, hook, tool, result
         FROM {table_ref}
-        WHERE event IN ('deny', 'warn')
+        WHERE result IN ('deny', 'warn')
         ORDER BY ts DESC
         LIMIT 50
     """,
@@ -286,7 +287,7 @@ _QUERY_TEMPLATES = {
           tool,
           CAST(COUNT(*) AS INT64) AS count
         FROM {table_ref}
-        WHERE event = 'deny'
+        WHERE result = 'deny'
           AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
         GROUP BY tool
         ORDER BY count DESC
@@ -296,7 +297,7 @@ _QUERY_TEMPLATES = {
           project,
           CAST(COUNT(*) AS INT64) AS count
         FROM {table_ref}
-        WHERE event = 'deny'
+        WHERE result = 'deny'
           AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
           AND project IS NOT NULL
         GROUP BY project
@@ -305,8 +306,8 @@ _QUERY_TEMPLATES = {
     """,
     "trends": """
         SELECT
-          FORMAT_DATE('%Y-%m-%d', DATE(ts))      AS day,
-          CAST(COUNTIF(event = 'deny') AS INT64) AS denies
+          FORMAT_DATE('%Y-%m-%d', DATE(ts))        AS day,
+          CAST(COUNTIF(result = 'deny') AS INT64)  AS denies
         FROM {table_ref}
         WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
         GROUP BY day

@@ -740,6 +740,8 @@ cmd_sync() {
   # Check credentials: support both OIDC (GitHub Actions) and service account keys (local)
   local use_oidc=false
 
+  local adc_file="${HOME}/.config/gcloud/application_default_credentials.json"
+
   if [[ -n "${GOOGLE_IDENTITY_TOKEN:-}" ]]; then
     # OIDC mode (GitHub Actions Workload Identity Federation)
     use_oidc=true
@@ -751,9 +753,15 @@ cmd_sync() {
       exit 1
     fi
     log_info "Using service account key: $GOOGLE_APPLICATION_CREDENTIALS"
+  elif [[ -f "$adc_file" ]]; then
+    # Application Default Credentials (gcloud auth application-default login)
+    export GOOGLE_APPLICATION_CREDENTIALS="$adc_file"
+    log_info "Using Application Default Credentials: $adc_file"
   else
     log_error "No GCP credentials found. Choose one:"
-    log_info "  Local (service account key):"
+    log_info "  Application Default Credentials (recommended):"
+    log_info "    gcloud auth application-default login"
+    log_info "  Service account key:"
     log_info "    export GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcp-sa-key.json"
     log_info "  GitHub Actions (OIDC):"
     log_info "    Use 'google-github-actions/auth@v1' with Workload Identity"
@@ -797,6 +805,25 @@ cmd_sync() {
   else
     log_error "Failed to sync audit log to Cloud Storage"
     exit 1
+  fi
+
+  # Load into BigQuery
+  if command -v bq &>/dev/null; then
+    local bq_table="${project_id}:hapai_dataset.events"
+    log_info "Loading into BigQuery: $bq_table"
+    if bq load \
+        --source_format=NEWLINE_DELIMITED_JSON \
+        --ignore_unknown_values \
+        --replace=false \
+        "$bq_table" \
+        "$gcs_path" 2>&1; then
+      log_ok "BigQuery load completed"
+    else
+      log_warn "BigQuery load failed — data is still in Cloud Storage at $gcs_path"
+    fi
+  else
+    log_warn "bq CLI not found — skipping BigQuery load (data uploaded to GCS)"
+    log_info "To load manually: bq load --source_format=NEWLINE_DELIMITED_JSON ${project_id}:hapai_dataset.events $gcs_path"
   fi
 }
 
