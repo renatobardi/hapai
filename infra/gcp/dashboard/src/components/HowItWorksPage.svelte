@@ -120,13 +120,13 @@ guardrails:
 
   auto_format:
     enabled: true
-    python: "ruff format {file}"
-    javascript: "prettier --write {file}"
+    python: "ruff format &#123;file&#125;"
+    javascript: "prettier --write &#123;file&#125;"
 
   auto_lint:
     enabled: true
-    python: "ruff check {file}"
-    javascript: "eslint {file}"</code></pre>
+    python: "ruff check &#123;file&#125;"
+    javascript: "eslint &#123;file&#125;"</code></pre>
     </section>
 
     <section id="cli-commands" class="docs-section">
