@@ -18,6 +18,6 @@
 {/if}
 
 <style>
-  .logo-sm { height: 24px; width: auto; display: block; }
+  .logo-sm { height: 34px; width: auto; display: block; }
   .logo-lg { height: 96px; width: auto; display: block; }
 </style>
