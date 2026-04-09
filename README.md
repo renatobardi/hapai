@@ -4,12 +4,14 @@
 
 **hapai** v1.3+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
 
-## What's New in v1.3+
+## What's New in v1.4.3
 
+- **"How it works" page fixed** — Docs page now routes and renders correctly
+- **Dashboard nav improved** — "Dashboard" link hidden when not authenticated; nav no longer overlaps Sign In button
+- **Logo & branding** — New logo design, correct light/dark variants, larger header size
 - **Svelte 5 Analytics Dashboard** — Real-time visualization of guardrail events
 - **Cloud Integration** — BigQuery streaming + Cloud Functions + GitHub Pages
 - **GitHub OAuth** — Firebase Authentication for dashboard access
-- **Extended Guardrails** — Branch taxonomy, PR reviews, git workflows
 - **OIDC Authentication** — Keyless service account access for Cloud Storage sync
 - **Node.js 24 Ready** — All GitHub Actions workflows upgraded to Node.js 24
 
