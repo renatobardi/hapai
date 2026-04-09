@@ -22,10 +22,10 @@
 <style>
   .gate { flex: 1; display: flex; align-items: center; justify-content: center; padding: var(--space-8) var(--space-3); }
   .inner { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); max-width: 320px; width: 100%; text-align: center; }
-  .desc { font-size: 14px; font-weight: var(--weight-light); color: var(--color-meta-gray); line-height: 1.5; }
+  .desc { font-size: 14px; font-weight: var(--weight-light); color: #4a4a4a; line-height: 1.5; }
   .btn { display: flex; align-items: center; justify-content: center; gap: var(--space-1); width: 100%; background: var(--color-near-black); color: #fff; padding: 14px 24px; font-size: 14px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.06em; transition: background 150ms; }
   .btn:hover:not(:disabled) { background: var(--color-blue); }
   .btn:disabled { background: var(--color-meta-gray); cursor: default; }
   .error { font-size: 12px; color: var(--color-deny); font-weight: var(--weight-bold); }
-  .note { font-size: 11px; color: var(--color-light-gray); text-transform: uppercase; letter-spacing: 0.06em; }
+  .note { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
 </style>
