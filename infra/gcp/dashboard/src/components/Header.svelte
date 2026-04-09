@@ -34,7 +34,7 @@
 <style>
   header { background: var(--color-black); height: 56px; padding: 0 var(--space-3); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: relative; }
   .brand { display: flex; align-items: center; gap: var(--space-2); }
-  .subtitle { font-size: 12px; font-weight: var(--weight-light); color: #c0c0c0; }
+  .subtitle { font-size: 12px; font-weight: var(--weight-light); color: #e8e8e8; }
   .nav { display: flex; align-items: center; gap: var(--space-3); position: absolute; left: 50%; transform: translateX(-50%); }
   .nav-link { font-size: 12px; font-weight: var(--weight-bold); color: var(--color-meta-gray); text-decoration: none; text-transform: uppercase; letter-spacing: 0.05em; transition: color 150ms; }
   .nav-link:hover { color: var(--color-white); }
