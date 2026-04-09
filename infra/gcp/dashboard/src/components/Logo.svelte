@@ -5,13 +5,13 @@
 
 {#if size === 'sm'}
   <img
-    src={dark ? '/hapai/logo-dark.png' : '/hapai/logo-light.png'}
+    src={dark ? '/hapai/logo-light.png' : '/hapai/logo-dark.png'}
     alt="hapai"
     class="logo-sm"
   />
 {:else if size === 'lg'}
   <img
-    src={dark ? '/hapai/logo-dark.png' : '/hapai/logo-light.png'}
+    src={dark ? '/hapai/logo-light.png' : '/hapai/logo-dark.png'}
     alt="hapai"
     class="logo-lg"
   />
