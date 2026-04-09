@@ -27,7 +27,7 @@ const padding = 20 * SCALE // 20px
 // Calculate dimensions
 const dashColumnWidth = Math.max(...dashWidths)
 const dashColumnHeight = (dashHeight * 3) + (dashGap * 2)
-const svgWidth = padding + dashColumnWidth + barMargin + barWidth + barMargin + 150 + padding
+const svgWidth = padding + dashColumnWidth + barMargin + barWidth + barMargin + 320 + padding
 const svgHeight = padding + Math.max(dashColumnHeight, barHeight) + padding
 
 function generateSVG(lightMode = true) {
