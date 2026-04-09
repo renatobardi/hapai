@@ -58,7 +58,7 @@ function generateSVG(lightMode = true) {
 
   // Draw text
   const textX = barX + barWidth + barMargin
-  const textY = padding + (containerHeight + textSize / 2)
+  const textY = padding + (containerHeight / 2) + (textSize * 0.35)
   svg += `<text x="${textX}" y="${textY}" font-size="${textSize}" fill="${textColor}" letter-spacing="-${0.03 * textSize}">hapai</text>`
 
   svg += '</svg>'
