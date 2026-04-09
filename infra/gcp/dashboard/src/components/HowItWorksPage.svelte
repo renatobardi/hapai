@@ -18,10 +18,14 @@
   <aside class="sidebar">
     <nav class="sidebar-nav">
       {#each sections as section}
-        <a href="#{section.id}"
+        <a href="#/docs"
            class="sidebar-link"
            class:active={activeSection === section.id}
-           onclick={() => activeSection = section.id}>
+           onclick={(e) => {
+             e.preventDefault()
+             activeSection = section.id
+             document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth' })
+           }}>
           {section.label}
         </a>
       {/each}
