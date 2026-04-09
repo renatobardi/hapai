@@ -13,7 +13,7 @@
   </div>
   <nav class="nav">
     {#if $authStore.user}
-      <a href="#/" class="nav-link" class:active={$route === '' || $route === '#/' || !$route.startsWith('#/docs')} onclick={(e) => { e.preventDefault(); navigate('#/') }}>Dashboard</a>
+      <a href="#/" class="nav-link" class:active={$route === '' || $route === '#/'} onclick={(e) => { e.preventDefault(); navigate('#/') }}>Dashboard</a>
     {/if}
     <a href="#/docs" class="nav-link" class:active={$route.startsWith('#/docs')} onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>How it works</a>
   </nav>
