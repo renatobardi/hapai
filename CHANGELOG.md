@@ -1,5 +1,35 @@
 # hapai Changelog
 
+## v1.4.2 (2026-04-09) — Dashboard UX Fixes
+
+### ✅ Delivered
+
+**Dashboard Navigation Fixes**
+- Fixed "How it works" link not navigating to docs page (root cause: CSS `position: absolute` on `.nav` caused the link to be overlapped and unclickable by the "Sign In" button)
+- Extracted shared `route` store (`stores/route.js`) with `hashchange` listener — routing is now decoupled from component lifecycle and auth loading state
+- Route check now runs before auth loading gate so `#/docs` renders `HowItWorksPage` immediately
+- "Dashboard" nav link hidden when user is not authenticated (previously always visible)
+- Fixed `HowItWorksPage` sidebar sticky offset: `56px` → `80px` (actual header height)
+
+**Logo & Style Fixes (PRs #14–#19)**
+- Fixed logo variant selection for light/dark backgrounds (was inverted)
+- Increased logo canvas width from 150px to 320px (text was being clipped)
+- Fixed textY formula to prevent vertical clipping
+- Header logo size increased 80% total (+40% + another +40%)
+- Subtitle "Guardrails Analytics" font increased 50% (18px), color lightened to `#e8e8e8`
+- AuthGate description text font increased 50% (21px), darkened for readability
+
+### 📝 Commits
+
+- `812df28` — fix: add How it works routing and hide Dashboard link when not logged in (#20)
+- `b710621` — style: header logo +40%, subtitle layout e desc +50% (#19)
+- `66addbd` — style: logo header +40% e melhora contraste dos textos (#18)
+- `2ae9582` — fix: correct textY formula to prevent vertical clipping (#17)
+- `ef3bf32` — fix: increase logo canvas width to fit full 'hapai' text (#15)
+- `71f1bde` — fix: correct logo variant selection for light and dark backgrounds (#14)
+
+---
+
 ## v1.4.1 (2026-04-08) — Node.js 24 Ready
 
 ### ✅ Delivered

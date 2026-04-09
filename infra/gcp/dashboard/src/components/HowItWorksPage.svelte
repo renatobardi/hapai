@@ -262,9 +262,9 @@ hapai sync --dry-run       # Preview sync</code></pre>
 </div>
 
 <style>
-  .docs-container { display: flex; min-height: calc(100vh - 56px); background: var(--color-off-white); }
+  .docs-container { display: flex; min-height: calc(100vh - 80px); background: var(--color-off-white); }
 
-  .sidebar { width: 200px; background: var(--color-white); border-right: 1px solid var(--color-light-gray); padding: var(--space-3); position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .sidebar { width: 200px; background: var(--color-white); border-right: 1px solid var(--color-light-gray); padding: var(--space-3); position: sticky; top: 80px; height: calc(100vh - 80px); overflow-y: auto; }
   .sidebar-nav { display: flex; flex-direction: column; gap: var(--space-1); }
   .sidebar-link { font-size: 12px; font-weight: var(--weight-normal); color: var(--color-meta-gray); text-decoration: none; padding: 6px 8px; border-radius: 2px; transition: all 150ms; }
   .sidebar-link:hover { background: var(--color-off-white); color: var(--color-near-black); }
