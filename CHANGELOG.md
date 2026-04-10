@@ -1,5 +1,26 @@
 # hapai Changelog
 
+## v1.5.1 (2026-04-10) — CI Sync Pipeline Fix
+
+### ✅ Delivered
+
+**hapai-sync.yml rewritten (PR #27)**
+- Replaced broken `./bin/hapai sync` call (runner had no `~/.hapai/audit.jsonl`) with two-step pipeline:
+  1. Download today's audit log from GCS: `gs://hapai-audit-bardi/YYYY-MM/DD.jsonl`
+  2. Load into BigQuery with `bq load --noreplace` (append, idempotent per day)
+- Graceful skip when no file exists for the day (exit 0, no error)
+- Hard fail (`exit 1`) when `bq load` itself fails — errors are now surfaced, not silently swallowed
+- Uses OIDC + Workload Identity Federation (no service account keys in CI)
+- Runs daily at 2h UTC + supports manual `workflow_dispatch`
+
+### 📝 Commits
+
+- `0d18538` — fix: rewrite hapai-sync workflow to load GCS data into BigQuery
+- `62f83bb` — fix: download only today's GCS file, fail loudly on bq load error
+- `1f55340` — fix: skip BigQuery load step when no audit file was downloaded
+
+---
+
 ## v1.5.0 (2026-04-09) — Auto-Fix for PR Review Issues
 
 ### ✅ Delivered
