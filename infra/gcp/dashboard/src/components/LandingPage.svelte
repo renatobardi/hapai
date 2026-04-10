@@ -231,7 +231,7 @@ hapai validate</pre>
   .text-link:hover { text-decoration: underline; }
 
   .code-block {
-    background: var(--color-near-black); color: #e8e8e8;
+    background: var(--color-near-black); color: var(--color-text-on-dark);
     padding: var(--space-3); font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 13px; line-height: 1.7; overflow-x: auto;
     margin: 0 0 var(--space-3); white-space: pre;
@@ -251,17 +251,17 @@ hapai validate</pre>
   }
   .hero-sub {
     font-size: 18px; font-weight: var(--weight-light);
-    color: #e8e8e8; margin: 0 0 var(--space-4); line-height: 1.6;
+    color: var(--color-text-on-dark); margin: 0 0 var(--space-4); line-height: 1.6;
   }
   .hero-ctas { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
-  .terminal { background: #1a1a1a; border: 1px solid #333; }
-  .terminal-bar { background: #2a2a2a; padding: 10px 14px; display: flex; gap: 6px; align-items: center; }
-  .dot { width: 10px; height: 10px; background: #444; display: block; }
+  .terminal { background: var(--surface-terminal); border: 1px solid var(--color-border-dark); }
+  .terminal-bar { background: var(--surface-terminal-bar); padding: 10px 14px; display: flex; gap: 6px; align-items: center; }
+  .dot { width: 10px; height: 10px; background: var(--color-text-on-dark-subtle); display: block; }
   .terminal-body {
     margin: 0; padding: var(--space-3);
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 13px; line-height: 1.7; color: #ccc;
+    font-size: 13px; line-height: 1.7; color: var(--color-text-on-dark-muted);
     white-space: pre; overflow-x: auto;
   }
   .t-prompt { color: var(--color-meta-gray); }
@@ -272,10 +272,10 @@ hapai validate</pre>
   .problem { background: var(--color-white); }
   .cards-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
   .problem-card {
-    border: 1px solid #e0e0e0; padding: var(--space-3);
+    border: 1px solid var(--color-border-medium); padding: var(--space-3);
     display: flex; flex-direction: column; gap: var(--space-1);
   }
-  .problem-card p { font-size: 14px; color: #555; line-height: 1.6; }
+  .problem-card p { font-size: 14px; color: var(--color-text-muted); line-height: 1.6; }
 
   /* ─── Solution ─── */
   .solution { background: var(--color-off-white); }
@@ -285,19 +285,19 @@ hapai validate</pre>
     color: var(--color-blue); line-height: 1; display: block; margin-bottom: var(--space-1);
   }
   .step h3 { font-size: 18px; margin-top: 0; }
-  .step p { font-size: 14px; color: #555; line-height: 1.6; }
-  .step-divider { background: #ddd; height: 80px; width: 1px; margin-top: 16px; }
+  .step p { font-size: 14px; color: var(--color-text-muted); line-height: 1.6; }
+  .step-divider { background: var(--color-border-medium); height: 80px; width: 1px; margin-top: 16px; }
 
   /* ─── Guardrails ─── */
   .guardrails { background: var(--color-white); }
   .guards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-bottom: var(--space-3); }
-  .guard-card { border: 1px solid #e0e0e0; border-top-width: 3px; padding: var(--space-2); }
+  .guard-card { border: 1px solid var(--color-border-medium); border-top-width: 3px; padding: var(--space-2); }
   .guard-card strong { font-size: 14px; font-weight: var(--weight-bold); display: block; margin-bottom: 6px; }
-  .guard-card p { font-size: 13px; color: #555; line-height: 1.5; margin: 0; }
+  .guard-card p { font-size: 13px; color: var(--color-text-muted); line-height: 1.5; margin: 0; }
   .guard-deny { border-top-color: var(--color-deny); }
   .guard-warn { border-top-color: var(--color-warn); }
   .guard-blue { border-top-color: var(--color-blue); }
-  .guards-note { font-size: 13px; color: #555; margin-bottom: var(--space-2); }
+  .guards-note { font-size: 13px; color: var(--color-text-muted); margin-bottom: var(--space-2); }
 
   /* ─── Ecosystem ─── */
   .ecosystem { background: var(--color-off-white); }
@@ -317,7 +317,7 @@ hapai validate</pre>
   .analytics-heading { color: #fff; margin: 0; }
   .analytics-desc {
     font-size: 16px; font-weight: var(--weight-light);
-    color: #ccc; max-width: 640px; line-height: 1.7;
+    color: var(--color-text-on-dark-muted); max-width: 640px; line-height: 1.7;
   }
   .analytics-features { font-size: 13px; color: var(--color-meta-gray); letter-spacing: 0.03em; }
   .analytics-note { font-size: 12px; color: var(--color-meta-gray); }
@@ -341,8 +341,8 @@ hapai validate</pre>
   }
   .footer-links a:hover { color: #fff; }
   .footer-links a:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
-  .footer-links span { color: #444; }
-  .footer-note { font-size: 11px; color: #444; }
+  .footer-links span { color: var(--color-text-on-dark-subtle); }
+  .footer-note { font-size: 11px; color: var(--color-text-on-dark-subtle); }
 
   /* ─── Responsive: tablet ─── */
   @media (max-width: 900px) {

@@ -49,7 +49,7 @@
 <style>
   header { background: var(--color-black); height: 80px; padding: 0 var(--space-3); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: relative; }
   .brand { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-  .subtitle { font-size: 18px; font-weight: var(--weight-light); color: #e8e8e8; line-height: 1; }
+  .subtitle { font-size: 18px; font-weight: var(--weight-light); color: var(--color-text-on-dark); line-height: 1; }
   .nav { display: flex; align-items: center; gap: var(--space-3); }
   .nav-link { font-size: 12px; font-weight: var(--weight-bold); color: var(--color-meta-gray); text-decoration: none; text-transform: uppercase; letter-spacing: 0.05em; transition: color 150ms; }
   .nav-link:hover { color: var(--color-white); }
@@ -66,7 +66,7 @@
   .btn-primary svg { display: block; width: 16px; height: 16px; }
   .btn-primary:hover:not(:disabled) { background: var(--color-blue-dark); }
   .btn-primary:disabled { background: var(--color-meta-gray); cursor: default; }
-  .btn-secondary { background: transparent; color: var(--color-meta-gray); padding: 8px 16px; font-size: 12px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid #333; transition: color 150ms, border-color 150ms; }
-  .btn-secondary:hover { color: var(--color-white); border-color: #666; }
-  .signin-error { font-size: 11px; color: #c0392b; margin: 4px 0 0; text-align: right; }
+  .btn-secondary { background: transparent; color: var(--color-meta-gray); padding: 8px 16px; font-size: 12px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid var(--color-border-dark); transition: color 150ms, border-color 150ms; }
+  .btn-secondary:hover { color: var(--color-white); border-color: var(--color-border-dark-hover); }
+  .signin-error { font-size: 11px; color: var(--color-deny); margin: 4px 0 0; text-align: right; }
 </style>
