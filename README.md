@@ -132,12 +132,13 @@ hapai_dataset.events  (BigQuery)
 Analytics Dashboard  (GitHub Pages)
 ```
 
-**Two sync paths:**
+**Auto-sync — get data to GCS automatically:**
 
-| Path | When | How |
-|------|------|-----|
-| **Local** | After each session | `hapai sync` — uploads GCS + loads BigQuery in one command |
-| **CI (automatic)** | Daily at 2h UTC | `hapai-sync.yml` — downloads today's GCS file, loads BigQuery |
+| Method | When | How |
+|--------|------|-----|
+| **Claude Code** | Session end | `gcp.auto_sync.enabled: true` in `hapai.yaml` |
+| **Cursor · Windsurf · Devin · Trae · Copilot** | After each commit | `hapai install --git-hooks` |
+| **CI (safety net)** | Daily at 2h UTC | `hapai-sync.yml` — loads from GCS to BigQuery |
 
 **Local sync:**
 ```bash
@@ -172,7 +173,9 @@ See [`infra/gcp/SETUP.md`](infra/gcp/SETUP.md) for setup instructions.
 ```bash
 hapai install --global        # Global (~/.hapai)
 hapai install --project       # Per-project (./hapai/)
+hapai install --git-hooks     # Post-commit auto-sync (Cursor/Windsurf/Devin/Trae/Copilot)
 hapai uninstall [--global]    # Remove hooks
+hapai uninstall --git-hooks   # Remove post-commit hook
 hapai validate                # Verify installation
 ```
 

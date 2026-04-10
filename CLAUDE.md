@@ -230,7 +230,8 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 - `templates/settings.hooks.json` — hook registration template for Claude Code
 - `templates/claude.md.inject` — markdown block injected into project CLAUDE.md on install (wrapped in `<!-- hapai:start -->...<!-- hapai:end -->`)
 - `templates/guardrails-rules.md` — human-readable guardrails reference
-- `exporters/export-*.sh` — exporters for Cursor, Copilot, Windsurf, Devin, etc.
+- `exporters/export-*.sh` — exporters for Cursor, Copilot, Windsurf, Devin, Trae, Antigravity
+- `hooks/git/post-commit.sh` — git post-commit hook installed via `hapai install --git-hooks`; fires `hapai sync` in background after each commit; works with any AI coding tool that commits via git
 
 ## Claude Code Integration
 
