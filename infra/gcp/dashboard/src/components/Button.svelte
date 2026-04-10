@@ -1,12 +1,8 @@
 <script>
-  export let variant = 'primary'
-  export let size = 'md'
-  export let disabled = false
-  export let type = 'button'
-  export let onclick = undefined
+  let { variant = 'primary', size = 'md', disabled = false, type = 'button', onclick = undefined, children } = $props()
 </script>
 <button {type} {disabled} {onclick} class="btn btn-{variant} btn-{size}">
-  <slot />
+  {@render children?.()}
 </button>
 <style>
   .btn {

@@ -1,4 +1,4 @@
 <script>
-  export let type = 'info'
+  let { type = 'info', children } = $props()
 </script>
-<span class="badge badge-{type}"><slot /></span>
+<span class="badge badge-{type}">{@render children?.()}</span>
