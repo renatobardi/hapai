@@ -55,12 +55,45 @@ hapai validate
 | **Destructive Commands** | `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE` | `command_safety.blocked` |
 | **Blast Radius** | Large commits touching too many files or packages | `blast_radius.max_files` |
 | **Uncommitted Changes** | AI overwriting your uncommitted work | `uncommitted_changes.enabled` |
-| **PR Review** | Background code review on all PRs | `pr_review.enabled` |
+| **PR Review** | Background code review on all PRs (with optional auto-fix) | `pr_review.enabled` |
 | **Git Workflow** | Trunk-based or GitFlow enforcement | `git_workflow.model` |
 
 All guardrails support `fail_open`:
 - **`fail_open: false`** — Block execution, show error
 - **`fail_open: true`** — Warn but allow (soft constraints)
+
+## Automations
+
+Automations run in the background after tool execution, enabling proactive code fixes and improvements.
+
+### Auto-Fix for PR Review Issues
+
+When code review finds issues, **automatically attempt to fix them before blocking the push**.
+
+**How it works:**
+1. Code review detects issues (critical, high, medium, or low severity)
+2. If `auto_fix.enabled: true`, launch background fix agent
+3. Fix agent invokes a model to apply corrections to the code
+4. Re-run review synchronously to validate fixes
+5. If all issues resolved → allow push (`fix_clean` state)
+6. If issues remain after max attempts → block push with list of failures (`fix_failed` state)
+
+**Configuration:**
+```yaml
+guardrails:
+  pr_review:
+    auto_fix:
+      enabled: false              # opt-in (requires pr_review.enabled=true)
+      model: "claude-sonnet-4-6"  # model for applying fixes
+      max_fix_attempts: 2         # rounds of fix → re-review → fix
+      severities:                 # which issues to auto-fix
+        - critical
+        - high
+        - medium
+        - low
+```
+
+**Disabled by default** — double opt-in ensures this is explicit and project-aware.
 
 ## Analytics Dashboard
 

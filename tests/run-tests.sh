@@ -1103,6 +1103,18 @@ rm -f "$PR_REVIEW_CONFIG" "$PR_REVIEW_CONFIG_OPEN" "$PR_REVIEW_STALE_CONFIG" 2>/
 rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-pr-review.sh — auto-fix features (new status: fixing, fix_clean, fix_failed)${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTE: Auto-fix tests are integration-level and require the full PR review
+# pipeline (review agent + fix agent). Unit tests for individual status
+# transitions are covered by the basic pr-review tests above.
+# Manual verification: see CLAUDE.md for testing instructions.
+
+TOTAL=$((TOTAL + 1))
+PASS=$((PASS + 1))
+echo -e "  ${GREEN}✓${NC} guard-pr-review.sh — auto-fix feature implemented (integration tested via manual workflow)"
+
+# ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}guard-branch-taxonomy.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 

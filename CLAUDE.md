@@ -12,6 +12,48 @@ The system combines:
 - **Cloud integration** — BigQuery + Cloud Storage + GitHub Pages deployment
 - **Multi-tool exporters** — Export guardrails to Cursor, Copilot, Windsurf, etc.
 
+## Prerequisites
+
+Before working on this codebase, ensure:
+- **jq 1.6+** — Required for all hook scripts and validation. Install: `brew install jq`
+- **Node.js + npm** — Required only for dashboard development (`infra/gcp/dashboard/`)
+- **Bash 4+** — All scripts use `set -euo pipefail` and POSIX-compatible tools
+- **Tested platforms** — macOS and Linux. CI runs on both via `ci.yml`. WSL supported via installer detection.
+
+## Quick Commands
+
+Common tasks when developing hapai:
+
+```bash
+# Run all tests (bash assertions, no framework)
+bash tests/run-tests.sh
+
+# Test a specific guardrail
+bash tests/run-tests.sh 2>&1 | grep -A 30 "guard-branch"
+
+# Test individual hook in isolation
+echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | \
+  bash hooks/pre-tool-use/guard-branch.sh
+
+# Validate installation
+hapai validate
+
+# Check active hooks and audit counts
+hapai status
+
+# View recent audit log entries
+hapai audit
+
+# Dashboard development (local)
+cd infra/gcp/dashboard && npm ci && npm run dev
+
+# Dashboard production build
+cd infra/gcp/dashboard && npm run build
+
+# Test CLI installation locally
+HAPAI_DEV=1 bash install.sh
+```
+
 ## Running Tests
 
 ```bash
@@ -54,6 +96,39 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 ```
 
 ## Architecture
+
+### Directory Structure
+
+```
+hapai/
+├── bin/hapai                    # CLI entry point (command dispatcher)
+├── hooks/                       # All guardrail scripts (pure Bash)
+│   ├── _lib.sh                 # Shared library (YAML parsing, JSON I/O, audit, state)
+│   ├── pre-tool-use/           # Block before Claude Code execution
+│   │   ├── guard-*.sh          # Individual guardrails (branch, commit, files, etc.)
+│   │   └── flow-dispatcher.sh  # Sequential hook chains from config
+│   ├── post-tool-use/          # Run after Claude Code execution
+│   │   ├── auto-*.sh           # Automations (format, lint, checkpoint)
+│   │   └── audit-trail.sh      # Audit logging and PR review
+│   └── stop/                   # Run at session end
+│       └── *.sh                # Cleanup and cost tracking
+├── install.sh                  # Universal installer (curl-safe)
+├── tests/run-tests.sh          # All tests: bash assertions, no framework
+├── hapai.defaults.yaml         # Master config (all guardrails + cloud settings)
+├── infra/gcp/dashboard/        # Svelte 5 analytics app (separate npm project)
+│   ├── src/                    # Svelte components, Firebase SDK integration
+│   ├── package.json            # Node.js dependencies (Vite, Svelte, Chart.js)
+│   └── .env                    # Firebase config (secrets)
+├── infra/gcp/*.md              # GCP setup guides (SETUP.md, OIDC-SETUP.md)
+├── templates/                  # Code generation templates
+│   ├── settings.hooks.json     # Hook registration for Claude Code
+│   └── claude.md.inject        # CLAUDE.md block injected on install
+├── exporters/                  # Multi-tool guardrail exporters
+│   └── export-*.sh             # Export for Cursor, Copilot, Windsurf
+└── README.md, CHANGELOG.md     # Documentation and version history
+```
+
+**Two distinct runtimes:** Hooks are pure Bash (no npm dependencies); dashboard requires Node.js. They're independent — you can use hapai hooks without the dashboard.
 
 ### Hook System
 
@@ -115,19 +190,28 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 
 ### Configuration
 
-- `hapai.defaults.yaml` — master config for all guardrails, automation, observability, and cloud settings
-- Global override: `~/.hapai/hapai.yaml`
-- Project override: `hapai.yaml` in project root
+Configuration files are resolved in this order (first match wins):
 
-**Config resolution:** project `hapai.yaml` → `~/.hapai/hapai.yaml` → `hapai.defaults.yaml`
+1. **Project-local:** `hapai.yaml` in project root (when `CLAUDE_PROJECT_DIR` is set by Claude Code)
+2. **User global:** `~/.hapai/hapai.yaml` (applies to all projects using user's hapai)
+3. **Built-in defaults:** `hapai.defaults.yaml` (fallback, always available)
 
-**`fail_open`:** `true` = warn but allow (e.g. blast_radius, uncommitted_changes); `false` = hard deny.
+**Config structure:**
 
-**Blocklist & cooldown:** Configured under `blocklist.enabled` and `cooldown.*`. Cooldown escalates a hook to fail-open after exceeding `threshold` denials in `window_minutes`, resetting after `cooldown_minutes`.
+- `guardrails.{name}.enabled` — Enable/disable a specific guardrail
+- `guardrails.{name}.fail_open` — `true` = warn but allow; `false` = hard deny
+- `blocklist.enabled` — TTL-based pattern blocking system
+- `cooldown.*` — After N denials in a window, escalate hook to fail-open (prevents annoyance)
+- `flows.{name}.steps[]` — Sequential hook chains with `hook:` path and `gate: block|warn|skip`
+- Cloud settings: `observability`, `cloud_storage`, `bigquery` — for GCP integration
 
-**Flows:** Sequential hook chains defined under `flows.<name>.steps[]`, each with a `hook:` path and `gate: block|warn|skip`. Enabled via `flows.enabled: true`. Dispatched by `hooks/pre-tool-use/flow-dispatcher.sh`.
+**State storage:**
 
-**State storage:** Audit log at `~/.hapai/audit.jsonl` (append-only JSONL), per-hook counters at `~/.hapai/state/`.
+- `~/.hapai/audit.jsonl` — Append-only JSONL log of all hook executions (allow/deny/warn)
+- `~/.hapai/state/` — Per-hook counters (used by cooldown and rate limiting)
+- `~/.hapai/hapai.yaml` — User's global config overrides
+
+**For hapai development:** Project config lives in `hapai.yaml` (checked in), not in `~/.hapai/`.
 
 ### Dashboard
 
@@ -160,6 +244,46 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 - `templates/guardrails-rules.md` — human-readable guardrails reference
 - `exporters/export-*.sh` — exporters for Cursor, Copilot, Windsurf, Devin, etc.
 
+## Claude Code Integration
+
+### How Hooks Register
+
+When you run `hapai install`, the system:
+
+1. Copies hook scripts to either `~/.hapai/hooks/` (global) or `.claude/hooks/hapai/` (project)
+2. Registers hooks in Claude Code's settings file (`.claude/settings.json` or `~/.claude/settings.json`)
+3. Injects guardrail documentation into CLAUDE.md (wrapped in `<!-- hapai:start -->...<!-- hapai:end -->`)
+
+Claude Code then invokes hooks via JSON on stdin before/after tool execution.
+
+### Hook Event Types & Exit Codes
+
+- **PreToolUse** — Fires before Claude Code executes a tool (Bash, Write, Edit, etc.)
+- **PostToolUse** — Fires after tool execution (automations: format, lint, checkpoint)
+- **Stop** — Fires when session ends (cleanup, cost tracking)
+
+Exit codes follow the Claude Code hook API:
+- `0` — Allow execution
+- `2` — Deny execution (show error to user)
+
+All other exits are treated as `0` (fail-open trap in `_lib.sh` prevents hook crashes).
+
+### Installation Modes
+
+**Global installation** (`hapai install --global`):
+- Hooks copied to `~/.hapai/hooks/`
+- Settings registered in `~/.claude/settings.json`
+- Applies to ALL projects using Claude Code on this machine
+- Configuration: `~/.hapai/hapai.yaml` or built-in defaults
+
+**Project installation** (`hapai install --project` or `cd project && hapai install`):
+- Hooks copied to `.claude/hooks/hapai/`
+- Settings registered in `.claude/settings.json` (project-local)
+- Applies only to this project
+- Configuration: `hapai.yaml` (checked into git) → `~/.hapai/hapai.yaml` → defaults
+
+**For hapai development:** Install globally, then test using project-local overrides in `hapai.yaml`.
+
 ## Development Workflows
 
 ### Adding a New Guardrail
@@ -172,12 +296,30 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 
 ### Testing the CLI Installation
 
+When developing hapai itself, use **development mode** to test changes without permanently installing:
+
 ```bash
-bash install.sh --global       # installs to ~/.hapai/
-hapai validate
-hapai status
-hapai audit
+# Test installer logic without installing
+HAPAI_DEV=1 bash install.sh
+
+# This clones the installer but sources from the local ./bin/hapai instead of downloaded binary
 ```
+
+**Working on the hapai repo:**
+
+1. Make changes to hooks, CLI, or tests
+2. Run tests: `bash tests/run-tests.sh`
+3. Test CLI commands against local hooks: `./bin/hapai status`
+4. For full end-to-end testing, install globally, then override with project config:
+   ```bash
+   bash install.sh --global     # installs to ~/.hapai/
+   hapai validate
+   hapai status
+   hapai audit
+   ```
+5. Create a test project, install locally, and verify behavior
+
+**Important:** When developing the guardrails system itself (not using it), commit to `docs/`, `feat/`, `fix/` branches, never to `main`. The hooks enforce this via `guard-branch.sh`.
 
 ### Cloud Setup (GCP/BigQuery)
 
