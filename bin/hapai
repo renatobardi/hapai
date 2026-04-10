@@ -29,11 +29,17 @@ DIM='\033[90m'
 NC='\033[0m'
 
 print_logo() {
+  [ -t 1 ] || return 0
   printf "${CYAN}─── │${NC}  ${BOLD}╦ ╦╔═╗╔═╗╔═╗╦${NC}    ${DIM}v${HAPAI_VERSION}${NC}\n"
-  printf "${CYAN}    │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
-  printf "${CYAN}    │${NC}  ${BOLD}╩ ╩╩ ╩╩  ╩ ╩╩${NC}\n"
+  printf "${CYAN} ── │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
+  printf "${CYAN}─── │${NC}  ${BOLD}╩ ╩╩ ╩╩  ╩ ╩╩${NC}\n"
   printf "        ${DIM}guardrails for AI coding assistants${NC}\n"
   printf "\n"
+}
+
+print_logo_compact() {
+  [ -t 1 ] || return 0
+  printf "${CYAN}≡ │${NC} ${BOLD}hapai${NC}  ${DIM}—  guardrails for AI coding assistants  v${HAPAI_VERSION}${NC}\n\n"
 }
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
@@ -1057,19 +1063,19 @@ EOF
 }
 
 case "${1:-help}" in
-  install)      shift; cmd_install "$@" ;;
-  uninstall)    shift; cmd_uninstall "$@" ;;
-  validate)     cmd_validate ;;
-  kill)         cmd_kill ;;
-  revive)       cmd_revive ;;
-  status)       cmd_status ;;
-  audit)        shift; cmd_audit "${1:-20}" ;;
-  sync)         shift; cmd_sync "$@" ;;
-  export)       shift; cmd_export "$@" ;;
-  block)        shift; cmd_block "$@" ;;
-  unblock)      shift; cmd_unblock "$@" ;;
-  blocklist)    cmd_blocklist ;;
-  list-hooks)   cmd_list_hooks ;;
+  install)      print_logo_compact; shift; cmd_install "$@" ;;
+  uninstall)    print_logo_compact; shift; cmd_uninstall "$@" ;;
+  validate)     print_logo_compact; cmd_validate ;;
+  kill)         print_logo_compact; cmd_kill ;;
+  revive)       print_logo_compact; cmd_revive ;;
+  status)       print_logo_compact; cmd_status ;;
+  audit)        print_logo_compact; shift; cmd_audit "${1:-20}" ;;
+  sync)         print_logo_compact; shift; cmd_sync "$@" ;;
+  export)       print_logo_compact; shift; cmd_export "$@" ;;
+  block)        print_logo_compact; shift; cmd_block "$@" ;;
+  unblock)      print_logo_compact; shift; cmd_unblock "$@" ;;
+  blocklist)    print_logo_compact; cmd_blocklist ;;
+  list-hooks)   print_logo_compact; cmd_list_hooks ;;
   help|--help|-h) cmd_help ;;
   version|--version|-v) echo "hapai v${HAPAI_VERSION}" ;;
   *)
