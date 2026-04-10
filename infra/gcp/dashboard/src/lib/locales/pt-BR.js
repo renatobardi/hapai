@@ -2,7 +2,7 @@ export default {
   header: {
     subtitle: 'Guardrails Analytics',
     nav: { dashboard: 'Painel', docs: 'Como funciona' },
-    auth: { signIn: 'Entrar com GitHub', signOut: 'Sair', signingIn: 'Entrando…' }
+    auth: { signIn: 'Entrar com GitHub', signOut: 'Sair', signingIn: 'Entrando…', signInError: 'Falha ao entrar. Tente novamente.' }
   },
   app: { initializing: 'Inicializando…' },
   landing: {

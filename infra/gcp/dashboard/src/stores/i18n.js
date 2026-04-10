@@ -12,7 +12,7 @@ function detect() {
     if (saved && supported.includes(saved)) return saved
   }
   if (typeof navigator !== 'undefined') {
-    const full = navigator.language
+    const full = navigator.language || ''
     if (supported.includes(full)) return full
     const match = supported.find(l => l.startsWith(full.split('-')[0]))
     if (match) return match
