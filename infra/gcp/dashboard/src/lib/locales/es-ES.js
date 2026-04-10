@@ -185,21 +185,21 @@ export default {
     loading: 'Cargando analytics…',
     error: 'Error',
     retry: 'Reintentar',
-    denials: 'Denegaciones',
-    warnings: 'Advertencias'
+    denials: 'Acciones Bloqueadas',
+    warnings: 'Advertencias Suaves'
   },
   charts: {
     timeline: 'Línea de Tiempo de Eventos — 30 días',
     hooks: 'Hooks Más Bloqueadores',
-    tools: 'Distribución de Herramientas',
-    projects: 'Proyectos',
+    tools: 'Negaciones por Herramienta',
+    projects: 'Negaciones por Proyecto',
     trend: 'Tendencia de Denegación — 30 días',
     labels: { denials: 'Denegaciones', warnings: 'Advertencias', denialsPerDay: 'Denegaciones por día' }
   },
   table: {
-    title: 'Eventos Recientes',
-    empty: 'No se encontraron eventos.',
-    cols: { time: 'Hora', type: 'Tipo', hook: 'Hook', tool: 'Herramienta', reason: 'Motivo' }
+    title: 'Actividad de Guardrails',
+    empty: 'Aún no hay eventos de guardrail. Cuando hapai bloquee o avise, los eventos aparecerán aquí.',
+    cols: { time: 'Hora', type: 'Tipo', hook: 'Hook', tool: 'Herramienta', reason: 'Detalles' }
   },
   statCard: { period: 'Últimos 30 días' },
   loading: { default: 'Cargando…' }

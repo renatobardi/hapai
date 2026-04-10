@@ -185,21 +185,21 @@ export default {
     loading: 'Fetching analytics…',
     error: 'Error',
     retry: 'Retry',
-    denials: 'Denials',
-    warnings: 'Warnings'
+    denials: 'Blocked Actions',
+    warnings: 'Soft Warnings'
   },
   charts: {
     timeline: 'Event Timeline — 30 days',
     hooks: 'Top Blocking Hooks',
-    tools: 'Tools Distribution',
-    projects: 'Projects',
+    tools: 'Denials by Tool',
+    projects: 'Denials by Project',
     trend: 'Deny Rate Trend — 30 days',
     labels: { denials: 'Denials', warnings: 'Warnings', denialsPerDay: 'Denials per day' }
   },
   table: {
-    title: 'Recent Events',
-    empty: 'No events found.',
-    cols: { time: 'Time', type: 'Type', hook: 'Hook', tool: 'Tool', reason: 'Reason' }
+    title: 'Guardrail Activity',
+    empty: 'No guardrail events yet. Once hapai blocks or warns, events will appear here.',
+    cols: { time: 'Time', type: 'Type', hook: 'Hook', tool: 'Tool', reason: 'Details' }
   },
   statCard: { period: 'Last 30 days' },
   loading: { default: 'Loading…' }
