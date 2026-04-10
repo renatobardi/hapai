@@ -1,32 +1,35 @@
 <script>
+  import { t } from '../stores/i18n.js'
+
   let activeSection = $state('what-is-hapai')
-  const sections = [
-    { id: 'what-is-hapai', label: 'What is hapai' },
-    { id: 'quick-start', label: 'Quick Start' },
-    { id: 'guardrails', label: 'Guardrails' },
-    { id: 'configuration', label: 'Configuration' },
-    { id: 'automations', label: 'Automations' },
-    { id: 'cli-commands', label: 'CLI Commands' },
-    { id: 'analytics', label: 'Analytics' },
-    { id: 'cloud-logging', label: 'Cloud Logging' },
-    { id: 'export', label: 'Export' },
-    { id: 'faq', label: 'FAQ' }
+
+  const sectionKeys = [
+    { id: 'what-is-hapai',   key: 'whatIs' },
+    { id: 'quick-start',     key: 'quickStart' },
+    { id: 'guardrails',      key: 'guardrails' },
+    { id: 'configuration',   key: 'configuration' },
+    { id: 'automations',     key: 'automations' },
+    { id: 'cli-commands',    key: 'cliCommands' },
+    { id: 'analytics',       key: 'analytics' },
+    { id: 'cloud-logging',   key: 'cloudLogging' },
+    { id: 'export',          key: 'export' },
+    { id: 'faq',             key: 'faq' }
   ]
 </script>
 
 <div class="docs-container">
   <aside class="sidebar">
     <nav class="sidebar-nav">
-      {#each sections as section}
+      {#each sectionKeys as s}
         <a href="#/docs"
            class="sidebar-link"
-           class:active={activeSection === section.id}
+           class:active={activeSection === s.id}
            onclick={(e) => {
              e.preventDefault()
-             activeSection = section.id
-             document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth' })
+             activeSection = s.id
+             document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth' })
            }}>
-          {section.label}
+          {$t(`docs.nav.${s.key}`)}
         </a>
       {/each}
     </nav>
@@ -34,14 +37,14 @@
 
   <main class="content">
     <section id="what-is-hapai" class="docs-section">
-      <h2>What is hapai</h2>
-      <p>hapai is a deterministic guardrails system for AI coding assistants (Claude Code, Cursor, Copilot). It enforces security rules via shell-based hooks that intercept tool calls and block violations <strong>before execution</strong> — not probabilistic prompts that get ignored.</p>
-      <p>Why this matters: AI coding tools frequently ignore markdown instructions. They commit to protected branches, edit secrets files, run destructive commands, and add AI attribution despite explicit rules. LLMs see markdown as suggestions, not requirements.</p>
-      <p><strong>The solution:</strong> Deterministic enforcement via hooks running before the action, not after.</p>
+      <h2>{$t('docs.sections.whatIs.heading')}</h2>
+      <p>{$t('docs.sections.whatIs.p1')}</p>
+      <p>{$t('docs.sections.whatIs.p2')}</p>
+      <p><strong>{$t('docs.sections.whatIs.p3')}</strong></p>
     </section>
 
     <section id="quick-start" class="docs-section">
-      <h2>Quick Start</h2>
+      <h2>{$t('docs.sections.quickStart.heading')}</h2>
       <pre><code># Clone
 git clone https://github.com/renatobardi/hapai.git ~/hapai
 
@@ -56,33 +59,28 @@ hapai validate</code></pre>
     </section>
 
     <section id="guardrails" class="docs-section">
-      <h2>Guardrails</h2>
-      <p>Guardrails block violations before execution. All support <code>fail_open</code>:</p>
+      <h2>{$t('docs.sections.guardrails.heading')}</h2>
+      <p>{$t('docs.sections.guardrails.intro')}</p>
       <ul>
-        <li><strong>Branch Protection</strong> — Commits/pushes to protected branches (main, master)</li>
-        <li><strong>Branch Taxonomy</strong> — Enforces naming conventions (feat/, fix/, chore/, etc.)</li>
-        <li><strong>Commit Hygiene</strong> — Blocks Co-Authored-By, AI mentions, "Generated with Claude"</li>
-        <li><strong>File Protection</strong> — Prevents writes to .env, lockfiles, CI workflow files</li>
-        <li><strong>Destructive Commands</strong> — Blocks <code>rm -rf</code>, <code>git push --force</code>, <code>DROP TABLE</code>, etc.</li>
-        <li><strong>Blast Radius</strong> — Warns on large commits touching too many files</li>
-        <li><strong>Uncommitted Changes</strong> — Prevents overwriting your uncommitted work</li>
-        <li><strong>PR Review</strong> — Background code review on all PRs (optional)</li>
-        <li><strong>Git Workflow</strong> — Trunk-based or GitFlow enforcement</li>
+        {#each $t('docs.sections.guardrails.guards') as g}
+          <li>{@html g.replace(/^([^—]+)/, '<strong>$1</strong>')}</li>
+        {/each}
       </ul>
-      <p><strong>fail_open modes:</strong></p>
+      <p><strong>{$t('docs.sections.guardrails.failOpenTitle')}</strong></p>
       <ul>
-        <li><code>fail_open: false</code> — Block execution, show error</li>
-        <li><code>fail_open: true</code> — Warn but allow (soft constraints)</li>
+        {#each $t('docs.sections.guardrails.failOpenModes') as m}
+          <li><code>{m.split(' — ')[0]}</code>{m.includes(' — ') ? ' — ' + m.split(' — ')[1] : ''}</li>
+        {/each}
       </ul>
     </section>
 
     <section id="configuration" class="docs-section">
-      <h2>Configuration</h2>
-      <p>YAML-based with three-tier fallback:</p>
+      <h2>{$t('docs.sections.configuration.heading')}</h2>
+      <p>{$t('docs.sections.configuration.intro')}</p>
       <ol>
-        <li>Project <code>./hapai.yaml</code> (overrides all)</li>
-        <li>Global <code>~/.hapai/hapai.yaml</code></li>
-        <li>Defaults <code>hapai.defaults.yaml</code></li>
+        {#each $t('docs.sections.configuration.tiers') as tier}
+          <li>{tier}</li>
+        {/each}
       </ol>
       <pre><code>version: "1.0"
 risk_tier: medium
@@ -110,8 +108,8 @@ guardrails:
     </section>
 
     <section id="automations" class="docs-section">
-      <h2>Automations</h2>
-      <p>Automations run after execution. Enable in <code>hapai.yaml</code>:</p>
+      <h2>{$t('docs.sections.automations.heading')}</h2>
+      <p>{$t('docs.sections.automations.intro')}</p>
       <pre><code>automation:
   auto_checkpoint:
     enabled: true
@@ -130,47 +128,43 @@ guardrails:
     </section>
 
     <section id="cli-commands" class="docs-section">
-      <h2>CLI Commands</h2>
-      <p><strong>Installation:</strong></p>
+      <h2>{$t('docs.sections.cliCommands.heading')}</h2>
+      <p><strong>{$t('docs.sections.cliCommands.installation')}</strong></p>
       <pre><code>hapai install --global        # Global (~/.hapai)
 hapai install --project       # Per-project
 hapai validate                # Verify installation</code></pre>
-      <p><strong>Monitoring:</strong></p>
+      <p><strong>{$t('docs.sections.cliCommands.monitoring')}</strong></p>
       <pre><code>hapai status                  # Show active hooks
 hapai audit [N]               # Show last N entries</code></pre>
-      <p><strong>Emergency:</strong></p>
+      <p><strong>{$t('docs.sections.cliCommands.emergency')}</strong></p>
       <pre><code>hapai kill                    # Disable all hooks
 hapai revive                  # Re-enable hooks</code></pre>
-      <p><strong>Export:</strong></p>
+      <p><strong>{$t('docs.sections.cliCommands.export')}</strong></p>
       <pre><code>hapai export --target cursor     # Generate Cursor rules
 hapai export --target copilot    # Generate Copilot rules
 hapai export --all               # Export for all tools</code></pre>
     </section>
 
     <section id="analytics" class="docs-section">
-      <h2>Analytics Dashboard</h2>
-      <p>This dashboard displays real-time guardrail events from your audit logs:</p>
+      <h2>{$t('docs.sections.analytics.heading')}</h2>
+      <p>{$t('docs.sections.analytics.intro')}</p>
       <ul>
-        <li><strong>Timeline</strong> — Daily denial/warning counts (30-day rolling window)</li>
-        <li><strong>Top Blocking Hooks</strong> — Which guardrails are most active</li>
-        <li><strong>Recent Events</strong> — Live feed of denials and warnings</li>
-        <li><strong>Tool Distribution</strong> — Which tools trigger guards most</li>
-        <li><strong>Project Breakdown</strong> — Per-project statistics</li>
-        <li><strong>Deny Rate Trend</strong> — Historical analysis</li>
+        {#each $t('docs.sections.analytics.features') as f}
+          <li>{@html f.replace(/^([^—]+)/, '<strong>$1</strong>')}</li>
+        {/each}
       </ul>
-      <p><strong>Setup:</strong></p>
+      <p><strong>{$t('docs.sections.analytics.setupTitle')}</strong></p>
       <ol>
-        <li>Create Firebase project with GitHub OAuth</li>
-        <li>Set GitHub Actions secrets (VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID)</li>
-        <li>Push to main → GitHub Actions builds and deploys to GitHub Pages</li>
-        <li>Dashboard live at: <code>https://owner.github.io/repo/</code></li>
+        {#each $t('docs.sections.analytics.setup') as s}
+          <li>{s}</li>
+        {/each}
       </ol>
     </section>
 
     <section id="cloud-logging" class="docs-section">
-      <h2>Cloud Logging (Optional)</h2>
-      <p>Sync audit logs to GCP for enterprise analytics and compliance.</p>
-      <p><strong>Architecture:</strong></p>
+      <h2>{$t('docs.sections.cloudLogging.heading')}</h2>
+      <p>{$t('docs.sections.cloudLogging.p1')}</p>
+      <p><strong>{$t('docs.sections.cloudLogging.archTitle')}</strong></p>
       <pre><code>hapai audit logs (local)
     ↓
 GitHub Actions OIDC (keyless auth)
@@ -182,81 +176,50 @@ Cloud Function (triggered on upload)
 BigQuery dataset
     ↓
 Analytics Dashboard</code></pre>
-      <p><strong>Enable in hapai.yaml:</strong></p>
+      <p><strong>{$t('docs.sections.cloudLogging.enableTitle')}</strong></p>
       <pre><code>gcp:
   enabled: true
   project_id: your-gcp-project
   bucket: hapai-audit-username
   region: us-east1
   retention_days: 90</code></pre>
-      <p><strong>Sync:</strong></p>
+      <p><strong>{$t('docs.sections.cloudLogging.syncTitle')}</strong></p>
       <pre><code>hapai sync                 # Manual sync
 hapai sync --dry-run       # Preview sync</code></pre>
     </section>
 
     <section id="export" class="docs-section">
-      <h2>Export to Other Tools</h2>
-      <p>hapai exports guardrails to 8 different AI coding tools:</p>
+      <h2>{$t('docs.sections.export.heading')}</h2>
+      <p>{$t('docs.sections.export.p1')}</p>
       <table>
         <thead>
           <tr>
-            <th>Tool</th>
-            <th>File</th>
-            <th>Command</th>
+            <th>{$t('docs.sections.export.cols.tool')}</th>
+            <th>{$t('docs.sections.export.cols.file')}</th>
+            <th>{$t('docs.sections.export.cols.command')}</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>Cursor</td>
-            <td><code>.cursor/rules/hapai.mdc</code></td>
-            <td><code>hapai export --target cursor</code></td>
-          </tr>
-          <tr>
-            <td>Copilot</td>
-            <td><code>.github/copilot-instructions.md</code></td>
-            <td><code>hapai export --target copilot</code></td>
-          </tr>
-          <tr>
-            <td>Windsurf</td>
-            <td><code>.windsurf/rules/hapai.md</code></td>
-            <td><code>hapai export --target windsurf</code></td>
-          </tr>
-          <tr>
-            <td>Devin.ai</td>
-            <td><code>AGENTS.md</code></td>
-            <td><code>hapai export --target devin</code></td>
-          </tr>
-          <tr>
-            <td>Trae</td>
-            <td><code>.trae/rules/hapai.md</code></td>
-            <td><code>hapai export --target trae</code></td>
-          </tr>
+          <tr><td>Cursor</td><td><code>.cursor/rules/hapai.mdc</code></td><td><code>hapai export --target cursor</code></td></tr>
+          <tr><td>Copilot</td><td><code>.github/copilot-instructions.md</code></td><td><code>hapai export --target copilot</code></td></tr>
+          <tr><td>Windsurf</td><td><code>.windsurf/rules/hapai.md</code></td><td><code>hapai export --target windsurf</code></td></tr>
+          <tr><td>Devin.ai</td><td><code>AGENTS.md</code></td><td><code>hapai export --target devin</code></td></tr>
+          <tr><td>Trae</td><td><code>.trae/rules/hapai.md</code></td><td><code>hapai export --target trae</code></td></tr>
         </tbody>
       </table>
-      <p>Export all tools at once:</p>
+      <p>{$t('docs.sections.export.exportAll')}</p>
       <pre><code>hapai export --all</code></pre>
     </section>
 
     <section id="faq" class="docs-section">
-      <h2>FAQ</h2>
-      <p><strong>Q: Do hooks affect Claude Code performance?</strong><br/>
-      A: Minimal. Each hook runs in &lt;100ms. PreToolUse has 7s timeout, PostToolUse has 5s timeout.</p>
-
-      <p><strong>Q: How do I temporarily disable a guardrail?</strong><br/>
-      A: Edit <code>hapai.yaml</code> and set <code>enabled: false</code> for that guardrail, or use <code>hapai kill</code> to disable all hooks.</p>
-
-      <p><strong>Q: Can I create custom guardrails?</strong><br/>
-      A: Yes. Create a script in <code>~/.hapai/hooks/pre-tool-use/my-guard.sh</code> and register it in <code>~/.claude/settings.json</code>.</p>
-
-      <p><strong>Q: Where are audit logs stored?</strong><br/>
-      A: Local: <code>~/.hapai/audit.jsonl</code> (append-only). Cloud: BigQuery (if GCP sync enabled).</p>
-
-      <p><strong>Q: How do I see what hooks are doing?</strong><br/>
-      A: Use <code>hapai audit</code> to see recent entries, or <code>tail -f ~/.hapai/audit.jsonl</code> to stream live.</p>
+      <h2>{$t('docs.sections.faq.heading')}</h2>
+      {#each $t('docs.sections.faq.questions') as qa}
+        <p><strong>Q: {qa.q}</strong><br/>A: {qa.a}</p>
+      {/each}
     </section>
 
     <section class="footer">
-      <p>For detailed setup guides, see <a href="https://github.com/renatobardi/hapai" target="_blank">hapai on GitHub</a>.</p>
+      <p>{$t('docs.sections.footer')} <a href="https://github.com/renatobardi/hapai" target="_blank">hapai on GitHub</a>.</p>
     </section>
   </main>
 </div>

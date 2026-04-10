@@ -1,14 +1,21 @@
 <script>
+  import { t } from '../stores/i18n.js'
   export let data = []
   const fmt = ts => new Date(ts).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
 </script>
 <div class="card">
-  <div class="card-title">Recent Events</div>
-  {#if !data.length}<p class="empty">No events found.</p>
+  <div class="card-title">{$t('table.title')}</div>
+  {#if !data.length}<p class="empty">{$t('table.empty')}</p>
   {:else}
   <div class="wrap">
     <table>
-      <thead><tr><th>Time</th><th>Type</th><th>Hook</th><th>Tool</th><th>Reason</th></tr></thead>
+      <thead><tr>
+        <th>{$t('table.cols.time')}</th>
+        <th>{$t('table.cols.type')}</th>
+        <th>{$t('table.cols.hook')}</th>
+        <th>{$t('table.cols.tool')}</th>
+        <th>{$t('table.cols.reason')}</th>
+      </tr></thead>
       <tbody>
         {#each data as r}
         <tr>

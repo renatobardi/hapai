@@ -1,10 +1,11 @@
 <script>
-  export let label = ''; export let value = 0; export let accent = 'default'; export let period = 'Last 30 days'
+  import { t } from '../stores/i18n.js'
+  export let label = ''; export let value = 0; export let accent = 'default'
 </script>
 <div class="card" class:deny={accent==='deny'} class:warn={accent==='warn'}>
   <div class="label">{label}</div>
   <div class="value" class:vdeny={accent==='deny'} class:vwarn={accent==='warn'}>{value}</div>
-  <div class="period">{period}</div>
+  <div class="period">{$t('statCard.period')}</div>
 </div>
 <style>
   .card { background: var(--color-white); border: 1px solid var(--color-light-gray); border-top: 3px solid var(--color-light-gray); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); }
