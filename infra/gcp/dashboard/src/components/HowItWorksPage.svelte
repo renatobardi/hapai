@@ -4,6 +4,7 @@
 
   let activeSection = $state('what-is-hapai')
   let observer
+  const intersecting = new Set()
 
   const navGroups = [
     {
@@ -46,8 +47,13 @@
   onMount(() => {
     observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries.find(e => e.isIntersecting)
-        if (visible) activeSection = visible.target.id
+        for (const e of entries) {
+          if (e.isIntersecting) intersecting.add(e.target)
+          else intersecting.delete(e.target)
+        }
+        if (intersecting.size === 0) return
+        const top = [...intersecting].sort((a, b) => a.offsetTop - b.offsetTop)[0]
+        activeSection = top.id
       },
       { rootMargin: '-20% 0px -70% 0px' }
     )
