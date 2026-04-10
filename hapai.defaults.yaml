@@ -244,3 +244,5 @@ gcp:
   bucket: ""                        # Cloud Storage bucket (e.g., hapai-audit-username)
   region: "us-east1"                # GCP region
   retention_days: 90                # BigQuery partition expiration
+  auto_sync:
+    enabled: false                  # set true to upload audit.jsonl to GCS at session end

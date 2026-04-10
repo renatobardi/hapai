@@ -423,6 +423,32 @@ rm -f "$COST_TRANSCRIPT"
 cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}auto-sync.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+STOP_INPUT='{"hook_event_name":"Stop","transcript_path":""}'
+
+# Test: disabled by default — exits 0 silently
+exit_code=0
+echo "$STOP_INPUT" | HAPAI_HOME="$HAPAI_HOME" bash "$HAPAI_ROOT/hooks/stop/auto-sync.sh" &>/dev/null || exit_code=$?
+assert_exit 0 "$exit_code" "auto-sync: exits 0 when disabled by default"
+
+# Test: exits 0 when gcp.enabled is false even if auto_sync.enabled is true
+echo -e "gcp:\n  enabled: false\n  auto_sync:\n    enabled: true" > "$HAPAI_HOME/hapai.yaml"
+exit_code=0
+echo "$STOP_INPUT" | HAPAI_HOME="$HAPAI_HOME" bash "$HAPAI_ROOT/hooks/stop/auto-sync.sh" &>/dev/null || exit_code=$?
+assert_exit 0 "$exit_code" "auto-sync: exits 0 when gcp.enabled is false"
+
+# Test: exits 0 when audit log is empty (nothing to upload)
+echo -e "gcp:\n  enabled: true\n  auto_sync:\n    enabled: true" > "$HAPAI_HOME/hapai.yaml"
+rm -f "$HAPAI_HOME/audit.jsonl"
+exit_code=0
+echo "$STOP_INPUT" | HAPAI_HOME="$HAPAI_HOME" bash "$HAPAI_ROOT/hooks/stop/auto-sync.sh" &>/dev/null || exit_code=$?
+assert_exit 0 "$exit_code" "auto-sync: exits 0 when audit log does not exist"
+
+cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
+
+# ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}load-context.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 
