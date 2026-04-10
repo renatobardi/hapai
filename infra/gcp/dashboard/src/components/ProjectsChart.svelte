@@ -3,6 +3,7 @@
   import { get } from 'svelte/store'
   import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js'
   import { t, locale } from '../stores/i18n.js'
+  import Card from './Card.svelte'
   Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
   export let data = []
   let canvas; let chart
@@ -17,5 +18,5 @@
   $: if (canvas && data && $locale) build()
   onMount(build); onDestroy(()=>chart?.destroy())
 </script>
-<div class="card"><div class="card-title">{$t('charts.projects')}</div><div class="w"><canvas bind:this={canvas}></canvas></div></div>
+<Card title={$t('charts.projects')}><div class="w"><canvas bind:this={canvas}></canvas></div></Card>
 <style>.w{height:260px;position:relative;}</style>

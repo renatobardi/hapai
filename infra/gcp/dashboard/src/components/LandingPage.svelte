@@ -2,6 +2,7 @@
   import { signIn } from '../lib/firebase.js'
   import { navigate } from '../stores/route.js'
   import { t } from '../stores/i18n.js'
+  import Button from './Button.svelte'
 
   let signingIn = $state(false)
   let signInError = $state('')
@@ -55,7 +56,7 @@
       <h1>{$t('landing.hero.headline')}</h1>
       <p class="hero-sub">{$t('landing.hero.sub')}</p>
       <div class="hero-ctas">
-        <button class="btn-primary" onclick={scrollToQuickStart}>{$t('landing.hero.cta')}</button>
+        <Button size="lg" onclick={scrollToQuickStart}>{$t('landing.hero.cta')}</Button>
         <a class="btn-ghost" href="https://github.com/renatobardi/hapai" target="_blank" rel="noopener">{$t('landing.hero.github')}</a>
       </div>
     </div>
@@ -173,9 +174,9 @@ hapai validate</pre>
     <h2 class="analytics-heading">{$t('landing.analytics.heading')}</h2>
     <p class="analytics-desc">{$t('landing.analytics.desc')}</p>
     <p class="analytics-features">{$t('landing.analytics.features')}</p>
-    <button class="btn-primary" onclick={handleSignIn} disabled={signingIn}>
+    <Button size="lg" onclick={handleSignIn} disabled={signingIn}>
       {signingIn ? $t('landing.analytics.signingIn') : $t('landing.analytics.cta')}
-    </button>
+    </Button>
     {#if signInError}<p class="signin-error">{signInError}</p>{/if}
     <p class="analytics-note">{$t('landing.analytics.note')}</p>
   </div>
@@ -185,7 +186,7 @@ hapai validate</pre>
 <section class="footer-cta" use:fadeIn>
   <div class="section-inner footer-inner">
     <h2 class="footer-heading">{$t('landing.footer.heading')}</h2>
-    <button class="btn-primary" onclick={scrollToQuickStart}>{$t('landing.footer.cta')}</button>
+    <Button size="lg" onclick={scrollToQuickStart}>{$t('landing.footer.cta')}</Button>
     <nav class="footer-links" aria-label="Footer links">
       <a href="https://github.com/renatobardi/hapai" target="_blank" rel="noopener">{$t('landing.footer.links.github')}</a>
       <span aria-hidden="true">·</span>
@@ -205,17 +206,6 @@ hapai validate</pre>
   h2 { font-family: 'Space Grotesk', var(--font); font-size: 32px; font-weight: 700; margin: 0 0 var(--space-6); line-height: 1.2; }
   h3 { font-size: 16px; font-weight: var(--weight-bold); margin: var(--space-2) 0 var(--space-1); }
   p { margin: 0; line-height: 1.6; }
-
-  .btn-primary {
-    background: var(--color-blue); color: #fff;
-    padding: 12px 28px; font-size: 13px; font-weight: var(--weight-bold);
-    text-transform: uppercase; letter-spacing: 0.06em;
-    border: none; cursor: pointer; transition: background 150ms;
-    display: inline-flex; align-items: center; gap: 8px;
-  }
-  .btn-primary:hover:not(:disabled) { background: var(--color-blue-dark); }
-  .btn-primary:disabled { background: var(--color-meta-gray); cursor: default; }
-  .btn-primary:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
 
   .btn-ghost {
     background: transparent; color: #fff;

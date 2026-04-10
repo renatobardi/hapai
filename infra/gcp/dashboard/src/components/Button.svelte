@@ -3,8 +3,9 @@
   export let size = 'md'
   export let disabled = false
   export let type = 'button'
+  export let onclick = undefined
 </script>
-<button {type} {disabled} class="btn btn-{variant} btn-{size}">
+<button {type} {disabled} {onclick} class="btn btn-{variant} btn-{size}">
   <slot />
 </button>
 <style>
