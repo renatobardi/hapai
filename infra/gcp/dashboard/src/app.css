@@ -11,6 +11,7 @@
   --color-off-white:   #f9f9f9;
   --color-white:       #ffffff;
   --color-deny:        #c0392b;
+  --color-deny-area:   rgba(192, 57, 43, 0.08);
   --color-warn:        #e67e22;
   --color-allow:       #27ae60;
   --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px;
