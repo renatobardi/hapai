@@ -194,7 +194,7 @@ Configuration files are resolved in this order (first match wins):
 - `i18n.js` — `locale` (writable), `setLocale()`, and `t` (derived store returning a translation function); browser language auto-detected, persisted to localStorage
 - `route.js` — `currentRoute` writable store; updated by `hashchange` events
 
-**i18n:** Three locales in `src/lib/locales/` (`en.json`, `pt-BR.json`, `es-ES.json`). Translation keys are dot-separated (e.g. `header.nav.docs`). The `t` store is a derived store — use `$t('key')` in components. Language toggle is in `Header.svelte`. In Svelte template `{...}` blocks, literal curly braces in strings must be escaped as `&#123;` / `&#125;` to avoid parse errors.
+**i18n:** Three locales in `src/lib/locales/` (`en.js`, `pt-BR.js`, `es-ES.js`) — JavaScript modules with `export default {}`. Translation keys are dot-separated (e.g. `header.nav.docs`). The `t` store is a derived store — use `$t('key')` in components. Language toggle is in `Header.svelte`. In Svelte template `{...}` blocks, literal curly braces in strings must be escaped as `&#123;` / `&#125;` to avoid parse errors.
 
 **Key components** (`src/`):
 - `App.svelte` — router shell
