@@ -32,25 +32,37 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Run hapai sync
-        env:
-          HAPAI_SYNC_PROJECT_ID: 'hapai-oute'
-          HAPAI_SYNC_BUCKET: 'hapai-audit-bardi'
+      - name: Download today's audit log from GCS
         run: |
-          # Create hapai.yaml for this run
-          cat > hapai.yaml <<EOF
-          version: "1.0"
-          risk_tier: medium
-          gcp:
-            enabled: true
-            project_id: $HAPAI_SYNC_PROJECT_ID
-            bucket: $HAPAI_SYNC_BUCKET
-            region: us-east1
-            retention_days: 90
-          EOF
+          DATE_PART=$(date -u +%Y-%m)
+          DAY_PART=$(date -u +%d)
+          GCS_PATH="gs://hapai-audit-bardi/${DATE_PART}/${DAY_PART}.jsonl"
+          mkdir -p /tmp/hapai-audit
+          echo "Downloading: ${GCS_PATH}"
+          if gsutil cp "${GCS_PATH}" /tmp/hapai-audit/today.jsonl 2>&1; then
+            echo "Downloaded $(wc -l < /tmp/hapai-audit/today.jsonl) lines"
+          else
+            echo "No audit log found for today (${GCS_PATH}) — nothing to load"
+            exit 0
+          fi
 
-          # Run sync (GOOGLE_IDENTITY_TOKEN is set by google-github-actions/auth)
-          ./bin/hapai sync
+      - name: Load into BigQuery
+        run: |
+          PROJECT="hapai-oute"
+          BQ_TABLE="${PROJECT}:hapai_dataset.events"
+          SCHEMA="infra/gcp/bigquery-schema.json"
+          FILE="/tmp/hapai-audit/today.jsonl"
+          if [[ ! -f "$FILE" ]]; then
+            echo "No audit file to load — skipping"
+            exit 0
+          fi
+          echo "Loading: ${FILE}"
+          if bq load --project_id="$PROJECT" --source_format=NEWLINE_DELIMITED_JSON --schema="$SCHEMA" --ignore_unknown_values --noreplace "$BQ_TABLE" "$FILE"; then
+            echo "BigQuery load completed"
+          else
+            echo "ERROR: BigQuery load failed"
+            exit 1
+          fi
 
       - name: Slack notification (optional)
         if: failure()
