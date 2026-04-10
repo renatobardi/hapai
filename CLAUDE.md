@@ -54,22 +54,6 @@ cd infra/gcp/dashboard && npm run build
 HAPAI_DEV=1 bash install.sh
 ```
 
-## Running Tests
-
-```bash
-bash tests/run-tests.sh
-```
-
-Tests are bash-based assertions in a single file. No test framework — just `assert_*` functions. CI runs on both macOS and Linux via `ci.yml`. Tests require `jq` to be installed.
-
-### Running a Single Test Group
-
-Tests are structured by hook name with section headers. Filter output to a specific hook:
-
-```bash
-bash tests/run-tests.sh 2>&1 | grep -A 30 "guard-branch"
-```
-
 ### Testing Individual Hooks
 
 Hooks read Claude Code's hook JSON format from stdin. The correct schema:
@@ -154,23 +138,6 @@ hapai/
 
 **Hook lifecycle** — Claude Code triggers hooks via JSON on stdin. Each hook reads tool name/command/file path, sources `hooks/_lib.sh` for config/audit utilities, then exits 0 (allow) or 2 (deny). Hooks never crash the host tool — all internal errors exit 0 (fail-open trap).
 
-**Hook directory structure:**
-- `hooks/_lib.sh` — shared library: YAML config loading (hand-parsed, no external tools), JSON I/O via `jq`, audit logging, state counters, blocklist, cooldown
-- `hooks/pre-tool-use/guard-branch.sh` — blocks commits/pushes to protected branches (main, master)
-- `hooks/pre-tool-use/guard-branch-rules.sh` — enforces branch naming: allowed prefixes, kebab-case description, must branch from protected base
-- `hooks/pre-tool-use/guard-branch-taxonomy.sh` — validates taxonomy prefix on branch creation
-- `hooks/pre-tool-use/guard-commit-msg.sh` — blocks AI co-authorship strings in commit messages
-- `hooks/pre-tool-use/guard-destructive.sh` — blocks rm -rf, force-push, DROP TABLE, etc.
-- `hooks/pre-tool-use/guard-files.sh` — blocks writes to .env, lockfiles, CI workflow files
-- `hooks/pre-tool-use/guard-blast-radius.sh` — warns (fail-open) when commit touches too many files/packages
-- `hooks/pre-tool-use/guard-uncommitted.sh` — warns (fail-open) on uncommitted changes before new operations
-- `hooks/pre-tool-use/guard-git-workflow.sh` — enforces trunk-based workflow (blocks long-lived branches, non-FF merges); disabled by default (`guardrails.git_workflow.enabled: false`)
-- `hooks/pre-tool-use/guard-pr-review.sh` — runs background AI review before push; opt-in (`guardrails.pr_review.enabled: false`)
-- `hooks/pre-tool-use/flow-dispatcher.sh` — runs sequential hook chains defined in `hapai.yaml` under `flows`
-- `hooks/post-tool-use/auto-checkpoint.sh`, `auto-format.sh`, `auto-lint.sh` — automations after Write/Edit
-- `hooks/post-tool-use/audit-trail.sh`, `pr-review-trigger.sh` — audit logging and PR review initiation
-- `hooks/stop/squash-checkpoints.sh`, `require-tests.sh`, `cost-tracker.sh` — session-end automations
-
 ### `_lib.sh` Key Functions
 
 - `read_input()` / `get_field()` / `get_tool_name()` — parse hook JSON from stdin
@@ -245,16 +212,6 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 - `exporters/export-*.sh` — exporters for Cursor, Copilot, Windsurf, Devin, etc.
 
 ## Claude Code Integration
-
-### How Hooks Register
-
-When you run `hapai install`, the system:
-
-1. Copies hook scripts to either `~/.hapai/hooks/` (global) or `.claude/hooks/hapai/` (project)
-2. Registers hooks in Claude Code's settings file (`.claude/settings.json` or `~/.claude/settings.json`)
-3. Injects guardrail documentation into CLAUDE.md (wrapped in `<!-- hapai:start -->...<!-- hapai:end -->`)
-
-Claude Code then invokes hooks via JSON on stdin before/after tool execution.
 
 ### Hook Event Types & Exit Codes
 
@@ -343,10 +300,3 @@ See `infra/gcp/SETUP.md`. Enabled via `hapai sync` after GCP setup. Key steps: F
 - Hooks must never crash — all internal errors exit 0 (fail-open via global ERR trap in `_lib.sh`)
 - Bash portability: uses POSIX grep/sed; tested on Ubuntu + macOS in CI
 
-## Key Documentation
-
-- **`README.md`** — Project overview, guardrail reference table, quick start
-- **`USAGE.md`** — Portuguese-language usage guide (installation, configuration, examples)
-- **`CHANGELOG.md`** — Version history and release notes
-- **`infra/gcp/SETUP.md`** — Cloud infrastructure setup guide
-- **`infra/gcp/OIDC-SETUP.md`** — GitHub Actions OIDC Workload Identity configuration
