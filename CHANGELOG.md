@@ -1,5 +1,48 @@
 # hapai Changelog
 
+## v1.5.0 (2026-04-09) — Auto-Fix for PR Review Issues
+
+### ✅ Delivered
+
+**Automatic Issue Correction**
+- New `_pr-fix-agent.sh` worker: automatically fixes issues found by code review before blocking push
+- When code review detects issues, system now attempts to fix them automatically (opt-in via `auto_fix.enabled`)
+- Fix agent invokes a model to apply corrections, then re-runs review synchronously to validate fixes
+- Configurable loop: up to `max_fix_attempts` (default 2) rounds of fix → re-review → fix
+- Severity filtering: only auto-fix issues matching configured severities (critical, high, medium, low)
+
+**New State Transitions**
+- `fixing` — auto-fix is running in background; user can retry push shortly
+- `fix_clean` — all issues were auto-fixed; status resets to clean, push allowed
+- `fix_failed` — auto-fix exhausted max attempts; issues remain, push blocked with list of failures
+
+**Configuration (New)**
+```yaml
+guardrails:
+  pr_review:
+    auto_fix:
+      enabled: false             # opt-in (double opt-in with pr_review.enabled)
+      model: "claude-sonnet-4-6" # configurable model for fixes
+      max_fix_attempts: 2        # rounds of fix → re-review
+      severities:                # which severity levels to auto-fix
+        - critical
+        - high
+        - medium
+        - low
+```
+
+**Cost Optimization**
+- Review agent remains Haiku (cheap, fast detection)
+- Fix agent uses Sonnet (more capable for applying fixes)
+- Configurable per project: `auto_fix.model` can be overridden in project `hapai.yaml`
+
+### 📝 Commits
+
+- `b5532b3` — feat: complete auto-fix implementation for PR review issues
+- `15fe363` — feat: auto-fix for PR review issues (incomplete — tests need debugging)
+
+---
+
 ## v1.4.3 (2026-04-09) — HowItWorksPage Template Syntax Fix
 
 ### ✅ Delivered

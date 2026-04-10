@@ -128,12 +128,22 @@ guardrails:
     fail_open: false
 
   # PR review: mandatory background code review on all PRs (v1.3+)
+  # Auto-fix: automatically fix issues found by review (v1.5+)
   pr_review:
     enabled: false  # requires 'claude' CLI installed and authenticated
     model: "claude-haiku-4-5-20251001"
     fail_open: false
     review_timeout_seconds: 300
     max_diff_chars: 8000
+    auto_fix:
+      enabled: false              # opt-in: automatically fix found issues
+      model: "claude-sonnet-4-6"  # model used for applying fixes (more capable than review model)
+      max_fix_attempts: 2         # max rounds of fix → re-review → fix
+      severities:                 # which severities to auto-fix
+        - critical
+        - high
+        - medium
+        - low
 
   # Git workflow: trunk-based or GitFlow enforcement (v1.3+)
   git_workflow:
@@ -164,6 +174,32 @@ automation:
     python: "ruff check {file}"
     javascript: "eslint {file}"
 ```
+
+#### Auto-fix para code review (v1.5+)
+
+Quando o code review detecta issues, o sistema pode **automaticamente tentar corrigi-los** antes de bloquear o push.
+
+**Como funciona:**
+1. Review detecta issues (critical, high, medium, low)
+2. Se `pr_review.auto_fix.enabled: true` → dispara agente de fix em background
+3. Agente de fix invoca um modelo para aplicar correções
+4. Re-executa review sincronamente para validar as correções
+5. Se todos os issues foram corrigidos → push permitido (state: `fix_clean`)
+6. Se issues persistem após `max_fix_attempts` → push bloqueado com lista de falhas (state: `fix_failed`)
+
+**Estados visíveis ao usuário:**
+- `fixing` — "PR review found issues — auto-fix is running in background. Try again shortly."
+- `fix_clean` — Issues foram corrigidos, push permitido
+- `fix_failed` — Auto-fix tentou mas não conseguiu, push bloqueado
+
+**Configuração:** veja seção `pr_review.auto_fix` acima. Ativado per-projeto:
+
+```bash
+# Ativar auto-fix apenas para este projeto
+# (edite hapai.yaml do projeto e ative auto_fix.enabled: true)
+```
+
+**Double opt-in:** exige TANTO `pr_review.enabled: true` QUANTO `auto_fix.enabled: true`.
 
 ### O que é `fail_open`?
 
