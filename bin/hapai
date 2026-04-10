@@ -198,6 +198,7 @@ cmd_install() {
 
     # Step 1: remove all existing hapai hook groups
     local stripped
+    local strip_ok=1
     stripped="$(echo "$existing" | jq '
       if .hooks then
         .hooks |= with_entries(
@@ -206,26 +207,32 @@ cmd_install() {
               (.hooks // [{}])[0].command // .command // "" |
               contains("hapai") | not
             )
-          ) | select(length > 0)
+          )
         ) |
+        .hooks |= with_entries(select(.value | length > 0)) |
         if .hooks == {} then del(.hooks) else . end
       else . end
-    ' 2>/dev/null)" || stripped="$existing"
+    ' 2>/dev/null)" || { strip_ok=0; stripped="$existing"; }
 
-    # Step 2: add new hapai hooks from template
+    # Step 2: add new hapai hooks from template.
+    # If Step 1 failed (strip_ok=0), stripped still contains old hapai hooks;
+    # skip the concat path to avoid duplicates and fall through to the safe fallback.
     local merged
-    merged="$(echo "$stripped" | jq --argjson hapai "$resolved" '
-      . as $base |
-      $hapai.hooks as $new_hooks |
-      ($base.hooks // {}) as $existing_hooks |
-      reduce ($new_hooks | keys[]) as $event (
-        $base;
-        .hooks[$event] = (($existing_hooks[$event] // []) + ($new_hooks[$event] // []))
-      )
-    ' 2>/dev/null)" || {
-      # If merge fails, just add hooks key
+    if [[ "$strip_ok" -eq 1 ]]; then
+      merged="$(echo "$stripped" | jq --argjson hapai "$resolved" '
+        . as $base |
+        $hapai.hooks as $new_hooks |
+        ($base.hooks // {}) as $existing_hooks |
+        reduce ($new_hooks | keys[]) as $event (
+          $base;
+          .hooks[$event] = (($existing_hooks[$event] // []) + ($new_hooks[$event] // []))
+        )
+      ' 2>/dev/null)" || merged=""
+    fi
+    if [[ -z "${merged:-}" ]]; then
+      # Safe fallback: overwrite only the hooks key with the fresh template
       merged="$(echo "$existing" | jq --argjson hapai "$resolved" '. + {hooks: $hapai.hooks}' 2>/dev/null)" || merged="$resolved"
-    }
+    fi
 
     echo "$merged" | jq '.' > "$settings_file"
   else
@@ -329,8 +336,9 @@ cmd_uninstall() {
               (.hooks // [{}])[0].command // .command // "" |
               contains("hapai") | not
             )
-          ) | select(length > 0)
+          )
         ) |
+        .hooks |= with_entries(select(.value | length > 0)) |
         if .hooks == {} then del(.hooks) else . end
       else . end
     ' "$settings_file" 2>/dev/null)" || cleaned=""
