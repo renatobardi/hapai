@@ -11,8 +11,11 @@
 
 **hapai** v1.3+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
 
-## What's New in v1.6.0
+## What's New in v1.6.1
 
+- **ASCII art logo** — Renders in `hapai status`, `hapai validate`, install output, and README header
+- **Auto-sync at session end** — `hooks/stop/auto-sync.sh` fires `hapai sync` at Claude Code session end; `hooks/git/post-commit.sh` covers Cursor, Windsurf, Devin, Trae, Copilot, and plain git (opt-in via `hapai install --git-hooks`)
+- **Installer cleanup** — Stale hook registrations are stripped from `settings.json` before merging the current template
 - **Design system** — 22 CSS tokens covering colors, surfaces, shadows, and transitions; no more hardcoded hex values across dashboard components
 - **Shared component library** — `Button`, `Card`, `Badge`, and `EmptyState` in Svelte 5 runes syntax (`$props()` / `{@render}`)
 - **Full i18n** — EN, PT-BR, and ES-ES across all pages; updated UX copy ("Blocked Actions", "Soft Warnings", "Guardrail Activity")

@@ -1,5 +1,42 @@
 # hapai Changelog
 
+## v1.6.1 (2026-04-10) — ASCII Logo, Hook Cleanup & Docs
+
+### ✅ Delivered
+
+**ASCII Art Logo (PR #38, #39)**
+- `print_logo()` and `print_logo_compact()` added to `bin/hapai` — logo renders on `status`, `validate`, and install output
+- ASCII art also added to installer output and README header
+- Fixed middle line alignment (gap on right, not left) and added leading newline for terminal spacing
+
+**Installer: stale hook cleanup (PR #37)**
+- `hapai install` now strips stale hapai hooks from `settings.json` before merging the current template
+- Prevents ghost hook registrations from accumulating across installs when hook filenames change
+
+**Auto-sync at session end (PR #36)**
+- `hooks/stop/auto-sync.sh` — Stop hook: fires `hapai sync` at Claude Code session end (opt-in via `gcp.auto_sync.enabled: true`)
+- `hooks/git/post-commit.sh` — Git post-commit hook: fires `hapai sync` after every commit; covers Cursor, Windsurf, Devin, Trae, Copilot, and plain git
+- `hapai install --git-hooks` / `hapai uninstall --git-hooks` manage the post-commit hook
+- Registered in `templates/settings.hooks.json` Stop event array
+
+**CLAUDE.md expanded (8c299d2)**
+- Added all 8 hook event types with directories
+- Documented PR review pipeline and flow dispatcher matcher syntax
+- Full exporters table (8 target tools)
+- Added `risk_tier`, `pr_review.*`, `branch_taxonomy.*` config keys
+- Added `version`, `install/uninstall --git-hooks` CLI commands
+
+### 📝 Key commits
+
+- `fa41d57` — feat: ASCII art logo for CLI, installer and README (#38)
+- `e7f7ee9` — fix: correct logo icon middle line alignment (#39)
+- `2fe38ac` — fix: add leading newline before logo output for terminal spacing
+- `4fa72b4` — fix: strip stale hapai hooks before merging template on install (#37)
+- `3710d5e` — feat: auto-sync audit log to GCS at session end (#36)
+- `8c299d2` — docs: expand CLAUDE.md with missing hook types, PR review system, exporters, and config
+
+---
+
 ## v1.6.0 (2026-04-10) — Dashboard Design System, i18n & Docs Sidebar
 
 ### ✅ Delivered
