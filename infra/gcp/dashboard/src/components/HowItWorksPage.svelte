@@ -1,36 +1,78 @@
 <script>
+  import { onMount, onDestroy } from 'svelte'
   import { t } from '../stores/i18n.js'
 
   let activeSection = $state('what-is-hapai')
+  let observer
 
-  const sectionKeys = [
-    { id: 'what-is-hapai',   key: 'whatIs' },
-    { id: 'quick-start',     key: 'quickStart' },
-    { id: 'guardrails',      key: 'guardrails' },
-    { id: 'configuration',   key: 'configuration' },
-    { id: 'automations',     key: 'automations' },
-    { id: 'cli-commands',    key: 'cliCommands' },
-    { id: 'analytics',       key: 'analytics' },
-    { id: 'cloud-logging',   key: 'cloudLogging' },
-    { id: 'export',          key: 'export' },
-    { id: 'faq',             key: 'faq' }
+  const navGroups = [
+    {
+      labelKey: 'docs.nav.groups.gettingStarted',
+      sections: [
+        { id: 'what-is-hapai', key: 'whatIs' },
+        { id: 'quick-start',   key: 'quickStart' },
+      ]
+    },
+    {
+      labelKey: 'docs.nav.groups.configuration',
+      sections: [
+        { id: 'guardrails',    key: 'guardrails' },
+        { id: 'configuration', key: 'configuration' },
+        { id: 'automations',   key: 'automations' },
+      ]
+    },
+    {
+      labelKey: 'docs.nav.groups.reference',
+      sections: [
+        { id: 'cli-commands',  key: 'cliCommands' },
+        { id: 'export',        key: 'export' },
+      ]
+    },
+    {
+      labelKey: 'docs.nav.groups.cloud',
+      sections: [
+        { id: 'analytics',     key: 'analytics' },
+        { id: 'cloud-logging', key: 'cloudLogging' },
+      ]
+    },
+    {
+      labelKey: 'docs.nav.groups.help',
+      sections: [
+        { id: 'faq', key: 'faq' },
+      ]
+    },
   ]
+
+  onMount(() => {
+    observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.find(e => e.isIntersecting)
+        if (visible) activeSection = visible.target.id
+      },
+      { rootMargin: '-20% 0px -70% 0px' }
+    )
+    document.querySelectorAll('.docs-section[id]').forEach(s => observer.observe(s))
+  })
+
+  onDestroy(() => observer?.disconnect())
 </script>
 
 <div class="docs-container">
   <aside class="sidebar">
     <nav class="sidebar-nav">
-      {#each sectionKeys as s}
-        <a href="#/docs"
-           class="sidebar-link"
-           class:active={activeSection === s.id}
-           onclick={(e) => {
-             e.preventDefault()
-             activeSection = s.id
-             document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth' })
-           }}>
-          {$t(`docs.nav.${s.key}`)}
-        </a>
+      {#each navGroups as group}
+        <p class="nav-group-label">{$t(group.labelKey)}</p>
+        {#each group.sections as s}
+          <a href="#/docs"
+             class="sidebar-link"
+             class:active={activeSection === s.id}
+             onclick={(e) => {
+               e.preventDefault()
+               document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth' })
+             }}>
+            {$t(`docs.nav.${s.key}`)}
+          </a>
+        {/each}
       {/each}
     </nav>
   </aside>
@@ -228,8 +270,10 @@ hapai sync --dry-run       # Preview sync</code></pre>
   .docs-container { display: flex; min-height: calc(100vh - 80px); background: var(--color-off-white); }
 
   .sidebar { width: 200px; background: var(--color-white); border-right: 1px solid var(--color-light-gray); padding: var(--space-3); position: sticky; top: 80px; height: calc(100vh - 80px); overflow-y: auto; }
-  .sidebar-nav { display: flex; flex-direction: column; gap: var(--space-1); }
-  .sidebar-link { font-size: 12px; font-weight: var(--weight-normal); color: var(--color-meta-gray); text-decoration: none; padding: 6px 8px; border-radius: 2px; transition: all 150ms; }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-group-label { font-size: 10px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-meta-gray); padding: 10px 8px 4px; margin: 0; }
+  .nav-group-label:first-child { padding-top: 0; }
+  .sidebar-link { font-size: 12px; font-weight: var(--weight-normal); color: var(--color-meta-gray); text-decoration: none; padding: 6px 8px; border-radius: 2px; transition: all var(--transition-fast); }
   .sidebar-link:hover { background: var(--color-off-white); color: var(--color-near-black); }
   .sidebar-link.active { background: var(--color-light-gray); color: var(--color-near-black); font-weight: var(--weight-bold); }
 

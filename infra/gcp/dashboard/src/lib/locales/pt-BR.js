@@ -77,6 +77,7 @@ export default {
   },
   docs: {
     nav: {
+      groups: { gettingStarted: 'Primeiros Passos', configuration: 'Configuração', reference: 'Referência', cloud: 'Nuvem', help: 'Ajuda' },
       whatIs: 'O que é hapai',
       quickStart: 'Início Rápido',
       guardrails: 'Guardrails',
