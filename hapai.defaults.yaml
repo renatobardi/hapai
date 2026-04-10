@@ -245,4 +245,5 @@ gcp:
   region: "us-east1"                # GCP region
   retention_days: 90                # BigQuery partition expiration
   auto_sync:
-    enabled: false                  # set true to upload audit.jsonl to GCS at session end
+    enabled: false                  # Claude Code: upload audit.jsonl at session end (stop hook)
+                                    # Other tools: hapai install --git-hooks (post-commit)
