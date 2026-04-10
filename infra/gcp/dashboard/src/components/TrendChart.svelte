@@ -23,10 +23,9 @@
   $: if (canvas && data && $locale) build()
   onMount(build); onDestroy(()=>chart?.destroy())
 </script>
-<div class="dark"><div class="inner"><div class="card-title">{$t('charts.trend')}</div><div class="w"><canvas bind:this={canvas}></canvas></div></div></div>
+<div class="dark"><div class="card-title">{$t('charts.trend')}</div><div class="w"><canvas bind:this={canvas}></canvas></div></div>
 <style>
-  .dark { background: var(--color-near-black); padding: var(--space-3); margin-top: var(--space-3); }
-  .inner { max-width: 1400px; margin: 0 auto; }
+  .dark { background: var(--color-near-black); padding: var(--space-3); }
   .card-title { font-size: 11px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-meta-gray); margin-bottom: var(--space-2); }
   .w { height: 180px; position: relative; }
 </style>
