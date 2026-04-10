@@ -9,10 +9,16 @@
   function build() {
     if (!canvas || !data.length) return
     const T = get(t)
+    const s = getComputedStyle(document.documentElement)
+    const cDeny        = s.getPropertyValue('--color-deny').trim()
+    const cWhite       = s.getPropertyValue('--color-white').trim()
+    const cMetaGray    = s.getPropertyValue('--color-meta-gray').trim()
+    const cGrid        = s.getPropertyValue('--color-grid-on-dark').trim()
+    const cBorderDark  = s.getPropertyValue('--color-border-on-dark').trim()
     if (chart) chart.destroy()
-    chart = new Chart(canvas, { type:'line', data:{ labels:data.map(d=>d.day), datasets:[{label:T('charts.labels.denialsPerDay'),data:data.map(d=>d.denies),borderColor:'#c0392b',backgroundColor:'rgba(192,57,43,0.08)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#c0392b',tension:0,fill:true}] },
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#ffffff',font:{weight:'700',size:12},boxWidth:12}}},
-        scales:{x:{ticks:{color:'#757575',font:{size:11}},grid:{color:'rgba(255,255,255,0.08)'},border:{color:'rgba(255,255,255,0.1)'}},y:{ticks:{color:'#757575',font:{size:11}},grid:{color:'rgba(255,255,255,0.08)'},border:{color:'rgba(255,255,255,0.1)'}}}} })
+    chart = new Chart(canvas, { type:'line', data:{ labels:data.map(d=>d.day), datasets:[{label:T('charts.labels.denialsPerDay'),data:data.map(d=>d.denies),borderColor:cDeny,backgroundColor:'rgba(192,57,43,0.08)',borderWidth:2,pointRadius:3,pointBackgroundColor:cDeny,tension:0,fill:true}] },
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:cWhite,font:{weight:'700',size:12},boxWidth:12}}},
+        scales:{x:{ticks:{color:cMetaGray,font:{size:11}},grid:{color:cGrid},border:{color:cBorderDark}},y:{ticks:{color:cMetaGray,font:{size:11}},grid:{color:cGrid},border:{color:cBorderDark}}}} })
   }
   $: if (canvas && data && $locale) build()
   onMount(build); onDestroy(()=>chart?.destroy())
