@@ -170,4 +170,20 @@ _review_written=1
 issue_count="$(echo "$issues" | jq 'length' 2>/dev/null || echo "0")"
 audit_log "allow" "PR review complete on branch ${branch}: status=${review_status}, issues=${issue_count}"
 
+# ─── Auto-fix: launch fix agent if enabled and issues found ──────────────────
+if [[ "$review_status" == "issues" ]]; then
+  auto_fix_enabled="$(config_get "guardrails.pr_review.auto_fix.enabled" "false")"
+  current_attempt="$(state_get "pr-review.fix_attempt" "0")"
+  if [[ "$auto_fix_enabled" == "true" ]] && [[ "$current_attempt" -eq 0 ]] && command -v claude &>/dev/null; then
+    if [[ "$branch" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+      state_set "pr-review.status" "fixing"
+      state_set "pr-review.fix_attempt" "1"
+      _review_written=1
+      nohup bash "${SCRIPT_DIR}/_pr-fix-agent.sh" "$branch" "1" &>/dev/null &
+      disown 2>/dev/null || true
+      audit_log "allow" "PR fix agent launched for branch ${branch} (attempt 1)"
+    fi
+  fi
+fi
+
 exit 0

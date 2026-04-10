@@ -116,6 +116,40 @@ A fresh review has been started. Fix the issues and push again once it completes
     fi
     ;;
 
+  fixing)
+    warn "hapai: PR review found issues — auto-fix is running in background. Try again shortly."
+    ;;
+
+  fix_clean)
+    # Issues were auto-fixed; reset for next push cycle
+    state_set "pr-review.status" "clean"
+    state_set "pr-review.fix_attempt" "0"
+    allow
+    ;;
+
+  fix_failed)
+    issues="$(state_get "pr-review.issues" "[]")"
+    issue_count="$(echo "$issues" | jq 'length' 2>/dev/null || echo "?")"
+    formatted="$(echo "$issues" | jq -r '.[] | "  [\(.severity)] \(.file // "?"):\(.line // "?") — \(.message // "?")"' 2>/dev/null | head -30 || echo "  (could not parse issues)")"
+    fix_attempts="$(state_get "pr-review.fix_attempt" "?")"
+
+    msg="hapai: Auto-fix failed after ${fix_attempts} attempt(s). ${issue_count} issue(s) remain on branch '${branch}'.
+
+${formatted}
+
+Please fix the issues manually and push again."
+
+    fail_open="$(config_get "guardrails.pr_review.fail_open" "false")"
+    state_increment "guard-pr-review.deny_count" 2>/dev/null || true
+    audit_log "deny" "PR fix failed: ${issue_count} issues remain on branch ${branch}"
+
+    if [[ "$fail_open" == "true" ]]; then
+      warn "$msg"
+    else
+      deny "$msg"
+    fi
+    ;;
+
   *)
     # Unknown status — fail open
     exit 0

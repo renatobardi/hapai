@@ -71,6 +71,15 @@ guardrails:
     review_timeout_seconds: 300  # treat a pending review as stale after 5 minutes
     max_diff_chars: 8000         # truncate diff sent to the model (token cost guard)
     base_branch: ""              # base branch for diff (auto-detect main/master if empty)
+    auto_fix:
+      enabled: false             # opt-in: auto-fix issues before blocking
+      model: "claude-sonnet-4-6" # more capable model for applying fixes
+      max_fix_attempts: 2        # max rounds of fix → re-review → fix
+      severities:                # which severity levels to auto-fix
+        - critical
+        - high
+        - medium
+        - low
 
   branch_taxonomy:
     enabled: true

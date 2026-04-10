@@ -70,6 +70,7 @@ state_set "pr-review.status" "pending"
 state_set "pr-review.branch" "$branch"
 state_set "pr-review.started_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 state_set "pr-review.issues" "[]"
+state_set "pr-review.fix_attempt" "0"
 
 # Launch background review agent (fully detached)
 agent_script="${SCRIPT_DIR}/../_pr-review-agent.sh"

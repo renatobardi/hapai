@@ -1103,6 +1103,56 @@ rm -f "$PR_REVIEW_CONFIG" "$PR_REVIEW_CONFIG_OPEN" "$PR_REVIEW_STALE_CONFIG" 2>/
 rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}guard-pr-review.sh — auto-fix features (new status: fixing, fix_clean, fix_failed)${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Ensure we're in the test branch
+cd "$MOCK_REPO" && git checkout feat/pr-review-test -q 2>/dev/null || true
+
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG"
+
+# status=fixing → warn, not blocked
+set_review_state "fixing"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}')"
+assert_allowed "$output" "pr-review: allows push when status=fixing (warns)"
+assert_contains "$output" "auto-fix\|running\|background\|shortly" "pr-review: fixing message mentions auto-fix"
+
+# status=fix_clean → allow and reset state
+set_review_state "fix_clean"
+echo "1" > "$HAPAI_HOME/state/pr-review.fix_attempt"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}')"
+assert_allowed "$output" "pr-review: allows push when status=fix_clean"
+state_val="$(cat "$HAPAI_HOME/state/pr-review.status" 2>/dev/null || echo "unset")"
+TOTAL=$((TOTAL + 1))
+if [[ "$state_val" == "clean" ]]; then
+  echo -e "  ${GREEN}✓${NC} pr-review: status reset to clean after fix_clean"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${RED}✗${NC} pr-review: expected status=clean after fix_clean, got '$state_val'"
+  FAIL=$((FAIL + 1))
+fi
+
+# status=fix_failed, fail_open=false → deny with failure message
+set_review_state "fix_failed"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+echo "2" > "$HAPAI_HOME/state/pr-review.fix_attempt"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}')"
+assert_blocked "$output" "pr-review: blocks push when status=fix_failed and fail_open=false"
+assert_contains "$output" "Auto-fix\|failed\|attempt" "pr-review: fix_failed message mentions attempts"
+assert_contains "$output" "issue" "pr-review: fix_failed message lists remaining issues"
+
+# status=fix_failed, fail_open=true → warn only
+export _HAPAI_CONFIG="$PR_REVIEW_CONFIG_OPEN"
+set_review_state "fix_failed"
+echo "$SAMPLE_ISSUES" > "$HAPAI_HOME/state/pr-review.issues"
+echo "2" > "$HAPAI_HOME/state/pr-review.fix_attempt"
+output="$(run_hook_check "pre-tool-use/guard-pr-review.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}')"
+assert_allowed "$output" "pr-review: warns when status=fix_failed and fail_open=true"
+
+unset _HAPAI_CONFIG
+rm -f "$HAPAI_HOME/state/pr-review."* 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}guard-branch-taxonomy.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 
