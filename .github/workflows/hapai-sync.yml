@@ -32,25 +32,29 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Run hapai sync
-        env:
-          HAPAI_SYNC_PROJECT_ID: 'hapai-oute'
-          HAPAI_SYNC_BUCKET: 'hapai-audit-bardi'
+      - name: Download audit logs from GCS
         run: |
-          # Create hapai.yaml for this run
-          cat > hapai.yaml <<EOF
-          version: "1.0"
-          risk_tier: medium
-          gcp:
-            enabled: true
-            project_id: $HAPAI_SYNC_PROJECT_ID
-            bucket: $HAPAI_SYNC_BUCKET
-            region: us-east1
-            retention_days: 90
-          EOF
+          mkdir -p /tmp/hapai-audit
+          gsutil -m rsync -r gs://hapai-audit-bardi/ /tmp/hapai-audit/
+          echo "Files downloaded:"
+          find /tmp/hapai-audit -name "*.jsonl" | sort
 
-          # Run sync (GOOGLE_IDENTITY_TOKEN is set by google-github-actions/auth)
-          ./bin/hapai sync
+      - name: Load into BigQuery
+        run: |
+          PROJECT="hapai-oute"
+          BQ_TABLE="${PROJECT}:hapai_dataset.events"
+          SCHEMA="infra/gcp/bigquery-schema.json"
+          ERRORS=0
+          while IFS= read -r -d '' file; do
+            echo "Loading: $file"
+            if bq load --project_id="$PROJECT" --source_format=NEWLINE_DELIMITED_JSON --schema="$SCHEMA" --ignore_unknown_values --noreplace "$BQ_TABLE" "$file"; then
+              echo "OK: $file"
+            else
+              echo "WARN: $file failed (pode ser duplicata — continuando)"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < <(find /tmp/hapai-audit -name "*.jsonl" -print0 | sort -z)
+          echo "Done. Erros: $ERRORS"
 
       - name: Slack notification (optional)
         if: failure()
