@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # hapai git post-commit hook
 # Fires hapai sync in background after each git commit.
 # Works with any AI coding tool that commits via git:

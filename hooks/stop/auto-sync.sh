@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # hapai/hooks/stop/auto-sync.sh
 # Uploads audit.jsonl to GCS at the end of each Claude Code session.
 # Runs hapai sync in background — does not block session teardown.
