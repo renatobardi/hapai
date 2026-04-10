@@ -190,24 +190,37 @@ cmd_install() {
   resolved="$(jq --arg path "$hooks_abs_path" 'walk(if type == "string" then gsub("__HAPAI_HOOKS__"; $path) else . end)' "$template")"
 
   if [[ -f "$settings_file" ]]; then
-    # Deep merge: existing settings + hapai hooks
+    # Deep merge: strip existing hapai hooks first, then add new template hooks.
+    # Stripping first ensures the template is always authoritative — avoids
+    # unique_by() keeping stale groups when new hooks are added to a group.
     local existing
     existing="$(cat "$settings_file")"
 
-    # Merge hooks arrays (append hapai hooks to existing)
+    # Step 1: remove all existing hapai hook groups
+    local stripped
+    stripped="$(echo "$existing" | jq '
+      if .hooks then
+        .hooks |= with_entries(
+          .value |= map(
+            select(
+              (.hooks // [{}])[0].command // .command // "" |
+              contains("hapai") | not
+            )
+          ) | select(length > 0)
+        ) |
+        if .hooks == {} then del(.hooks) else . end
+      else . end
+    ' 2>/dev/null)" || stripped="$existing"
+
+    # Step 2: add new hapai hooks from template
     local merged
-    merged="$(echo "$existing" | jq --argjson hapai "$resolved" '
+    merged="$(echo "$stripped" | jq --argjson hapai "$resolved" '
       . as $base |
       $hapai.hooks as $new_hooks |
       ($base.hooks // {}) as $existing_hooks |
-      # For each hook event, concatenate arrays (dedup by command)
       reduce ($new_hooks | keys[]) as $event (
         $base;
-        .hooks[$event] = (
-          ($existing_hooks[$event] // []) +
-          ($new_hooks[$event] // [])
-          | unique_by(.hooks[0].command // .command // .)
-        )
+        .hooks[$event] = (($existing_hooks[$event] // []) + ($new_hooks[$event] // []))
       )
     ' 2>/dev/null)" || {
       # If merge fails, just add hooks key
