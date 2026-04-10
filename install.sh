@@ -234,7 +234,7 @@ main() {
   if [ -t 1 ]; then
     printf "\n"
     printf "${CYAN}─── │${NC}  ${BOLD}╦ ╦╔═╗╔═╗╔═╗╦${NC}\n"
-    printf "${CYAN} ── │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
+    printf "${CYAN}──  │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
     printf "${CYAN}─── │${NC}  ${BOLD}╩ ╩╩ ╩╩  ╩ ╩╩${NC}\n"
     printf "        ${DIM}guardrails for AI coding assistants${NC}\n"
     printf "\n"

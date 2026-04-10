@@ -31,7 +31,7 @@ NC='\033[0m'
 print_logo() {
   [ -t 1 ] || return 0
   printf "${CYAN}─── │${NC}  ${BOLD}╦ ╦╔═╗╔═╗╔═╗╦${NC}    ${DIM}v${HAPAI_VERSION}${NC}\n"
-  printf "${CYAN} ── │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
+  printf "${CYAN}──  │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
   printf "${CYAN}─── │${NC}  ${BOLD}╩ ╩╩ ╩╩  ╩ ╩╩${NC}\n"
   printf "        ${DIM}guardrails for AI coding assistants${NC}\n"
   printf "\n"
