@@ -135,6 +135,9 @@ hapai/
 | `list-hooks` | List all installed hooks |
 | `sync` | Upload audit logs to Cloud Storage (GCP required) |
 | `export [--all]` | Export guardrails to Cursor, Copilot, Windsurf formats |
+| `install --git-hooks` | Install post-commit hook for non-Claude tools (fires `hapai sync`) |
+| `uninstall --git-hooks` | Remove post-commit hook |
+| `version` | Show installed hapai version |
 
 **Hook lifecycle** — Claude Code triggers hooks via JSON on stdin. Each hook reads tool name/command/file path, sources `hooks/_lib.sh` for config/audit utilities, then exits 0 (allow) or 2 (deny). Hooks never crash the host tool — all internal errors exit 0 (fail-open trap).
 
@@ -167,10 +170,25 @@ Configuration files are resolved in this order (first match wins):
 
 - `guardrails.{name}.enabled` — Enable/disable a specific guardrail
 - `guardrails.{name}.fail_open` — `true` = warn but allow; `false` = hard deny
+- `risk_tier` — Global severity level (`low | medium | high | critical`); controls default deny vs. warn behavior
 - `blocklist.enabled` — TTL-based pattern blocking system
 - `cooldown.*` — After N denials in a window, escalate hook to fail-open (prevents annoyance)
-- `flows.{name}.steps[]` — Sequential hook chains with `hook:` path and `gate: block|warn|skip`
+- `flows.{name}.steps[]` — Sequential hook chains; each step has `hook:` path, `gate: block|warn|skip`, and optional `match:` pattern
+  - `gate: block` — a denial from this step stops the chain; `gate: warn` — logs but continues; `gate: skip` — always continues
+  - `match:` syntax: `"Bash(git commit*)"` (tool + glob on input) or bare tool names like `"Write|Edit|MultiEdit"`
 - Cloud settings: `observability`, `cloud_storage`, `bigquery` — for GCP integration
+
+**PR review config** (`guardrails.pr_review.*`):
+- `enabled` — Run background code review after `gh pr create` / `git push -u`
+- `model` — Claude model for reviews (default: `claude-haiku-4-5-20251001`)
+- `review_timeout_seconds` — Abort review after N seconds (default: 300)
+- `max_diff_chars` — Skip review if diff exceeds this (default: 8000; token cost guard)
+- `base_branch` — Override base branch; empty = auto-detect
+- `auto_fix.enabled` — Automatically fix issues found by reviewer (model: Sonnet, off by default)
+
+**Branch taxonomy config** (`guardrails.branch_taxonomy.*`):
+- `allowed_prefixes` — List of valid branch prefixes (e.g. `feat/, fix/, chore/`)
+- `require_description` — Enforce `prefix/description` format (not just `prefix/`)
 
 **State storage:**
 
@@ -230,22 +248,52 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 - `templates/settings.hooks.json` — hook registration template for Claude Code
 - `templates/claude.md.inject` — markdown block injected into project CLAUDE.md on install (wrapped in `<!-- hapai:start -->...<!-- hapai:end -->`)
 - `templates/guardrails-rules.md` — human-readable guardrails reference
-- `exporters/export-*.sh` — exporters for Cursor, Copilot, Windsurf, Devin, Trae, Antigravity
 - `hooks/git/post-commit.sh` — git post-commit hook installed via `hapai install --git-hooks`; fires `hapai sync` in background after each commit; works with any AI coding tool that commits via git
+
+**Exporters** (`exporters/`):
+
+| Script | Output path | Target tool |
+|---|---|---|
+| `export-claude.sh` | hooks + settings.json | Claude Code |
+| `export-cursor.sh` | `.cursor/rules/hapai.mdc` | Cursor |
+| `export-copilot.sh` | `.github/copilot-instructions.md` | GitHub Copilot |
+| `export-windsurf.sh` | `.windsurf/rules/hapai.md` | Windsurf |
+| `export-devin.sh` | `AGENTS.md` | Devin |
+| `export-trae.sh` | `.trae/rules/hapai.md` | Trae |
+| `export-antigravity.sh` | `GEMINI.md` + `AGENTS.md` | Antigravity/Gemini |
+| `export-universal.sh` | `AGENTS.md` | Cross-tool fallback |
 
 ## Claude Code Integration
 
 ### Hook Event Types & Exit Codes
 
-- **PreToolUse** — Fires before Claude Code executes a tool (Bash, Write, Edit, etc.)
-- **PostToolUse** — Fires after tool execution (automations: format, lint, checkpoint)
-- **Stop** — Fires when session ends (cleanup, cost tracking)
+| Event | Directory | Purpose |
+|---|---|---|
+| `PreToolUse` | `hooks/pre-tool-use/` | Block before Claude executes a tool |
+| `PostToolUse` | `hooks/post-tool-use/` | Automations after tool execution |
+| `Stop` | `hooks/stop/` | Cleanup and cost tracking at session end |
+| `SessionStart` | `hooks/session-start/` | Load context, scan TODOs/issues on session init |
+| `UserPromptSubmit` | `hooks/user-prompt-submit/` | Warn on production keywords before any tool runs |
+| `PreCompact` | `hooks/pre-compact/` | Backup transcript before context compaction |
+| `Notification` | `hooks/notification/` | Sound alerts on guardrail events |
+| `PermissionRequest` | `hooks/permission-request/` | Auto-allow read-only operations |
 
 Exit codes follow the Claude Code hook API:
 - `0` — Allow execution
 - `2` — Deny execution (show error to user)
 
 All other exits are treated as `0` (fail-open trap in `_lib.sh` prevents hook crashes).
+
+### PR Review System
+
+When `guardrails.pr_review.enabled = true`, a background review pipeline activates on `gh pr create` or `git push -u`:
+
+1. **`post-tool-use/pr-review-trigger.sh`** — Detects the push/PR command, spawns `_pr-review-agent.sh` in background
+2. **`hooks/_pr-review-agent.sh`** — Runs `claude` CLI (Haiku model by default) to review the diff; writes findings to `~/.hapai/state/pr_review_issues`
+3. **`pre-tool-use/guard-pr-review.sh`** — On subsequent `git push` or merge, blocks if unresolved issues exist
+4. **`hooks/_pr-fix-agent.sh`** — Optional auto-fixer (Sonnet model); activated when `auto_fix.enabled = true`
+
+The review is fire-and-forget — it never blocks the original push. Only follow-up pushes are gated.
 
 ### Installation Modes
 
