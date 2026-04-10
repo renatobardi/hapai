@@ -1,5 +1,12 @@
 # hapai
 
+```
+─── │  ╦ ╦╔═╗╔═╗╔═╗╦
+    │  ╠═╣╠═╣╠═╝╠═╣║
+    │  ╩ ╩╩ ╩╩  ╩ ╩╩
+        guardrails for AI coding assistants
+```
+
 > Deterministic guardrails for AI coding assistants. Hooks that enforce rules **before execution** — not probabilistic prompts that get ignored.
 
 **hapai** v1.3+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.

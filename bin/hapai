@@ -25,7 +25,16 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
+DIM='\033[90m'
 NC='\033[0m'
+
+print_logo() {
+  printf "${CYAN}─── │${NC}  ${BOLD}╦ ╦╔═╗╔═╗╔═╗╦${NC}    ${DIM}v${HAPAI_VERSION}${NC}\n"
+  printf "${CYAN}    │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
+  printf "${CYAN}    │${NC}  ${BOLD}╩ ╩╩ ╩╩  ╩ ╩╩${NC}\n"
+  printf "        ${DIM}guardrails for AI coding assistants${NC}\n"
+  printf "\n"
+}
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1001,9 +1010,8 @@ _export_all() {
 # ─── MAIN ───────────────────────────────────────────────────────────────────
 
 cmd_help() {
+  print_logo
   cat << EOF
-${BOLD}hapai${NC} v${HAPAI_VERSION} — AI coding guardrails
-
 ${BOLD}Usage:${NC}
   hapai <command> [options]
 

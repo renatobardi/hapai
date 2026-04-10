@@ -230,10 +230,13 @@ verify_install() {
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 main() {
-  echo ""
-  echo -e "${BOLD}hapai installer${NC}"
-  echo "─────────────────────────────────"
-  echo ""
+  local DIM='\033[90m'
+  printf "\n"
+  printf "${CYAN}─── │${NC}  ${BOLD}╦ ╦╔═╗╔═╗╔═╗╦${NC}\n"
+  printf "${CYAN}    │${NC}  ${BOLD}╠═╣╠═╣╠═╝╠═╣║${NC}\n"
+  printf "${CYAN}    │${NC}  ${BOLD}╩ ╩╩ ╩╩  ╩ ╩╩${NC}\n"
+  printf "        ${DIM}guardrails for AI coding assistants${NC}\n"
+  printf "\n"
 
   local os
   os="$(detect_os)"
