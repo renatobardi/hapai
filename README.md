@@ -4,17 +4,17 @@
 
 **hapai** v1.3+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
 
-## What's New in v1.5.0
+## What's New in v1.6.0
 
+- **Design system** — 22 CSS tokens covering colors, surfaces, shadows, and transitions; no more hardcoded hex values across dashboard components
+- **Shared component library** — `Button`, `Card`, `Badge`, and `EmptyState` in Svelte 5 runes syntax (`$props()` / `{@render}`)
+- **Full i18n** — EN, PT-BR, and ES-ES across all pages; updated UX copy ("Blocked Actions", "Soft Warnings", "Guardrail Activity")
+- **Landing page** — Unauthenticated visitors now see a proper landing page instead of a blank auth gate
+- **Docs sidebar** — Scroll spy via `IntersectionObserver` + 5 labeled section groups (Getting Started, Configuration, Reference, Cloud, Help)
+- **OAuth error handling** — Sign-in failures surface user-visible feedback in `Header`; popup-closed events silently ignored
 - **Auto-fix for PR review issues** — When code review detects issues, hapai automatically attempts to fix them before blocking the push (opt-in via `auto_fix.enabled`)
-- **CI sync pipeline** — `hapai-sync.yml` workflow downloads today's GCS audit log and loads into BigQuery daily at 2h UTC (no more broken runner dependency)
-- **ADC support** — `hapai sync` accepts `gcloud auth application-default login` credentials locally, no manual `GOOGLE_APPLICATION_CREDENTIALS` export needed
-- **Dashboard data pipeline fixed** — `hapai sync` loads directly to BigQuery after GCS upload
-- **Cloud Function queries fixed** — Analytics queries correctly filter on `result` field (allow/deny/warn)
-- **Svelte 5 Analytics Dashboard** — Real-time visualization of guardrail events
-- **Cloud Integration** — BigQuery + Cloud Functions + GitHub Pages
-- **GitHub OAuth** — Firebase Authentication for dashboard access
-- **OIDC Authentication** — Keyless service account access for Cloud Storage sync
+- **CI sync pipeline** — `hapai-sync.yml` downloads today's GCS audit log and loads into BigQuery daily at 2h UTC
+- **ADC support** — `hapai sync` accepts `gcloud auth application-default login` credentials locally
 
 ## The Problem
 
@@ -103,7 +103,7 @@ Deploy a real-time analytics dashboard to GitHub Pages to monitor guardrail even
 
 - **Timeline** — Daily denial/warning counts (30-day rolling window)
 - **Top Blocking Hooks** — Which guardrails are most active
-- **Recent Events** — Live feed of all denials and warnings
+- **Guardrail Activity** — Live feed of all blocked actions and warnings
 - **Tool Distribution** — Which tools trigger guards most
 - **Project Breakdown** — Per-project statistics
 - **Deny Rate Trend** — Historical deny rate analysis

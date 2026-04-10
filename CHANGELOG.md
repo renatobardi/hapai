@@ -1,5 +1,56 @@
 # hapai Changelog
 
+## v1.6.0 (2026-04-10) — Dashboard Design System, i18n & Docs Sidebar
+
+### ✅ Delivered
+
+**Design System Tokens (PR #34)**
+- 22 new CSS custom properties in `app.css`: surfaces, extended text/border scale, chart grid colors, shadows, transitions, and `--color-deny-area` for chart fill
+- Replaced all hardcoded hex values in `LandingPage`, `Header`, and `TrendChart` with tokens
+- Single source of truth: changing a token updates every component that references it
+
+**Shared Component Library (PR #34)**
+- `Button` — variant (`primary` / `secondary` / `ghost` / `danger`) + size (`sm` / `md` / `lg`) props
+- `Card` — optional title + accent border color
+- `Badge` — semantic type variants (`deny` / `warn` / `allow`)
+- `EmptyState` — consistent empty state messaging
+- All four components written in Svelte 5 runes syntax (`$props()`, `{@render children?.()}`)
+- Migrated `Header`, `LandingPage`, `DenialsTable`, and chart components (~34 lines of duplicated styles removed)
+
+**UX Copy Improvements — EN / PT-BR / ES-ES (PRs #32 & #34)**
+- "Denials" → "Blocked Actions", "Warnings" → "Soft Warnings", "Recent Events" → "Guardrail Activity"
+- "Reason" → "Details" in event table
+- Chart titles: "Denials by Tool / Project"
+- Expanded empty state messages per component
+- All copy keys translated in all three locales
+
+**Landing Page for Unauthenticated Visitors (PR #31)**
+- Full landing page shown when not signed in (replaces blank auth gate)
+- Communicates value proposition, key guardrails, and quick-start steps
+
+**Docs Sidebar — Scroll Spy + Section Grouping (PR #34)**
+- `IntersectionObserver` scroll spy: active section updates while scrolling (not just on click)
+- Flat nav reorganized into 5 labeled groups: Getting Started, Configuration, Reference, Cloud, Help
+- Scroll spy always selects the topmost visible section (tracks intersecting set, sorts by `offsetTop`)
+- All group labels i18n'd in EN, PT-BR, and ES-ES
+
+**Dashboard Layout Fix (PR #34)**
+- `TrendChart` moved inside `.content` max-width container — no more full-bleed breakout on wide screens
+
+**OAuth Sign-In Error Handling (PR #33)**
+- `Header.svelte` now catches sign-in failures and displays error feedback
+- Distinguishes `auth/popup-closed-by-user` (silent) from real errors (shown to user)
+- `navigator.language` guarded for environments where it may be undefined
+
+### 📝 Key commits
+
+- `bce79b1` — fix/feat: design system tokens, shared components, UX copy & Docs sidebar (#34)
+- `bc90ae2` — fix: handle OAuth sign-in errors in Header and guard navigator.language (#33)
+- `fb0b78e` — feat: i18n — EN / PT-BR / ES-ES across all pages and components (#32)
+- `b125a88` — feat: landing page for unauthenticated visitors (#31)
+
+---
+
 ## v1.5.1 (2026-04-10) — CI Sync Pipeline Fix
 
 ### ✅ Delivered
