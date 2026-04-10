@@ -186,7 +186,7 @@ Configuration files are resolved in this order (first match wins):
 
 **Tech stack:** Svelte 5, Vite 6, Firebase SDK (GitHub OAuth), Chart.js. No Tailwind — uses `app.css`.
 
-**Routing:** Hash-based (`#/docs`, `#/config`, etc.) via `stores/route.js`. `App.svelte` is the auth gate and router. Key components: `Dashboard.svelte` (metrics), `HowItWorksPage.svelte` (docs), chart components (`HooksChart`, `TrendChart`, `DenialsTable`, etc.).
+**Routing:** Hash-based (`#/docs`, `#/config`, etc.) via `stores/route.js`. `App.svelte` is the router. Unauthenticated visitors see `LandingPage.svelte`; authenticated users see `Dashboard.svelte`. Key components: `Dashboard.svelte` (metrics), `HowItWorksPage.svelte` (docs), chart components (`HooksChart`, `TrendChart`, `DenialsTable`, etc.).
 
 **Environment variables** (Vite, set in `infra/gcp/dashboard/.env`):
 ```

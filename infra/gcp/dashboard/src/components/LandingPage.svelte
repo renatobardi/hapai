@@ -3,10 +3,13 @@
   import { navigate } from '../stores/route.js'
 
   let signingIn = $state(false)
+  let signInError = $state('')
 
   async function handleSignIn() {
-    signingIn = true
-    try { await signIn() } catch(e){} finally { signingIn = false }
+    signingIn = true; signInError = ''
+    try { await signIn() } catch(e) {
+      if (e.code !== 'auth/popup-closed-by-user') signInError = 'Sign in failed. Try again.'
+    } finally { signingIn = false }
   }
 
   function scrollToQuickStart() {
@@ -189,6 +192,7 @@ hapai validate</pre>
     <button class="btn-primary" onclick={handleSignIn} disabled={signingIn}>
       {signingIn ? 'Signing in…' : 'Sign in with GitHub'}
     </button>
+    {#if signInError}<p class="signin-error">{signInError}</p>{/if}
     <p class="analytics-note">Dashboard requires GitHub authentication. Your audit data stays yours.</p>
   </div>
 </section>
@@ -337,6 +341,7 @@ hapai validate</pre>
   }
   .analytics-features { font-size: 13px; color: var(--color-meta-gray); letter-spacing: 0.03em; }
   .analytics-note { font-size: 12px; color: var(--color-meta-gray); }
+  .signin-error { font-size: 12px; color: var(--color-deny); font-weight: var(--weight-bold); }
 
   /* ─── Footer CTA ─── */
   .footer-cta { background: var(--color-black); }
