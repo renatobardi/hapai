@@ -2,7 +2,7 @@
   import { authStore } from './stores/auth.js'
   import { route } from './stores/route.js'
   import Header from './components/Header.svelte'
-  import AuthGate from './components/AuthGate.svelte'
+  import LandingPage from './components/LandingPage.svelte'
   import Dashboard from './components/Dashboard.svelte'
   import LoadingState from './components/LoadingState.svelte'
   import HowItWorksPage from './components/HowItWorksPage.svelte'
@@ -16,7 +16,7 @@
   {:else if $authStore.user}
     <Dashboard />
   {:else}
-    <AuthGate />
+    <LandingPage />
   {/if}
 </div>
 <style>
