@@ -1,11 +1,14 @@
 <script>
   import { t } from '../stores/i18n.js'
+  import Badge from './Badge.svelte'
+  import Card from './Card.svelte'
+  import EmptyState from './EmptyState.svelte'
   export let data = []
   const fmt = ts => new Date(ts).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
 </script>
-<div class="card">
-  <div class="card-title">{$t('table.title')}</div>
-  {#if !data.length}<p class="empty">{$t('table.empty')}</p>
+<Card title={$t('table.title')}>
+  {#if !data.length}
+    <EmptyState message={$t('table.empty')} />
   {:else}
   <div class="wrap">
     <table>
@@ -20,7 +23,7 @@
         {#each data as r}
         <tr>
           <td class="time">{fmt(r.ts)}</td>
-          <td><span class="badge badge-{r.event}">{r.event}</span></td>
+          <td><Badge type={r.event}>{r.event}</Badge></td>
           <td class="mono">{r.hook}</td>
           <td class="mono">{r.tool}</td>
           <td class="reason">{r.result || '—'}</td>
@@ -30,7 +33,7 @@
     </table>
   </div>
   {/if}
-</div>
+</Card>
 <style>
   .wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -42,5 +45,4 @@
   .time { font-size: 12px; color: var(--color-meta-gray); white-space: nowrap; }
   .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 12px; }
   .reason { max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-meta-gray); font-size: 12px; }
-  .empty { font-size: 13px; color: var(--color-meta-gray); padding: var(--space-3) 0; }
 </style>

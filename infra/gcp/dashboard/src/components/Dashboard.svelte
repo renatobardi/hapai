@@ -42,8 +42,8 @@
       {#if $dashboardStore.tools}<ToolsChart data={$dashboardStore.tools} />{/if}
       {#if $dashboardStore.projects}<ProjectsChart data={$dashboardStore.projects} />{/if}
     </div>
+    {#if $dashboardStore.trends}<TrendChart data={$dashboardStore.trends} />{/if}
   </div>
-  {#if $dashboardStore.trends}<TrendChart data={$dashboardStore.trends} />{/if}
 {/if}
 
 <style>

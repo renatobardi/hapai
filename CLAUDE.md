@@ -184,9 +184,30 @@ Configuration files are resolved in this order (first match wins):
 
 **Location:** `infra/gcp/dashboard/` — Svelte 5 app that visualizes guardrail events from BigQuery.
 
-**Tech stack:** Svelte 5, Vite 6, Firebase SDK (GitHub OAuth), Chart.js. No Tailwind — uses `app.css`.
+**Tech stack:** Svelte 5 (runes syntax: `$state()`, `$derived()`, `$effect()`), Vite 6, Firebase SDK (GitHub OAuth), Chart.js. No Tailwind — uses `app.css`.
 
-**Routing:** Hash-based (`#/docs`, `#/config`, etc.) via `stores/route.js`. `App.svelte` is the router. Unauthenticated visitors see `LandingPage.svelte`; authenticated users see `Dashboard.svelte`. Key components: `Dashboard.svelte` (metrics), `HowItWorksPage.svelte` (docs), chart components (`HooksChart`, `TrendChart`, `DenialsTable`, etc.).
+**Routing:** Hash-based (`#/docs`, `#/config`, etc.) via `stores/route.js`. `App.svelte` is the router. Unauthenticated visitors see `LandingPage.svelte`; authenticated users see `Dashboard.svelte`.
+
+**Store layer** (`src/stores/`):
+- `auth.js` — `authStore` with shape `{ user, idToken, loading }`; wraps Firebase `onAuthStateChanged`
+- `dashboard.js` — `dashboardStore` with shape `{ loading, error, stats, timeline, hooks, denials, tools, projects, trends }`; `loadDashboard(idToken)` fetches from BigQuery proxy
+- `i18n.js` — `locale` (writable), `setLocale()`, and `t` (derived store returning a translation function); browser language auto-detected, persisted to localStorage
+- `route.js` — `currentRoute` writable store; updated by `hashchange` events
+
+**i18n:** Three locales in `src/lib/locales/` (`en.js`, `pt-BR.js`, `es-ES.js`) — JavaScript modules with `export default {}`. Translation keys are dot-separated (e.g. `header.nav.docs`). The `t` store is a derived store — use `$t('key')` in components. Language toggle is in `Header.svelte`. In Svelte template `{...}` blocks, literal curly braces in strings must be escaped as `&#123;` / `&#125;` to avoid parse errors.
+
+**Key components** (`src/`):
+- `App.svelte` — router shell
+- `LandingPage.svelte` — unauthenticated landing page
+- `Dashboard.svelte` — authenticated metrics container
+- `Header.svelte` — nav + GitHub sign-in/out + language toggle (EN/PT/ES)
+- `HowItWorksPage.svelte` — docs page (`#/docs`)
+- Chart/data components: `StatCard`, `TimelineChart`, `HooksChart`, `DenialsTable`, `ToolsChart`, `ProjectsChart`, `TrendChart`
+- UI helpers: `Logo.svelte`, `LoadingState.svelte`
+
+**API layer** (`src/lib/`):
+- `firebase.js` — exports `auth`, `signIn()`, `signOut()`, `onAuthStateChanged` (GitHub OAuth provider)
+- `api.js` — `queryBQ(idToken)` POSTs to `VITE_BQ_PROXY_URL` Cloud Functions proxy with Bearer token
 
 **Environment variables** (Vite, set in `infra/gcp/dashboard/.env`):
 ```

@@ -77,6 +77,7 @@ export default {
   },
   docs: {
     nav: {
+      groups: { gettingStarted: 'Primeiros Passos', configuration: 'Configuração', reference: 'Referência', cloud: 'Nuvem', help: 'Ajuda' },
       whatIs: 'O que é hapai',
       quickStart: 'Início Rápido',
       guardrails: 'Guardrails',
@@ -185,21 +186,21 @@ export default {
     loading: 'Buscando analytics…',
     error: 'Erro',
     retry: 'Tentar novamente',
-    denials: 'Negações',
-    warnings: 'Avisos'
+    denials: 'Ações Bloqueadas',
+    warnings: 'Avisos Suaves'
   },
   charts: {
     timeline: 'Timeline de Eventos — 30 dias',
     hooks: 'Hooks Mais Bloqueadores',
-    tools: 'Distribuição de Ferramentas',
-    projects: 'Projetos',
+    tools: 'Negações por Ferramenta',
+    projects: 'Negações por Projeto',
     trend: 'Tendência de Negação — 30 dias',
     labels: { denials: 'Negações', warnings: 'Avisos', denialsPerDay: 'Negações por dia' }
   },
   table: {
-    title: 'Eventos Recentes',
-    empty: 'Nenhum evento encontrado.',
-    cols: { time: 'Hora', type: 'Tipo', hook: 'Hook', tool: 'Ferramenta', reason: 'Motivo' }
+    title: 'Atividade dos Guardrails',
+    empty: 'Nenhum evento de guardrail ainda. Quando hapai bloquear ou avisar, os eventos aparecerão aqui.',
+    cols: { time: 'Hora', type: 'Tipo', hook: 'Hook', tool: 'Ferramenta', reason: 'Detalhes' }
   },
   statCard: { period: 'Últimos 30 dias' },
   loading: { default: 'Carregando…' }
