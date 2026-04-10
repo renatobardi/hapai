@@ -17,6 +17,34 @@
   --space-6: 48px; --space-8: 64px;
   --font: 'Helvetica Neue', Arial, sans-serif;
   --weight-light: 300; --weight-normal: 400; --weight-bold: 700; --weight-black: 900;
+
+  /* Surfaces — terminal/code areas */
+  --surface-terminal:     #1a1a1a;
+  --surface-terminal-bar: #2a2a2a;
+
+  /* Text — extended scale */
+  --color-text-muted:          #555555;
+  --color-text-on-dark:        #e8e8e8;
+  --color-text-on-dark-muted:  #cccccc;
+  --color-text-on-dark-subtle: #444444;
+
+  /* Borders — extended scale */
+  --color-border-medium:     #e0e0e0;
+  --color-border-dark:       #333333;
+  --color-border-dark-hover: #666666;
+
+  /* Chart/grid on dark surfaces */
+  --color-grid-on-dark:   rgba(255, 255, 255, 0.08);
+  --color-border-on-dark: rgba(255, 255, 255, 0.1);
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* Motion */
+  --transition-fast:   150ms ease;
+  --transition-normal: 250ms ease;
 }
 html, body {
   font-family: var(--font); font-weight: var(--weight-normal);
