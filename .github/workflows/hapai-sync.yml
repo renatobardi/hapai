@@ -52,6 +52,10 @@ jobs:
           BQ_TABLE="${PROJECT}:hapai_dataset.events"
           SCHEMA="infra/gcp/bigquery-schema.json"
           FILE="/tmp/hapai-audit/today.jsonl"
+          if [[ ! -f "$FILE" ]]; then
+            echo "No audit file to load — skipping"
+            exit 0
+          fi
           echo "Loading: ${FILE}"
           if bq load --project_id="$PROJECT" --source_format=NEWLINE_DELIMITED_JSON --schema="$SCHEMA" --ignore_unknown_values --noreplace "$BQ_TABLE" "$FILE"; then
             echo "BigQuery load completed"
