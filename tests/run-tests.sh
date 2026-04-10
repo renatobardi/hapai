@@ -221,6 +221,45 @@ assert_blocked "$output" "Blocks edit of package-lock.json"
 output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/project/src/app.ts"}}')"
 assert_allowed "$output" "Allows write to src/app.ts"
 
+# ── Bash write bypass detection ──────────────────────────────────────────────
+# Python heredoc bypass (the original bypass that prompted this fix)
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"python3 - <<'\''EOF'\''\ncontent = open('\''/project/.github/workflows/ci.yml'\'').read()\nopen('\''/project/.github/workflows/ci.yml'\'', '\''w'\'').write(content)\nEOF"}}')"
+assert_blocked "$output" "Blocks Python heredoc writing to CI workflow"
+
+# Shell redirect to CI workflow
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo \"content\" > .github/workflows/ci.yml"}}')"
+assert_blocked "$output" "Blocks shell redirect to CI workflow"
+
+# tee to .env
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat config.txt | tee .env"}}')"
+assert_blocked "$output" "Blocks tee to .env"
+
+# sed -i on CI workflow
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"sed -i '\''s/foo/bar/'\'' .github/workflows/ci.yml"}}')"
+assert_blocked "$output" "Blocks sed -i on CI workflow"
+
+# cp to CI workflow
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cp /tmp/new.yml .github/workflows/ci.yml"}}')"
+assert_blocked "$output" "Blocks cp to CI workflow"
+
+# Node.js fs.writeFileSync to .env
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"node -e \"fs.writeFileSync('\''.env'\'', '\''SECRET=x'\'')\""}}')"
+assert_blocked "$output" "Blocks Node.js fs.writeFileSync to .env"
+
+# Bash reading CI workflow (cat) should be allowed
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat .github/workflows/ci.yml"}}')"
+assert_allowed "$output" "Allows cat (read) of CI workflow"
+
+# Bash grep on .env.example should be allowed
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"grep VARIABLE .env.example"}}')"
+assert_allowed "$output" "Allows grep on .env.example"
+
+# Python reading a workflow file (no write mode) should be allowed
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"python3 -c \"print(open('\''.github/workflows/ci.yml'\'').read())\""}}')"
+assert_allowed "$output" "Allows Python read-only open of CI workflow"
+
+# ── End Bash bypass detection tests ─────────────────────────────────────────
+
 # ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}auto-allow-readonly.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
