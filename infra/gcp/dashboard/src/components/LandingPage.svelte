@@ -1,6 +1,7 @@
 <script>
   import { signIn } from '../lib/firebase.js'
   import { navigate } from '../stores/route.js'
+  import { t } from '../stores/i18n.js'
 
   let signingIn = $state(false)
   let signInError = $state('')
@@ -8,7 +9,7 @@
   async function handleSignIn() {
     signingIn = true; signInError = ''
     try { await signIn() } catch(e) {
-      if (e.code !== 'auth/popup-closed-by-user') signInError = 'Sign in failed. Try again.'
+      if (e.code !== 'auth/popup-closed-by-user') signInError = $t('landing.analytics.signInError')
     } finally { signingIn = false }
   }
 
@@ -33,17 +34,17 @@
   }
 
   const guards = [
-    { name: 'Branch Protection',    color: 'deny', desc: 'Blocks commits and pushes to main, master, or any protected branch.' },
-    { name: 'Branch Taxonomy',      color: 'warn', desc: 'Enforces naming conventions: feat/, fix/, chore/, docs/, hotfix/.' },
-    { name: 'Branch Rules',         color: 'warn', desc: 'Validates branch descriptions and origin tracking.' },
-    { name: 'Commit Hygiene',       color: 'deny', desc: 'Strips AI attribution: Co-Authored-By, "Generated with Claude".' },
-    { name: 'File Protection',      color: 'deny', desc: 'Prevents writes to .env, lockfiles, CI workflows, and any pattern you define.' },
-    { name: 'Destructive Commands', color: 'deny', desc: 'Blocks rm -rf, git push --force, DROP TABLE, and configurable patterns.' },
-    { name: 'Blast Radius',         color: 'warn', desc: 'Warns when a commit touches too many files or packages. Monorepo-aware.' },
-    { name: 'Uncommitted Changes',  color: 'warn', desc: 'Prevents the AI from overwriting your uncommitted work.' },
-    { name: 'PR Review',            color: 'deny', desc: 'Background code review on every PR. Optional auto-fix before blocking.' },
-    { name: 'Git Workflow',         color: 'warn', desc: 'Enforces trunk-based or GitFlow model across the team.' },
-    { name: 'Flow Dispatcher',      color: 'blue', desc: 'Sequential hook chains with conditional gate logic for complex workflows.' },
+    { name: 'Branch Protection',    color: 'deny', key: 'branchProtection' },
+    { name: 'Branch Taxonomy',      color: 'warn', key: 'branchTaxonomy' },
+    { name: 'Branch Rules',         color: 'warn', key: 'branchRules' },
+    { name: 'Commit Hygiene',       color: 'deny', key: 'commitHygiene' },
+    { name: 'File Protection',      color: 'deny', key: 'fileProtection' },
+    { name: 'Destructive Commands', color: 'deny', key: 'destructiveCommands' },
+    { name: 'Blast Radius',         color: 'warn', key: 'blastRadius' },
+    { name: 'Uncommitted Changes',  color: 'warn', key: 'uncommittedChanges' },
+    { name: 'PR Review',            color: 'deny', key: 'prReview' },
+    { name: 'Git Workflow',         color: 'warn', key: 'gitWorkflow' },
+    { name: 'Flow Dispatcher',      color: 'blue', key: 'flowDispatcher' },
   ]
 </script>
 
@@ -51,11 +52,11 @@
 <section class="hero" use:fadeIn>
   <div class="hero-inner">
     <div class="hero-text">
-      <h1>Your AI just pushed to main. Again.</h1>
-      <p class="hero-sub">hapai is a deterministic guardrails system for AI coding assistants. Shell-based hooks that block dangerous actions before they execute — not markdown rules the AI ignores.</p>
+      <h1>{$t('landing.hero.headline')}</h1>
+      <p class="hero-sub">{$t('landing.hero.sub')}</p>
       <div class="hero-ctas">
-        <button class="btn-primary" onclick={scrollToQuickStart}>Get Started</button>
-        <a class="btn-ghost" href="https://github.com/renatobardi/hapai" target="_blank" rel="noopener">View on GitHub</a>
+        <button class="btn-primary" onclick={scrollToQuickStart}>{$t('landing.hero.cta')}</button>
+        <a class="btn-ghost" href="https://github.com/renatobardi/hapai" target="_blank" rel="noopener">{$t('landing.hero.github')}</a>
       </div>
     </div>
     <div class="terminal" aria-label="hapai denial example">
@@ -77,24 +78,16 @@ Action blocked. 0 violations allowed.</pre>
 <!-- ─── Problem ─── -->
 <section class="problem" use:fadeIn>
   <div class="section-inner">
-    <p class="section-label">The Problem</p>
-    <h2>AI coding tools ignore your rules</h2>
+    <p class="section-label">{$t('landing.problem.label')}</p>
+    <h2>{$t('landing.problem.heading')}</h2>
     <div class="cards-3">
-      <div class="problem-card">
-        <span class="badge badge-deny">DENY</span>
-        <h3>Commits to protected branches</h3>
-        <p>You wrote "never push to main" in CLAUDE.md. The AI read it, acknowledged it, and pushed to main anyway. Markdown is a suggestion, not a constraint.</p>
-      </div>
-      <div class="problem-card">
-        <span class="badge badge-deny">DENY</span>
-        <h3>Destructive commands in production</h3>
-        <p>rm -rf, git push --force, DROP TABLE — AI assistants will run these if the context suggests it. One bad inference, permanent damage.</p>
-      </div>
-      <div class="problem-card">
-        <span class="badge badge-warn">WARN</span>
-        <h3>Silent edits to sensitive files</h3>
-        <p>Your .env got committed. Your lockfile got rewritten. Your CI workflow was modified. You didn't notice until the build broke — or worse, until it didn't.</p>
-      </div>
+      {#each $t('landing.problem.cards') as card, i}
+        <div class="problem-card">
+          <span class="badge {i === 2 ? 'badge-warn' : 'badge-deny'}">{i === 2 ? 'WARN' : 'DENY'}</span>
+          <h3>{card.title}</h3>
+          <p>{card.desc}</p>
+        </div>
+      {/each}
     </div>
   </div>
 </section>
@@ -102,26 +95,17 @@ Action blocked. 0 violations allowed.</pre>
 <!-- ─── Solution ─── -->
 <section class="solution" use:fadeIn>
   <div class="section-inner">
-    <p class="section-label">The Solution</p>
-    <h2>Hooks, not prompts. Deterministic, not probabilistic.</h2>
+    <p class="section-label">{$t('landing.solution.label')}</p>
+    <h2>{$t('landing.solution.heading')}</h2>
     <div class="steps">
-      <div class="step">
-        <span class="step-num">01</span>
-        <h3>Install in 30 seconds</h3>
-        <p>Clone the repo, add to PATH, run hapai install --global. Three commands. No SDK, no server, no dependencies beyond bash and jq.</p>
-      </div>
-      <div class="step-divider" aria-hidden="true"></div>
-      <div class="step">
-        <span class="step-num">02</span>
-        <h3>Hooks intercept every action</h3>
-        <p>Every time your AI assistant tries to run a command, edit a file, or make a commit — hapai's shell hooks evaluate it against your rules before it executes.</p>
-      </div>
-      <div class="step-divider" aria-hidden="true"></div>
-      <div class="step">
-        <span class="step-num">03</span>
-        <h3>Violations are blocked, not logged</h3>
-        <p>When a rule is violated, the action is denied. The AI gets a clear error message and instructions on how to proceed correctly. No damage done.</p>
-      </div>
+      {#each $t('landing.solution.steps') as step, i}
+        {#if i > 0}<div class="step-divider" aria-hidden="true"></div>{/if}
+        <div class="step">
+          <span class="step-num">0{i + 1}</span>
+          <h3>{step.title}</h3>
+          <p>{step.desc}</p>
+        </div>
+      {/each}
     </div>
   </div>
 </section>
@@ -129,26 +113,26 @@ Action blocked. 0 violations allowed.</pre>
 <!-- ─── Guardrails ─── -->
 <section class="guardrails" use:fadeIn>
   <div class="section-inner">
-    <p class="section-label">Guardrails</p>
-    <h2>11 deterministic guards. Every one configurable.</h2>
+    <p class="section-label">{$t('landing.guardrails.label')}</p>
+    <h2>{$t('landing.guardrails.heading')}</h2>
     <div class="guards-grid">
       {#each guards as g}
         <div class="guard-card guard-{g.color}">
           <strong>{g.name}</strong>
-          <p>{g.desc}</p>
+          <p>{$t(`landing.guardrails.guards.${g.key}`)}</p>
         </div>
       {/each}
     </div>
-    <p class="guards-note">Every guard supports <code>fail_open</code> mode — set to <code>true</code> for soft warnings, <code>false</code> for hard blocks.</p>
-    <a class="text-link" href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>See full configuration →</a>
+    <p class="guards-note">{$t('landing.guardrails.note')}</p>
+    <a class="text-link" href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>{$t('landing.guardrails.link')}</a>
   </div>
 </section>
 
 <!-- ─── Ecosystem ─── -->
 <section class="ecosystem" use:fadeIn>
   <div class="section-inner">
-    <p class="section-label">Ecosystem</p>
-    <h2>One config. Every AI coding tool.</h2>
+    <p class="section-label">{$t('landing.ecosystem.label')}</p>
+    <h2>{$t('landing.ecosystem.heading')}</h2>
     <p class="tool-list">Claude Code · Cursor · GitHub Copilot · Devin · Windsurf · Trae · Antigravity</p>
     <pre class="code-block"># Export guardrails to all tools at once
 hapai export --all
@@ -162,8 +146,8 @@ hapai export --target copilot</pre>
 <!-- ─── Quick Start ─── -->
 <section class="quick-start" id="quick-start" use:fadeIn>
   <div class="section-inner">
-    <p class="section-label">Quick Start</p>
-    <h2>Three commands. You're protected.</h2>
+    <p class="section-label">{$t('landing.quickStart.label')}</p>
+    <h2>{$t('landing.quickStart.heading')}</h2>
     <pre class="code-block"># Clone
 git clone https://github.com/renatobardi/hapai.git ~/hapai
 
@@ -176,8 +160,8 @@ hapai install --global
 # Verify everything works
 hapai validate</pre>
     <div class="qs-links">
-      <a class="text-link" href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>Want to configure guardrails?</a>
-      <a class="text-link" href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>Need project-level overrides?</a>
+      <a class="text-link" href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>{$t('landing.quickStart.links.config')}</a>
+      <a class="text-link" href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>{$t('landing.quickStart.links.overrides')}</a>
     </div>
   </div>
 </section>
@@ -185,31 +169,31 @@ hapai validate</pre>
 <!-- ─── Analytics Preview ─── -->
 <section class="analytics" use:fadeIn>
   <div class="section-inner">
-    <p class="section-label analytics-label">Analytics</p>
-    <h2 class="analytics-heading">See what your AI is doing.</h2>
-    <p class="analytics-desc">hapai logs every action — denials, warnings, and allows — to an append-only audit trail. Sync to BigQuery for enterprise analytics, or use the built-in dashboard to visualize guardrail activity across all your projects.</p>
-    <p class="analytics-features">30-day timeline · Top blocking hooks · Tool distribution · Per-project breakdown · Deny rate trends</p>
+    <p class="section-label analytics-label">{$t('landing.analytics.label')}</p>
+    <h2 class="analytics-heading">{$t('landing.analytics.heading')}</h2>
+    <p class="analytics-desc">{$t('landing.analytics.desc')}</p>
+    <p class="analytics-features">{$t('landing.analytics.features')}</p>
     <button class="btn-primary" onclick={handleSignIn} disabled={signingIn}>
-      {signingIn ? 'Signing in…' : 'Sign in with GitHub'}
+      {signingIn ? $t('landing.analytics.signingIn') : $t('landing.analytics.cta')}
     </button>
     {#if signInError}<p class="signin-error">{signInError}</p>{/if}
-    <p class="analytics-note">Dashboard requires GitHub authentication. Your audit data stays yours.</p>
+    <p class="analytics-note">{$t('landing.analytics.note')}</p>
   </div>
 </section>
 
 <!-- ─── Footer CTA ─── -->
 <section class="footer-cta" use:fadeIn>
   <div class="section-inner footer-inner">
-    <h2 class="footer-heading">Stop hoping the AI will follow the rules. Enforce them.</h2>
-    <button class="btn-primary" onclick={scrollToQuickStart}>Get Started</button>
+    <h2 class="footer-heading">{$t('landing.footer.heading')}</h2>
+    <button class="btn-primary" onclick={scrollToQuickStart}>{$t('landing.footer.cta')}</button>
     <nav class="footer-links" aria-label="Footer links">
-      <a href="https://github.com/renatobardi/hapai" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/renatobardi/hapai" target="_blank" rel="noopener">{$t('landing.footer.links.github')}</a>
       <span aria-hidden="true">·</span>
-      <a href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>Documentation</a>
+      <a href="#/docs" onclick={(e) => { e.preventDefault(); navigate('#/docs') }}>{$t('landing.footer.links.docs')}</a>
       <span aria-hidden="true">·</span>
-      <a href="https://github.com/renatobardi/hapai/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="https://github.com/renatobardi/hapai/blob/main/CHANGELOG.md" target="_blank" rel="noopener">{$t('landing.footer.links.changelog')}</a>
     </nav>
-    <p class="footer-note">hapai v1.5.1 · Pure bash. Zero dependencies. Deterministic safety.</p>
+    <p class="footer-note">{$t('landing.footer.note')}</p>
   </div>
 </section>
 
@@ -314,10 +298,6 @@ hapai validate</pre>
   .guard-warn { border-top-color: var(--color-warn); }
   .guard-blue { border-top-color: var(--color-blue); }
   .guards-note { font-size: 13px; color: #555; margin-bottom: var(--space-2); }
-  .guards-note code {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    background: #f0f0f0; padding: 1px 4px; font-size: 12px;
-  }
 
   /* ─── Ecosystem ─── */
   .ecosystem { background: var(--color-off-white); }

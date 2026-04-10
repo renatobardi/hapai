@@ -6,13 +6,14 @@
   import Dashboard from './components/Dashboard.svelte'
   import LoadingState from './components/LoadingState.svelte'
   import HowItWorksPage from './components/HowItWorksPage.svelte'
+  import { t } from './stores/i18n.js'
 </script>
 <div class="page">
   <Header />
   {#if $route.startsWith('#/docs')}
     <HowItWorksPage />
   {:else if $authStore.loading}
-    <LoadingState message="Initializing…" />
+    <LoadingState message={$t('app.initializing')} />
   {:else if $authStore.user}
     <Dashboard />
   {:else}

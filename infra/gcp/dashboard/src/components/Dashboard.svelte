@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { authStore } from '../stores/auth.js'
   import { dashboardStore, loadDashboard } from '../stores/dashboard.js'
+  import { t } from '../stores/i18n.js'
   import StatCard from './StatCard.svelte'
   import TimelineChart from './TimelineChart.svelte'
   import HooksChart from './HooksChart.svelte'
@@ -18,21 +19,21 @@
 </script>
 
 {#if $dashboardStore.loading}
-  <div class="content"><LoadingState message="Fetching analytics…" /></div>
+  <div class="content"><LoadingState message={$t('dashboard.loading')} /></div>
 {:else if $dashboardStore.error}
   <div class="content">
     <div class="err">
-      <span class="elabel">Error</span>
+      <span class="elabel">{$t('dashboard.error')}</span>
       <p>{$dashboardStore.error}</p>
-      <button on:click={() => loadDashboard($authStore.idToken)}>Retry</button>
+      <button on:click={() => loadDashboard($authStore.idToken)}>{$t('dashboard.retry')}</button>
     </div>
   </div>
 {:else}
   {@const s = stats($dashboardStore.stats)}
   <div class="content">
     <div class="row top">
-      <StatCard label="Denials"  value={s.denials  ?? 0} accent="deny" />
-      <StatCard label="Warnings" value={s.warnings ?? 0} accent="warn" />
+      <StatCard label={$t('dashboard.denials')}  value={s.denials  ?? 0} accent="deny" />
+      <StatCard label={$t('dashboard.warnings')} value={s.warnings ?? 0} accent="warn" />
       <div class="timeline">{#if $dashboardStore.timeline}<TimelineChart data={$dashboardStore.timeline} />{/if}</div>
     </div>
     {#if $dashboardStore.denials}<DenialsTable data={$dashboardStore.denials} />{/if}

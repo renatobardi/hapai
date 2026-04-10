@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js'
+  import { t } from '../stores/i18n.js'
   Chart.register(DoughnutController, ArcElement, Tooltip, Legend)
   export let data = []
   let canvas; let chart
@@ -14,5 +15,5 @@
   $: if (canvas && data) build()
   onMount(build); onDestroy(()=>chart?.destroy())
 </script>
-<div class="card"><div class="card-title">Top Blocking Hooks</div><div class="w"><canvas bind:this={canvas}></canvas></div></div>
+<div class="card"><div class="card-title">{$t('charts.hooks')}</div><div class="w"><canvas bind:this={canvas}></canvas></div></div>
 <style>.w{height:260px;position:relative;}</style>
