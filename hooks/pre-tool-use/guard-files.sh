@@ -31,10 +31,11 @@ if [[ "$tool_name" == "Bash" ]]; then
   _bash_has_ci_path()       { echo "$bash_cmd" | grep -qE '\.github/workflows/' 2>/dev/null; }
   _bash_has_env_path()      {
     echo "$bash_cmd" | grep -qE '\.env' 2>/dev/null || return 1
-    # Allow if it only matches .env.example / .env.sample
-    echo "$bash_cmd" | grep -qE '\.env\.?(example|sample)' 2>/dev/null && \
-      ! echo "$bash_cmd" | grep -qP '\.env(?!\.(example|sample))' 2>/dev/null && return 1
-    echo "$bash_cmd" | grep -qE '\.env' 2>/dev/null
+    # Strip .env.example and .env.sample occurrences, then check if .env remains.
+    # POSIX-compatible: avoids grep -P (not available on macOS BSD grep).
+    local _stripped
+    _stripped="$(echo "$bash_cmd" | sed 's/\.env\.\(example\|sample\)//g')"
+    echo "$_stripped" | grep -qE '\.env' 2>/dev/null
   }
   _bash_has_lockfile_path() { echo "$bash_cmd" | grep -qE '(package-lock\.json|pnpm-lock\.yaml|poetry\.lock|uv\.lock|[a-zA-Z0-9._-]+\.lock\b)' 2>/dev/null; }
 
@@ -67,8 +68,10 @@ if [[ "$tool_name" == "Bash" ]]; then
     echo "$bash_cmd" | grep -qE '\.(write|writelines)\s*\(' 2>/dev/null && return 0
     # Ruby File.write / File.open with write mode
     echo "$bash_cmd" | grep -qE "File\.(write|open)\s*\([^)]*['\"][wa]" 2>/dev/null && return 0
-    # Node.js fs write methods
-    echo "$bash_cmd" | grep -qE 'fs\.(writeFile|appendFile|writeFileSync|appendFileSync)\s*\(' 2>/dev/null && return 0
+    # Node.js fs write/copy/rename methods
+    echo "$bash_cmd" | grep -qE 'fs\.(writeFile|appendFile|writeFileSync|appendFileSync|copyFile|copyFileSync|rename|renameSync)\s*\(' 2>/dev/null && return 0
+    # Python file copy/move/rename (shutil, os, pathlib)
+    echo "$bash_cmd" | grep -qE '(shutil\.(copy|copyfile|copyfileobj|move)|os\.(rename|replace)|pathlib|Path\s*\([^)]*\)\.(write_text|write_bytes))\s*\(' 2>/dev/null && return 0
     return 1
   }
 

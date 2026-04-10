@@ -258,6 +258,10 @@ assert_allowed "$output" "Allows grep on .env.example"
 output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"python3 -c \"print(open('\''.github/workflows/ci.yml'\'').read())\""}}')"
 assert_allowed "$output" "Allows Python read-only open of CI workflow"
 
+# shutil.copy from .env.example to .env — bypass via mixed .env.example + .env in same command
+output="$(run_hook_check "pre-tool-use/guard-files.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"python3 -c \"import shutil; shutil.copy('"'"'.env.example'"'"', '"'"'.env'"'"')\""}}')"
+assert_blocked "$output" "Blocks shutil.copy from .env.example to .env"
+
 # ── End Bash bypass detection tests ─────────────────────────────────────────
 
 # ═══════════════════════════════════════════════════════════════════════════
