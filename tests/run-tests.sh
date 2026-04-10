@@ -449,6 +449,36 @@ assert_exit 0 "$exit_code" "auto-sync: exits 0 when audit log does not exist"
 cp "$HAPAI_ROOT/hapai.defaults.yaml" "$HAPAI_HOME/hapai.yaml"
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo -e "\n${BOLD}git/post-commit.sh${NC}"
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Test: exits 0 unconditionally (fire-and-forget — never blocks git)
+exit_code=0
+bash "$HAPAI_ROOT/hooks/git/post-commit.sh" &>/dev/null || exit_code=$?
+assert_exit 0 "$exit_code" "git post-commit: exits 0 (never blocks git commit)"
+
+# Test: install --git-hooks creates post-commit hook in a temp git repo
+TEMP_REPO="$(mktemp -d)"
+git init "$TEMP_REPO" --quiet
+cd "$TEMP_REPO"
+output="$("$HAPAI_ROOT/bin/hapai" install --git-hooks 2>&1)"
+assert_contains "$(cat .git/hooks/post-commit 2>/dev/null)" "hapai sync" "install --git-hooks: writes hapai sync to .git/hooks/post-commit"
+
+# Test: install --git-hooks is idempotent (running twice does not duplicate)
+"$HAPAI_ROOT/bin/hapai" install --git-hooks &>/dev/null
+count="$(grep -c "hapai sync" .git/hooks/post-commit 2>/dev/null || echo 0)"
+[[ "$count" -eq 1 ]]
+assert_exit 0 "$?" "install --git-hooks: idempotent — no duplicate lines on second run"
+
+# Test: uninstall --git-hooks removes the hook lines
+"$HAPAI_ROOT/bin/hapai" uninstall --git-hooks &>/dev/null || true
+remaining="$(grep -c "hapai sync" .git/hooks/post-commit 2>/dev/null || echo 0)"
+assert_exit 0 "$remaining" "uninstall --git-hooks: removes hapai sync from post-commit"
+
+cd "$HAPAI_ROOT"
+rm -rf "$TEMP_REPO" 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}load-context.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 
