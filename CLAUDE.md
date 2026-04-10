@@ -296,12 +296,30 @@ All other exits are treated as `0` (fail-open trap in `_lib.sh` prevents hook cr
 
 ### Testing the CLI Installation
 
+When developing hapai itself, use **development mode** to test changes without permanently installing:
+
 ```bash
-bash install.sh --global       # installs to ~/.hapai/
-hapai validate
-hapai status
-hapai audit
+# Test installer logic without installing
+HAPAI_DEV=1 bash install.sh
+
+# This clones the installer but sources from the local ./bin/hapai instead of downloaded binary
 ```
+
+**Working on the hapai repo:**
+
+1. Make changes to hooks, CLI, or tests
+2. Run tests: `bash tests/run-tests.sh`
+3. Test CLI commands against local hooks: `./bin/hapai status`
+4. For full end-to-end testing, install globally, then override with project config:
+   ```bash
+   bash install.sh --global     # installs to ~/.hapai/
+   hapai validate
+   hapai status
+   hapai audit
+   ```
+5. Create a test project, install locally, and verify behavior
+
+**Important:** When developing the guardrails system itself (not using it), commit to `docs/`, `feat/`, `fix/` branches, never to `main`. The hooks enforce this via `guard-branch.sh`.
 
 ### Cloud Setup (GCP/BigQuery)
 
