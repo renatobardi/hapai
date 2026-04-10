@@ -161,13 +161,20 @@ export default {
         p1: 'Sincronize logs de auditoria para GCP para analytics empresarial e compliance.',
         archTitle: 'Arquitetura:',
         enableTitle: 'Habilitar em hapai.yaml:',
-        syncTitle: 'Sincronizar:'
+        syncTitle: 'Sincronizar:',
+        autoSyncTitle: 'Sincronização automática:',
+        autoSyncColMethod: 'Ferramenta',
+        autoSyncColWhen: 'Quando',
+        autoSyncColHow: 'Como',
+        autoSyncSessionEnd: 'Fim de sessão',
+        autoSyncPostCommit: 'Após cada commit'
       },
       export: {
         heading: 'Exportar para Outras Ferramentas',
-        p1: 'hapai exporta guardrails para 8 ferramentas de IA diferentes:',
+        p1: 'hapai exporta guardrails para 6 ferramentas de IA diferentes:',
         cols: { tool: 'Ferramenta', file: 'Arquivo', command: 'Comando' },
-        exportAll: 'Exportar para todas as ferramentas de uma vez:'
+        exportAll: 'Exportar para todas as ferramentas de uma vez:',
+        gitHooksNote: 'Sincronização automática do log de auditoria após cada commit — funciona com qualquer ferramenta que use git:'
       },
       faq: {
         heading: 'FAQ',
