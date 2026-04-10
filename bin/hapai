@@ -120,12 +120,13 @@ cmd_uninstall_git_hooks() {
 
   # Remove file if only shebang remains; otherwise keep cleaned file
   local non_empty
-  non_empty="$(grep -v '^\s*$' "$temp_file" | grep -v '^#!' | wc -l | tr -d ' ')" || non_empty=0
+  non_empty="$(grep -v '^[[:space:]]*$' "$temp_file" | grep -v '^#!' | wc -l | tr -d ' ')" || non_empty=0
   if [[ "$non_empty" -eq 0 ]]; then
     rm -f "$hook_file" "$temp_file"
     log_ok "Git post-commit hook removed: $hook_file"
   else
     mv "$temp_file" "$hook_file"
+    chmod +x "$hook_file"
     log_ok "hapai removed from git post-commit hook: $hook_file"
   fi
 }
