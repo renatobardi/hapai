@@ -60,6 +60,77 @@ ensure_jq() {
 
 # ─── INSTALL ────────────────────────────────────────────────────────────────
 
+cmd_install_git_hooks() {
+  local git_root
+  git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    log_error "Not inside a git repository"
+    exit 1
+  }
+
+  local hook_dir="$git_root/.git/hooks"
+  local hook_file="$hook_dir/post-commit"
+  local marker="# hapai:post-commit"
+
+  mkdir -p "$hook_dir"
+
+  if [[ -f "$hook_file" ]] && grep -q "$marker" "$hook_file" 2>/dev/null; then
+    log_info "hapai git hook already installed: $hook_file"
+    return 0
+  fi
+
+  if [[ ! -f "$hook_file" ]]; then
+    printf '#!/usr/bin/env bash\n%s\nnohup hapai sync &>/dev/null & disown 2>/dev/null || true\n' \
+      "$marker" > "$hook_file"
+  else
+    printf '\n%s\nnohup hapai sync &>/dev/null & disown 2>/dev/null || true\n' \
+      "$marker" >> "$hook_file"
+  fi
+
+  chmod +x "$hook_file"
+  log_ok "Git post-commit hook installed: $hook_file"
+  log_info "hapai sync runs in background after each commit (Cursor, Windsurf, Devin, Trae, Copilot, or plain git)"
+}
+
+cmd_uninstall_git_hooks() {
+  local git_root
+  git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    log_error "Not inside a git repository"
+    exit 1
+  }
+
+  local hook_file="$git_root/.git/hooks/post-commit"
+  local marker="# hapai:post-commit"
+
+  if [[ ! -f "$hook_file" ]]; then
+    log_info "No git post-commit hook found"
+    return 0
+  fi
+
+  if ! grep -q "$marker" "$hook_file" 2>/dev/null; then
+    log_info "hapai git hook not present in $hook_file"
+    return 0
+  fi
+
+  local temp_file
+  temp_file="$(mktemp)"
+  grep -v "hapai:post-commit" "$hook_file" \
+    | grep -v "^nohup hapai sync" \
+    | grep -v "^disown" \
+    > "$temp_file" 2>/dev/null || true
+
+  # Remove file if only shebang remains; otherwise keep cleaned file
+  local non_empty
+  non_empty="$(grep -v '^[[:space:]]*$' "$temp_file" | grep -v '^#!' | wc -l | tr -d ' ')" || non_empty=0
+  if [[ "$non_empty" -eq 0 ]]; then
+    rm -f "$hook_file" "$temp_file"
+    log_ok "Git post-commit hook removed: $hook_file"
+  else
+    mv "$temp_file" "$hook_file"
+    chmod +x "$hook_file"
+    log_ok "hapai removed from git post-commit hook: $hook_file"
+  fi
+}
+
 cmd_install() {
   ensure_jq
   local mode="project"
@@ -67,6 +138,7 @@ cmd_install() {
     case "$1" in
       --global|-g) mode="global"; shift ;;
       --project|-p) mode="project"; shift ;;
+      --git-hooks) cmd_install_git_hooks; return $? ;;
       *) shift ;;
     esac
   done
@@ -212,6 +284,7 @@ cmd_install() {
 # ─── UNINSTALL ──────────────────────────────────────────────────────────────
 
 cmd_uninstall() {
+  [[ "${1:-}" == "--git-hooks" ]] && { cmd_uninstall_git_hooks; return $?; }
   ensure_jq
   local mode="project"
   [[ "${1:-}" == "--global" || "${1:-}" == "-g" ]] && mode="global"
@@ -915,7 +988,9 @@ ${BOLD}Usage:${NC}
 
 ${BOLD}Commands:${NC}
   install [--global|--project]   Install hooks
+  install --git-hooks            Install post-commit hook (Cursor/Windsurf/Devin/etc)
   uninstall [--global]           Remove hooks
+  uninstall --git-hooks          Remove post-commit hook
   validate                       Verify installation
   kill                           Emergency kill switch
   revive                         Restore after kill
@@ -941,6 +1016,8 @@ ${BOLD}Examples:${NC}
   hapai blocklist                     Show all active blocks
   hapai unblock main
   hapai list-hooks                    Show installed hooks
+  hapai install --git-hooks           Post-commit auto-sync for Cursor/Windsurf/Devin/etc
+  hapai uninstall --git-hooks         Remove post-commit hook
   hapai sync                          Sync audit logs to Cloud Storage
   hapai sync --dry-run                Preview sync without uploading
   hapai export --target cursor        Generate .cursor/rules/hapai.mdc

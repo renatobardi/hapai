@@ -234,6 +234,14 @@ Analytics Dashboard</code></pre>
       <p><strong>{$t('docs.sections.cloudLogging.syncTitle')}</strong></p>
       <pre><code>hapai sync                 # Manual sync
 hapai sync --dry-run       # Preview sync</code></pre>
+      <p><strong>{$t('docs.sections.cloudLogging.autoSyncTitle')}</strong></p>
+      <table>
+        <thead><tr><th>{$t('docs.sections.cloudLogging.autoSyncColMethod')}</th><th>{$t('docs.sections.cloudLogging.autoSyncColWhen')}</th><th>{$t('docs.sections.cloudLogging.autoSyncColHow')}</th></tr></thead>
+        <tbody>
+          <tr><td>Claude Code</td><td>{$t('docs.sections.cloudLogging.autoSyncSessionEnd')}</td><td><code>gcp.auto_sync.enabled: true</code></td></tr>
+          <tr><td>Cursor · Windsurf · Devin · Trae · Copilot</td><td>{$t('docs.sections.cloudLogging.autoSyncPostCommit')}</td><td><code>hapai install --git-hooks</code></td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section id="export" class="docs-section">
@@ -253,10 +261,13 @@ hapai sync --dry-run       # Preview sync</code></pre>
           <tr><td>Windsurf</td><td><code>.windsurf/rules/hapai.md</code></td><td><code>hapai export --target windsurf</code></td></tr>
           <tr><td>Devin.ai</td><td><code>AGENTS.md</code></td><td><code>hapai export --target devin</code></td></tr>
           <tr><td>Trae</td><td><code>.trae/rules/hapai.md</code></td><td><code>hapai export --target trae</code></td></tr>
+          <tr><td>Antigravity</td><td><code>GEMINI.md</code></td><td><code>hapai export --target antigravity</code></td></tr>
         </tbody>
       </table>
       <p>{$t('docs.sections.export.exportAll')}</p>
       <pre><code>hapai export --all</code></pre>
+      <p>{$t('docs.sections.export.gitHooksNote')}</p>
+      <pre><code>hapai install --git-hooks</code></pre>
     </section>
 
     <section id="faq" class="docs-section">

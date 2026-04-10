@@ -127,6 +127,11 @@
             "type": "command",
             "command": "bash __HAPAI_HOOKS__/stop/cost-tracker.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash __HAPAI_HOOKS__/stop/auto-sync.sh",
+            "timeout": 10
           }
         ]
       }

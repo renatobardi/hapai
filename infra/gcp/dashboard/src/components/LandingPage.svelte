@@ -140,7 +140,10 @@ hapai export --all
 
 # Or target a specific tool
 hapai export --target cursor
-hapai export --target copilot</pre>
+hapai export --target copilot
+
+# Auto-sync audit log after every commit (any tool)
+hapai install --git-hooks</pre>
   </div>
 </section>
 

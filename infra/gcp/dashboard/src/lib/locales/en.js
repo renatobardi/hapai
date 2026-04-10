@@ -161,13 +161,20 @@ export default {
         p1: 'Sync audit logs to GCP for enterprise analytics and compliance.',
         archTitle: 'Architecture:',
         enableTitle: 'Enable in hapai.yaml:',
-        syncTitle: 'Sync:'
+        syncTitle: 'Sync:',
+        autoSyncTitle: 'Auto-sync:',
+        autoSyncColMethod: 'Tool',
+        autoSyncColWhen: 'When',
+        autoSyncColHow: 'How',
+        autoSyncSessionEnd: 'Session end',
+        autoSyncPostCommit: 'After each commit'
       },
       export: {
         heading: 'Export to Other Tools',
-        p1: 'hapai exports guardrails to 8 different AI coding tools:',
+        p1: 'hapai exports guardrails to 6 different AI coding tools:',
         cols: { tool: 'Tool', file: 'File', command: 'Command' },
-        exportAll: 'Export all tools at once:'
+        exportAll: 'Export all tools at once:',
+        gitHooksNote: 'Auto-sync audit log after every commit — works with any tool that uses git:'
       },
       faq: {
         heading: 'FAQ',
