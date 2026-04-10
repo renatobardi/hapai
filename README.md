@@ -4,13 +4,13 @@
 
 **hapai** v1.3+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
 
-## What's New in v1.4.4
+## What's New in v1.5.0
 
-- **Dashboard data pipeline fixed** — `hapai sync` now loads directly to BigQuery after GCS upload (no broken CI dependency)
+- **Auto-fix for PR review issues** — When code review detects issues, hapai automatically attempts to fix them before blocking the push (opt-in via `auto_fix.enabled`)
+- **CI sync pipeline** — `hapai-sync.yml` workflow downloads today's GCS audit log and loads into BigQuery daily at 2h UTC (no more broken runner dependency)
 - **ADC support** — `hapai sync` accepts `gcloud auth application-default login` credentials locally, no manual `GOOGLE_APPLICATION_CREDENTIALS` export needed
-- **Cloud Function queries fixed** — Analytics queries now correctly filter on `result` field (allow/deny/warn) instead of `event` field
-- **"How it works" page fixed** — Docs page now routes and renders correctly
-- **Dashboard nav improved** — "Dashboard" link hidden when not authenticated
+- **Dashboard data pipeline fixed** — `hapai sync` loads directly to BigQuery after GCS upload
+- **Cloud Function queries fixed** — Analytics queries correctly filter on `result` field (allow/deny/warn)
 - **Svelte 5 Analytics Dashboard** — Real-time visualization of guardrail events
 - **Cloud Integration** — BigQuery + Cloud Functions + GitHub Pages
 - **GitHub OAuth** — Firebase Authentication for dashboard access
@@ -123,20 +123,21 @@ Sync audit logs to GCP for enterprise analytics and compliance.
 
 **Architecture:**
 ```
-hapai audit logs (~/.hapai/audit.jsonl)
-    ↓
-hapai sync  (local: ADC or service account key)
-    ↓
-Cloud Storage bucket  (gs://hapai-audit-{name}/YYYY-MM/DD.jsonl)
-    ↓
-BigQuery load  (bq load — runs automatically as part of hapai sync)
-    ↓
-BigQuery dataset (hapai_dataset.events)
-    ↓
-Cloud Function (bq-query) — serves Firebase-authenticated queries
-    ↓
-Analytics Dashboard (GitHub Pages)
+~/.hapai/audit.jsonl
+    ↓ hapai sync (local — ADC or service account key)
+gs://hapai-audit-{name}/YYYY-MM/DD.jsonl
+    ↓ bq load (part of hapai sync, or daily via hapai-sync.yml CI workflow)
+hapai_dataset.events  (BigQuery)
+    ↓ Cloud Function bq-query (Firebase auth required)
+Analytics Dashboard  (GitHub Pages)
 ```
+
+**Two sync paths:**
+
+| Path | When | How |
+|------|------|-----|
+| **Local** | After each session | `hapai sync` — uploads GCS + loads BigQuery in one command |
+| **CI (automatic)** | Daily at 2h UTC | `hapai-sync.yml` — downloads today's GCS file, loads BigQuery |
 
 **Local sync:**
 ```bash
@@ -152,6 +153,7 @@ hapai sync
 - Real-time dashboard with 30-day rolling analytics
 - No service account keys locally (ADC via `gcloud auth application-default login`)
 - No service account keys in CI (OIDC + Workload Identity)
+- Automatic daily ingestion via `hapai-sync.yml` for any GCS data not yet in BigQuery
 
 See [`infra/gcp/SETUP.md`](infra/gcp/SETUP.md) for setup instructions.
 
