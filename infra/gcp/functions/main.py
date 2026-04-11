@@ -438,6 +438,7 @@ def _query_hook_detail(hook_name: str, period: int) -> dict:
         FROM {ref}
         WHERE hook = @hook_name
           AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
         ORDER BY ts DESC LIMIT 10
     """, p)
 
@@ -490,6 +491,7 @@ def _query_tool_detail(tool_name: str, period: int) -> dict:
         FROM {ref}
         WHERE tool = @tool_name
           AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
         ORDER BY ts DESC LIMIT 10
     """, p)
 
