@@ -6,11 +6,11 @@
   import Card from './Card.svelte'
   Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
 
-  export let tools    = []
-  export let projects = []
+  let { tools = [], projects = [] } = $props()
 
-  let activeTab = 'tool'
-  let canvas, chart
+  let activeTab = $state('tool')
+  let canvas = $state()
+  let chart
 
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() }
   function hex2rgba(hex, a) {
@@ -20,6 +20,7 @@
 
   function build() {
     if (!canvas) return
+    if (chart) chart.destroy()
     const data = activeTab === 'tool' ? tools : projects
     if (!data.length) return
     const cBlue  = css('--color-blue')
@@ -31,7 +32,6 @@
     const labels  = activeTab === 'tool'
       ? data.map(d => d.tool)
       : data.map(d => d.project.split('/').pop())
-    if (chart) chart.destroy()
     chart = new Chart(canvas, {
       type: 'bar',
       data: {
@@ -49,15 +49,16 @@
     })
   }
 
-  $: if (canvas && $locale) build()
-  $: { activeTab; if (canvas) build() }
-  onMount(build); onDestroy(() => chart?.destroy())
+  $effect(() => { if (canvas) { $locale; build() } })
+  $effect(() => { activeTab; if (canvas) build() })
+  onMount(build)
+  onDestroy(() => chart?.destroy())
 </script>
 
 <Card title={$t('charts.hotspots.title')}>
   <div class="tabs">
-    <button class:active={activeTab==='tool'}    on:click={() => activeTab='tool'}>{$t('charts.hotspots.byTool')}</button>
-    <button class:active={activeTab==='project'} on:click={() => activeTab='project'}>{$t('charts.hotspots.byProject')}</button>
+    <button class:active={activeTab==='tool'}    onclick={() => activeTab='tool'}>{$t('charts.hotspots.byTool')}</button>
+    <button class:active={activeTab==='project'} onclick={() => activeTab='project'}>{$t('charts.hotspots.byProject')}</button>
   </div>
   <div class="w"><canvas bind:this={canvas}></canvas></div>
 </Card>

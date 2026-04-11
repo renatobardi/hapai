@@ -4,14 +4,14 @@
   import Card from './Card.svelte'
   import EmptyState from './EmptyState.svelte'
 
-  export let data = []
+  let { data = [] } = $props()
 
   const LIMIT = 20
-  let filterType = 'all'
-  let filterHook = ''
-  let filterTool = ''
-  let showAll    = false
-  let expanded   = new Set()
+  let filterType = $state('all')
+  let filterHook = $state('')
+  let filterTool = $state('')
+  let showAll    = $state(false)
+  let expanded   = $state(new Set())
 
   const fmtTime = ts => {
     const d = new Date(ts), now = new Date()
@@ -23,18 +23,32 @@
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   }
 
-  $: allHooks = [...new Set(data.map(r => r.hook))].filter(Boolean).sort()
-  $: allTools = [...new Set(data.map(r => r.tool))].filter(Boolean).sort()
+  let allHooks = $derived([...new Set(data.map(r => r.hook))].filter(Boolean).sort())
+  let allTools = $derived([...new Set(data.map(r => r.tool))].filter(Boolean).sort())
 
-  $: filtered = data.filter(r => {
+  let filtered = $derived(data.filter(r => {
     if (filterType !== 'all' && r.event !== filterType) return false
     if (filterHook && r.hook !== filterHook) return false
     if (filterTool && r.tool !== filterTool) return false
     return true
+  }))
+
+  let displayed  = $derived(showAll ? filtered : filtered.slice(0, LIMIT))
+  let hasFilters = $derived(filterType !== 'all' || filterHook !== '' || filterTool !== '')
+
+  // Clear expanded row state when any filter changes — indices are position-based
+  // and recomputing `filtered` invalidates them
+  $effect(() => {
+    filterType; filterHook; filterTool
+    expanded = new Set()
   })
 
-  $: displayed = showAll ? filtered : filtered.slice(0, LIMIT)
-  $: hasFilters = filterType !== 'all' || filterHook !== '' || filterTool !== ''
+  // Reset pagination and expanded state whenever the data prop is replaced
+  $effect(() => {
+    data
+    showAll = false
+    expanded = new Set()
+  })
 
   function toggleExpand(i) {
     const s = new Set(expanded)
@@ -65,7 +79,7 @@
       </select>
     {/if}
     {#if hasFilters}
-      <button class="clear" on:click={clearFilters}>{$t('table.clearFilters')}</button>
+      <button class="clear" onclick={clearFilters}>{$t('table.clearFilters')}</button>
     {/if}
   </div>
 
@@ -83,7 +97,7 @@
         </tr></thead>
         <tbody>
           {#each displayed as r, i}
-          <tr on:click={() => toggleExpand(i)}>
+          <tr onclick={() => toggleExpand(i)}>
             <td class="time">{fmtTime(r.ts)}</td>
             <td><Badge type={r.event}>{r.event}</Badge></td>
             <td class="mono">{r.hook}</td>
@@ -102,7 +116,7 @@
     </div>
     {#if !showAll && filtered.length > LIMIT}
       <div class="viewall">
-        <button on:click={() => showAll = true}>{$t('table.viewAll')} ({filtered.length}) →</button>
+        <button onclick={() => showAll = true}>{$t('table.viewAll')} ({filtered.length}) →</button>
       </div>
     {/if}
   {/if}

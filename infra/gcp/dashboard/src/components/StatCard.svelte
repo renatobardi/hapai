@@ -1,13 +1,10 @@
 <script>
   import { t } from '../stores/i18n.js'
   import { onMount } from 'svelte'
-  export let label = ''
-  export let value = 0
-  export let accent = 'default'
-  export let sparklineData = []
-  export let trend = null  // percent change: positive = worse, negative = better
 
-  let canvas
+  let { label = '', value = 0, accent = 'default', sparklineData = [], trend = null } = $props()
+
+  let canvas = $state()
 
   function drawSparkline() {
     if (!canvas || sparklineData.length < 2) return
@@ -33,11 +30,14 @@
     ctx.stroke()
   }
 
-  $: if (canvas && sparklineData) drawSparkline()
+  $effect(() => {
+    if (canvas && sparklineData.length >= 2) drawSparkline()
+  })
+
   onMount(drawSparkline)
 
-  $: trendDir = trend === null ? null : trend > 5 ? 'up' : trend < -5 ? 'down' : 'flat'
-  $: trendAbs  = trend === null ? '' : (trend > 0 ? '+' : '') + Math.round(trend) + '%'
+  let trendDir = $derived(trend === null ? null : trend > 5 ? 'up' : trend < -5 ? 'down' : 'flat')
+  let trendAbs = $derived(trend === null ? '' : (trend > 0 ? '+' : '') + Math.round(trend) + '%')
 </script>
 
 <div class="card" class:deny={accent==='deny'} class:warn={accent==='warn'}>

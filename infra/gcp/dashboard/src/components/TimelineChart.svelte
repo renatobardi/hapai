@@ -5,9 +5,11 @@
   import { t, locale } from '../stores/i18n.js'
   Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Filler, Tooltip, Legend)
 
-  export let data = []
-  let canvas, chart
-  let period = 30
+  let { data = [] } = $props()
+
+  let canvas = $state()
+  let period = $state(30)
+  let chart
 
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() }
   function hex2rgba(hex, a) {
@@ -66,18 +68,19 @@
     })
   }
 
-  $: if (canvas && data && $locale) build()
-  $: { period; if (canvas && data.length) build() }
-  onMount(build); onDestroy(() => chart?.destroy())
+  $effect(() => { if (canvas && data.length) { $locale; build() } })
+  $effect(() => { period; if (canvas && data.length) build() })
+  onMount(build)
+  onDestroy(() => chart?.destroy())
 </script>
 
 <div class="card">
   <div class="header">
     <div class="card-title">{$t('charts.timeline')}</div>
     <div class="periods">
-      <button class:active={period===7}  on:click={() => period=7}>7d</button>
-      <button class:active={period===14} on:click={() => period=14}>14d</button>
-      <button class:active={period===30} on:click={() => period=30}>30d</button>
+      <button class:active={period===7}  onclick={() => period=7}>7d</button>
+      <button class:active={period===14} onclick={() => period=14}>14d</button>
+      <button class:active={period===30} onclick={() => period=30}>30d</button>
     </div>
   </div>
   <div class="w"><canvas bind:this={canvas}></canvas></div>

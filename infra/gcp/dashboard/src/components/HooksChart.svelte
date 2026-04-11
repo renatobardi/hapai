@@ -1,13 +1,14 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { get } from 'svelte/store'
   import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js'
   import { t, locale } from '../stores/i18n.js'
   import Card from './Card.svelte'
   Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
 
-  export let data = []
-  let canvas, chart
+  let { data = [] } = $props()
+
+  let canvas = $state()
+  let chart
 
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() }
   function hex2rgba(hex, a) {
@@ -39,8 +40,9 @@
     })
   }
 
-  $: if (canvas && data && $locale) build()
-  onMount(build); onDestroy(() => chart?.destroy())
+  $effect(() => { if (canvas && data.length) { $locale; build() } })
+  onMount(build)
+  onDestroy(() => chart?.destroy())
 </script>
 <Card title={$t('charts.hooks')}><div class="w"><canvas bind:this={canvas}></canvas></div></Card>
 <style>.w { height: 260px; position: relative; }</style>

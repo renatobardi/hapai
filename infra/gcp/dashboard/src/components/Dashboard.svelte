@@ -11,7 +11,10 @@
   import LoadingState from './LoadingState.svelte'
 
   onMount(() => { if ($authStore.idToken) loadDashboard($authStore.idToken) })
-  $: if ($authStore.idToken && !$dashboardStore.stats && !$dashboardStore.loading) loadDashboard($authStore.idToken)
+
+  $effect(() => {
+    if ($authStore.idToken && !$dashboardStore.stats && !$dashboardStore.loading) loadDashboard($authStore.idToken)
+  })
 
   const stats = (s) => (s && s[0]) ? s[0] : { denials: 0, warnings: 0 }
 
@@ -33,10 +36,10 @@
     return ((newAvg - oldAvg) / oldAvg) * 100
   }
 
-  $: denialSparkline  = sparkline($dashboardStore.timeline, 'deny')
-  $: warningSparkline = sparkline($dashboardStore.timeline, 'warn')
-  $: denialTrend      = calcTrend(denialSparkline)
-  $: warningTrend     = calcTrend(warningSparkline)
+  let denialSparkline  = $derived(sparkline($dashboardStore.timeline, 'deny'))
+  let warningSparkline = $derived(sparkline($dashboardStore.timeline, 'warn'))
+  let denialTrend      = $derived(calcTrend(denialSparkline))
+  let warningTrend     = $derived(calcTrend(warningSparkline))
 </script>
 
 {#if $dashboardStore.loading}
@@ -46,7 +49,7 @@
     <div class="err">
       <span class="elabel">{$t('dashboard.error')}</span>
       <p>{$dashboardStore.error}</p>
-      <button on:click={() => loadDashboard($authStore.idToken)}>{$t('dashboard.retry')}</button>
+      <button onclick={() => loadDashboard($authStore.idToken)}>{$t('dashboard.retry')}</button>
     </div>
   </div>
 {:else}
@@ -93,9 +96,10 @@
           {#if $dashboardStore.hooks}
             <HooksChart data={$dashboardStore.hooks} />
           {/if}
-          {#if $dashboardStore.tools && $dashboardStore.projects}
-            <Hotspots tools={$dashboardStore.tools} projects={$dashboardStore.projects} />
-          {/if}
+          <Hotspots
+            tools={$dashboardStore.tools ?? []}
+            projects={$dashboardStore.projects ?? []}
+          />
         </div>
       </div>
     </div>
