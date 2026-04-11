@@ -11,15 +11,19 @@
   let currentIdx = $state(0)
 
   // Sync index when the event prop changes (e.g. opened from DenialsTable row)
+  // Use ts+hook+tool as composite key — object identity breaks after store reloads
   $effect(() => {
-    const i = events.findIndex(e => e === event)
+    const i = events.findIndex(e =>
+      e.ts === event?.ts && e.hook === event?.hook && e.tool === event?.tool
+    )
     currentIdx = i >= 0 ? i : 0
   })
 
   let current  = $derived(events[currentIdx] ?? event)
   let hasPrev  = $derived(currentIdx > 0)
   let hasNext  = $derived(currentIdx < events.length - 1)
-  let position = $derived(`${currentIdx + 1} ${$t('detail.of')} ${events.length}`)
+  // Guard against empty events array (denials not yet loaded)
+  let position = $derived(`${currentIdx + 1} ${$t('detail.of')} ${Math.max(events.length, 1)}`)
 
   function prev() { if (hasPrev) currentIdx-- }
   function next() { if (hasNext) currentIdx++ }

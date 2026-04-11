@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../stores/i18n.js'
+  import { t, locale } from '../stores/i18n.js'
   import Badge from './Badge.svelte'
   import Card from './Card.svelte'
   import EmptyState from './EmptyState.svelte'
@@ -15,11 +15,11 @@
   const fmtTime = ts => {
     const d = new Date(ts), now = new Date()
     const mins = Math.floor((now - d) / 60000)
-    if (mins < 1)   return 'just now'
-    if (mins < 60)  return mins + 'm ago'
+    if (mins < 1)   return $t('common.justNow')
+    if (mins < 60)  return mins + $t('common.minutesAgo')
     const hrs = Math.floor(mins / 60)
-    if (hrs < 24)   return hrs + 'h ago'
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    if (hrs < 24)   return hrs + $t('common.hoursAgo')
+    return d.toLocaleDateString($locale, { month: 'short', day: 'numeric' })
   }
 
   let allHooks = $derived([...new Set(data.map(r => r.hook))].filter(Boolean).sort())

@@ -18,6 +18,11 @@
     if ($authStore.idToken && !$dashboardStore.stats && !$dashboardStore.loading) loadDashboard($authStore.idToken)
   })
 
+  // Clear detail/drilldown when data reloads — object references change and become stale
+  $effect(() => {
+    if ($dashboardStore.loading) { activeEvent = null; drilldown = null }
+  })
+
   const stats = (s) => (s && s[0]) ? s[0] : { denials: 0, warnings: 0 }
 
   function sparkline(timeline, eventType) {

@@ -215,6 +215,7 @@ export default {
   },
   statCard: { period: 'Últimos 30 días' },
   loading: { default: 'Cargando…' },
+  common: { justNow: 'ahora', minutesAgo: 'm atrás', hoursAgo: 'h atrás' },
   drilldown: {
     close: '×',
     denials: 'denegaciones',
