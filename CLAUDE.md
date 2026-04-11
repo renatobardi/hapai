@@ -88,14 +88,21 @@ hapai/
 ├── bin/hapai                    # CLI entry point (command dispatcher)
 ├── hooks/                       # All guardrail scripts (pure Bash)
 │   ├── _lib.sh                 # Shared library (YAML parsing, JSON I/O, audit, state)
+│   ├── _pr-review-agent.sh     # Background PR reviewer (claude CLI, Haiku model)
+│   ├── _pr-fix-agent.sh        # Optional auto-fixer (Sonnet model)
 │   ├── pre-tool-use/           # Block before Claude Code execution
 │   │   ├── guard-*.sh          # Individual guardrails (branch, commit, files, etc.)
 │   │   └── flow-dispatcher.sh  # Sequential hook chains from config
 │   ├── post-tool-use/          # Run after Claude Code execution
 │   │   ├── auto-*.sh           # Automations (format, lint, checkpoint)
 │   │   └── audit-trail.sh      # Audit logging and PR review
-│   └── stop/                   # Run at session end
-│       └── *.sh                # Cleanup and cost tracking
+│   ├── stop/                   # Run at session end (cleanup, cost tracking)
+│   ├── session-start/          # Load context, scan TODOs/issues on session init
+│   ├── user-prompt-submit/     # Warn on production keywords before any tool runs
+│   ├── pre-compact/            # Backup transcript before context compaction
+│   ├── notification/           # Sound alerts on guardrail events
+│   ├── permission-request/     # Auto-allow read-only operations
+│   └── git/                    # post-commit hook for non-Claude tools (hapai sync)
 ├── install.sh                  # Universal installer (curl-safe)
 ├── tests/run-tests.sh          # All tests: bash assertions, no framework
 ├── hapai.defaults.yaml         # Master config (all guardrails + cloud settings)
@@ -254,7 +261,6 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 
 | Script | Output path | Target tool |
 |---|---|---|
-| `export-claude.sh` | hooks + settings.json | Claude Code |
 | `export-cursor.sh` | `.cursor/rules/hapai.mdc` | Cursor |
 | `export-copilot.sh` | `.github/copilot-instructions.md` | GitHub Copilot |
 | `export-windsurf.sh` | `.windsurf/rules/hapai.md` | Windsurf |
