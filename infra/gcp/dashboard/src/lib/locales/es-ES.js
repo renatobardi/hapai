@@ -62,7 +62,7 @@ export default {
       label: 'Analytics',
       heading: 'Observa qué está haciendo tu IA.',
       desc: 'hapai registra cada acción — denegaciones, advertencias y permisos — en un registro de auditoría append-only. Sincroniza con BigQuery para analytics empresarial, o usa el dashboard integrado para visualizar la actividad de los guardrails en todos tus proyectos.',
-      features: 'Línea de tiempo de 30 días · Hooks más bloqueadores · Distribución de herramientas · Desglose por proyecto · Tendencia de tasa de denegación',
+      features: 'Línea de tiempo de 30 días · Drill-down por guard y herramienta · Tarjetas de tasa Allow/Deny · Desglose por proyecto · Drawer de detalle del evento',
       cta: 'Iniciar sesión con GitHub',
       signingIn: 'Iniciando sesión…',
       signInError: 'Error al iniciar sesión. Inténtalo de nuevo.',
@@ -72,7 +72,7 @@ export default {
       heading: 'Deja de esperar que la IA siga las reglas. Hazlas cumplir.',
       cta: 'Empezar',
       links: { github: 'GitHub', docs: 'Documentación', changelog: 'Changelog' },
-      note: 'hapai v1.5.1 · Bash puro. Cero dependencias. Seguridad determinística.'
+      note: 'hapai v1.6.2 · Bash puro. Cero dependencias. Seguridad determinística.'
     }
   },
   docs: {
