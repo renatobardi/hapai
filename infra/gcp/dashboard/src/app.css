@@ -46,6 +46,13 @@
   /* Motion */
   --transition-fast:   150ms ease;
   --transition-normal: 250ms ease;
+
+  /* Trend indicators */
+  --color-trend-up:   var(--color-deny);
+  --color-trend-down: var(--color-allow);
+  --color-trend-flat: var(--color-meta-gray);
+  --sparkline-height: 24px;
+  --sparkline-width:  80px;
 }
 html, body {
   font-family: var(--font); font-weight: var(--weight-normal);
@@ -57,5 +64,5 @@ button { font-family: var(--font); border-radius: 0; cursor: pointer; border: no
 .badge-deny  { background: var(--color-deny);  color: #fff; }
 .badge-warn  { background: var(--color-warn);  color: #fff; }
 .badge-allow { background: var(--color-allow); color: #fff; }
-.card { background: var(--color-white); border: 1px solid var(--color-light-gray); padding: var(--space-3); }
+.card { background: var(--color-white); border: 1px solid var(--color-light-gray); padding: var(--space-3); box-shadow: var(--shadow-sm); }
 .card-title { font-size: 11px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-meta-gray); margin-bottom: var(--space-2); }
