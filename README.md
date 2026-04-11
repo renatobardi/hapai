@@ -9,22 +9,19 @@
 
 > Deterministic guardrails for AI coding assistants. Hooks that enforce rules **before execution** — not probabilistic prompts that get ignored.
 
-**hapai** v1.3+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
+**hapai** v1.6+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
 
-## What's New in v1.6.1
+## What's New in v1.6.2
 
-- **ASCII art logo** — Renders in `hapai status`, `hapai validate`, install output, and README header
-- **Auto-sync at session end** — `hooks/stop/auto-sync.sh` fires `hapai sync` at Claude Code session end; `hooks/git/post-commit.sh` covers Cursor, Windsurf, Devin, Trae, Copilot, and plain git (opt-in via `hapai install --git-hooks`)
-- **Installer cleanup** — Stale hook registrations are stripped from `settings.json` before merging the current template
-- **Design system** — 22 CSS tokens covering colors, surfaces, shadows, and transitions; no more hardcoded hex values across dashboard components
-- **Shared component library** — `Button`, `Card`, `Badge`, and `EmptyState` in Svelte 5 runes syntax (`$props()` / `{@render}`)
-- **Full i18n** — EN, PT-BR, and ES-ES across all pages; updated UX copy ("Blocked Actions", "Soft Warnings", "Guardrail Activity")
-- **Landing page** — Unauthenticated visitors now see a proper landing page instead of a blank auth gate
-- **Docs sidebar** — Scroll spy via `IntersectionObserver` + 5 labeled section groups (Getting Started, Configuration, Reference, Cloud, Help)
-- **OAuth error handling** — Sign-in failures surface user-visible feedback in `Header`; popup-closed events silently ignored
-- **Auto-fix for PR review issues** — When code review detects issues, hapai automatically attempts to fix them before blocking the push (opt-in via `auto_fix.enabled`)
-- **CI sync pipeline** — `hapai-sync.yml` downloads today's GCS audit log and loads into BigQuery daily at 2h UTC
-- **ADC support** — `hapai sync` accepts `gcloud auth application-default login` credentials locally
+- **Drill-down analytics (L2)** — Click any guard bar or hotspot to open an inline panel with mini-timeline, breakdown bars (by tool or by guard), and recent events list
+- **Event detail drawer (L3)** — Click any event to open a full detail drawer with ← Previous / Next → navigation and Escape key support
+- **Rate cards** — Two new KPI cards: Allow Rate and Deny Rate (percentages), calculated from `allow_count` / `total_events` returned by BigQuery
+- **Backend parameterization** — All BigQuery queries now accept `period` (7/14/30 days), `limit`/`offset` for pagination, and per-entity filters; injection-safe via `bigquery.ScalarQueryParameter`
+- **Period selector connected to BQ** — Switching 7d/14d/30d triggers a real reload from BigQuery, not a client-side slice
+- **Server-side drilldown detail** — `hook_detail` and `tool_detail` BQ queries return timeline + breakdown + recent events + stats for the selected entity
+- **Load more from server** — Events table supports server-side pagination (`offset`-based) beyond the initial 100 rows
+- **StatCard sparklines** — Trend sparkline (80×24px canvas) and directional arrow (↗/↘/→) on each KPI card
+- **Dead code removed** — `TrendChart`, `ToolsChart`, and `ProjectsChart` deleted; superseded by sparklines, `TimelineChart`, and `Hotspots` tabs
 
 ## The Problem
 

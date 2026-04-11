@@ -1,5 +1,51 @@
 # hapai Changelog
 
+## v1.6.2 (2026-04-11) — Dashboard Drill-Down, Event Detail & BQ Parameterization
+
+### ✅ Delivered
+
+**Drill-down analytics — L2 (PR #43)**
+- `DrillDown.svelte` — new inline panel that opens below the selected guard/tool/project bar
+- Shows mini CSS timeline, breakdown bars (tool breakdown for guards; guard breakdown for tools), and recent events list
+- Dismissable with × button; closes on new dashboard load
+
+**Event detail drawer — L3 (PR #43)**
+- `EventDetail.svelte` — full-screen right drawer with guard, tool, project, reason, and timestamp
+- ← Previous / Next → navigation across all visible events
+- Escape key closes the drawer; `findIndex` uses `ts+hook+tool` composite key to survive store reloads
+
+**Rate cards (PR #44)**
+- Two new KPI StatCards: **Allow Rate** (green) and **Deny Rate** (red), shown as percentages
+- BigQuery `stats` query extended to return `allow_count` and `total_events`
+
+**Backend parameterization (PR #44)**
+- All BQ queries accept `period` (7/14/30 days) via `bigquery.ScalarQueryParameter` — injection-safe
+- `denials` query accepts `limit`, `offset`, `event_filter`, `hook_filter`, `tool_filter`
+- New `hook_detail` and `tool_detail` queries: mini-timeline + breakdown + recent events + stats per entity
+- `_validate_period()`, `_validate_safe_string()`, `_validate_limit()`, `_validate_offset()` helpers enforce input bounds
+
+**Period selector connected to BQ (PR #44)**
+- Switching 7d/14d/30d calls `setPeriod(idToken, period)` → `loadDashboard(idToken, period)` — real BQ reload
+- All sub-queries respect the selected window consistently
+
+**Server-side pagination (PR #44)**
+- "Load more from server" button in events table appends next 100 rows via `loadMoreDenials(idToken)`
+- `denialsHasMore` flag controls button visibility
+
+**StatCard sparklines (PR #43/44)**
+- 80×24px canvas sparkline on each KPI card, drawn via `getComputedStyle()` for design token colors
+- Trend arrow (↗/↘/→) with `--color-trend-up/down/flat` tokens
+
+**Fix: drilldown recent events period filter (post-PR #44)**
+- `recent` sub-query in both `_query_hook_detail` and `_query_tool_detail` was missing the period time filter
+- Now consistent with `timeline`, `breakdown`, and `stats_row` sub-queries
+
+**Cleanup: remove dead chart components (PR #45)**
+- Deleted `TrendChart.svelte`, `ToolsChart.svelte`, `ProjectsChart.svelte`
+- Superseded by: sparklines + `TimelineChart` (TrendChart); `Hotspots.svelte` tabs (ToolsChart + ProjectsChart)
+
+---
+
 ## v1.6.1 (2026-04-10) — ASCII Logo, Hook Cleanup & Docs
 
 ### ✅ Delivered

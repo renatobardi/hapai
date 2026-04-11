@@ -62,7 +62,7 @@ export default {
       label: 'Analytics',
       heading: 'See what your AI is doing.',
       desc: 'hapai logs every action — denials, warnings, and allows — to an append-only audit trail. Sync to BigQuery for enterprise analytics, or use the built-in dashboard to visualize guardrail activity across all your projects.',
-      features: '30-day timeline · Top blocking hooks · Tool distribution · Per-project breakdown · Deny rate trends',
+      features: '30-day timeline · Drill-down per guard & tool · Allow/Deny rate cards · Per-project breakdown · Event detail drawer',
       cta: 'Sign in with GitHub',
       signingIn: 'Signing in…',
       signInError: 'Sign in failed. Try again.',
@@ -72,7 +72,7 @@ export default {
       heading: 'Stop hoping the AI will follow the rules. Enforce them.',
       cta: 'Get Started',
       links: { github: 'GitHub', docs: 'Documentation', changelog: 'Changelog' },
-      note: 'hapai v1.5.1 · Pure bash. Zero dependencies. Deterministic safety.'
+      note: 'hapai v1.6.2 · Pure bash. Zero dependencies. Deterministic safety.'
     }
   },
   docs: {
