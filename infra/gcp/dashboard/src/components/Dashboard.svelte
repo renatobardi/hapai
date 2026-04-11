@@ -8,6 +8,8 @@
   import HooksChart from './HooksChart.svelte'
   import DenialsTable from './DenialsTable.svelte'
   import Hotspots from './Hotspots.svelte'
+  import DrillDown from './DrillDown.svelte'
+  import EventDetail from './EventDetail.svelte'
   import LoadingState from './LoadingState.svelte'
 
   onMount(() => { if ($authStore.idToken) loadDashboard($authStore.idToken) })
@@ -40,6 +42,17 @@
   let warningSparkline = $derived(sparkline($dashboardStore.timeline, 'warn'))
   let denialTrend      = $derived(calcTrend(denialSparkline))
   let warningTrend     = $derived(calcTrend(warningSparkline))
+
+  // Drill-down state: { type: 'guard'|'tool'|'project', name: string } | null
+  let drilldown   = $state(null)
+  // Event detail state: event object | null
+  let activeEvent = $state(null)
+
+  function openGuard(name)             { drilldown = { type: 'guard', name } }
+  function openHotspot({ type, name }) { drilldown = { type, name } }
+  function closeDrilldown()            { drilldown = null }
+  function openEvent(event)            { activeEvent = event }
+  function closeEvent()                { activeEvent = null }
 </script>
 
 {#if $dashboardStore.loading}
@@ -56,6 +69,7 @@
   {@const s = stats($dashboardStore.stats)}
   <div class="dashboard">
 
+    <!-- L1: KPI row + timeline -->
     <div class="section">
       <div class="content">
         <div class="row top">
@@ -82,29 +96,58 @@
       </div>
     </div>
 
+    <!-- L1: Recent events feed -->
     <div class="section alt">
       <div class="content">
         {#if $dashboardStore.denials}
-          <DenialsTable data={$dashboardStore.denials} />
+          <DenialsTable
+            data={$dashboardStore.denials}
+            onselect={openEvent}
+          />
         {/if}
       </div>
     </div>
 
+    <!-- L1: Charts + inline drill-down (L2) -->
     <div class="section">
       <div class="content">
         <div class="row charts">
           {#if $dashboardStore.hooks}
-            <HooksChart data={$dashboardStore.hooks} />
+            <HooksChart
+              data={$dashboardStore.hooks}
+              onselect={openGuard}
+            />
           {/if}
           <Hotspots
             tools={$dashboardStore.tools ?? []}
             projects={$dashboardStore.projects ?? []}
+            onselect={openHotspot}
           />
         </div>
+
+        <!-- L2: Drill-down panel — inline, below charts -->
+        {#if drilldown}
+          <DrillDown
+            type={drilldown.type}
+            name={drilldown.name}
+            denials={$dashboardStore.denials ?? []}
+            onclose={closeDrilldown}
+            onselect={openEvent}
+          />
+        {/if}
       </div>
     </div>
 
   </div>
+
+  <!-- L3: Event detail drawer -->
+  {#if activeEvent}
+    <EventDetail
+      event={activeEvent}
+      events={$dashboardStore.denials ?? []}
+      onclose={closeEvent}
+    />
+  {/if}
 {/if}
 
 <style>

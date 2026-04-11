@@ -5,7 +5,7 @@
   import Card from './Card.svelte'
   Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
 
-  let { data = [] } = $props()
+  let { data = [], onselect = null } = $props()
 
   let canvas = $state()
   let chart
@@ -35,6 +35,13 @@
         scales: {
           x: { ticks: { color: cGray, font: { size: 11 } }, grid: { color: cLight }, border: { color: cLight } },
           y: { ticks: { color: cBlack, font: { size: 12, weight: '700' } }, grid: { display: false }, border: { display: false } }
+        },
+        onClick: (_, elements) => {
+          if (!elements.length || !onselect) return
+          onselect(data[elements[0].index].hook)
+        },
+        onHover: (evt, elements) => {
+          evt.native.target.style.cursor = (elements.length && onselect) ? 'pointer' : 'default'
         }
       }
     })
