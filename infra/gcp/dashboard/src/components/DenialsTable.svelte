@@ -4,7 +4,7 @@
   import Card from './Card.svelte'
   import EmptyState from './EmptyState.svelte'
 
-  let { data = [], onselect = null } = $props()
+  let { data = [], onselect = null, hasMore = false, onloadmore = null } = $props()
 
   const LIMIT = 20
   let filterType = $state('all')
@@ -94,6 +94,11 @@
     {#if !showAll && filtered.length > LIMIT}
       <div class="viewall">
         <button onclick={() => showAll = true}>{$t('table.viewAll')} ({filtered.length}) →</button>
+      </div>
+    {/if}
+    {#if showAll && hasMore && onloadmore}
+      <div class="viewall">
+        <button onclick={onloadmore}>{$t('table.loadMore')} →</button>
       </div>
     {/if}
   {/if}
