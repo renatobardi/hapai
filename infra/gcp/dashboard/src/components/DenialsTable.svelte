@@ -1,26 +1,25 @@
 <script>
-  import { t } from '../stores/i18n.js'
+  import { t, locale } from '../stores/i18n.js'
   import Badge from './Badge.svelte'
   import Card from './Card.svelte'
   import EmptyState from './EmptyState.svelte'
 
-  let { data = [] } = $props()
+  let { data = [], onselect = null } = $props()
 
   const LIMIT = 20
   let filterType = $state('all')
   let filterHook = $state('')
   let filterTool = $state('')
   let showAll    = $state(false)
-  let expanded   = $state(new Set())
 
   const fmtTime = ts => {
     const d = new Date(ts), now = new Date()
     const mins = Math.floor((now - d) / 60000)
-    if (mins < 1)   return 'just now'
-    if (mins < 60)  return mins + 'm ago'
+    if (mins < 1)   return $t('common.justNow')
+    if (mins < 60)  return mins + $t('common.minutesAgo')
     const hrs = Math.floor(mins / 60)
-    if (hrs < 24)   return hrs + 'h ago'
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    if (hrs < 24)   return hrs + $t('common.hoursAgo')
+    return d.toLocaleDateString($locale, { month: 'short', day: 'numeric' })
   }
 
   let allHooks = $derived([...new Set(data.map(r => r.hook))].filter(Boolean).sort())
@@ -36,25 +35,9 @@
   let displayed  = $derived(showAll ? filtered : filtered.slice(0, LIMIT))
   let hasFilters = $derived(filterType !== 'all' || filterHook !== '' || filterTool !== '')
 
-  // Clear expanded row state when any filter changes — indices are position-based
-  // and recomputing `filtered` invalidates them
-  $effect(() => {
-    filterType; filterHook; filterTool
-    expanded = new Set()
-  })
-
-  // Reset pagination and expanded state whenever the data prop is replaced
-  $effect(() => {
-    data
-    showAll = false
-    expanded = new Set()
-  })
-
-  function toggleExpand(i) {
-    const s = new Set(expanded)
-    s.has(i) ? s.delete(i) : s.add(i)
-    expanded = s
-  }
+  // Reset pagination when filters change or data is replaced
+  $effect(() => { filterType; filterHook; filterTool; showAll = false })
+  $effect(() => { data; showAll = false })
 
   function clearFilters() { filterType = 'all'; filterHook = ''; filterTool = '' }
 </script>
@@ -96,19 +79,13 @@
           <th>{$t('table.cols.reason')}</th>
         </tr></thead>
         <tbody>
-          {#each displayed as r, i}
-          <tr onclick={() => toggleExpand(i)}>
+          {#each displayed as r}
+          <tr onclick={() => onselect?.(r)} class:clickable={!!onselect}>
             <td class="time">{fmtTime(r.ts)}</td>
             <td><Badge type={r.event}>{r.event}</Badge></td>
             <td class="mono">{r.hook}</td>
             <td class="mono">{r.tool}</td>
-            <td class="reason">
-              {#if expanded.has(i)}
-                <span class="full">{r.result || '—'}</span>
-              {:else}
-                <span class="preview">{r.result || '—'}</span>
-              {/if}
-            </td>
+            <td class="reason"><span class="preview">{r.result || '—'}</span></td>
           </tr>
           {/each}
         </tbody>
@@ -142,14 +119,14 @@
   thead tr { background: var(--color-near-black); }
   th { color: #fff; font-size: 11px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 16px; text-align: left; white-space: nowrap; }
   td { padding: 11px 16px; border-bottom: 1px solid var(--color-light-gray); color: var(--color-near-black); vertical-align: middle; }
-  tbody tr { cursor: pointer; transition: background var(--transition-fast); }
-  tbody tr:hover td { background: var(--color-off-white); }
+  tbody tr { transition: background var(--transition-fast); }
+  tbody tr.clickable { cursor: pointer; }
+  tbody tr.clickable:hover td { background: var(--color-off-white); }
   tbody tr:last-child td { border-bottom: none; }
   .time { font-size: 12px; color: var(--color-meta-gray); white-space: nowrap; }
   .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 12px; }
   .reason { color: var(--color-meta-gray); font-size: 12px; }
   .preview { display: block; max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .full    { display: block; white-space: normal; word-break: break-word; }
   .viewall { text-align: center; padding: var(--space-2) 0 0; border-top: 1px solid var(--color-light-gray); }
   .viewall button {
     background: none; border: none; font-size: 12px; font-weight: var(--weight-bold);

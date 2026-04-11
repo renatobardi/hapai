@@ -214,5 +214,28 @@ export default {
     cols: { time: 'Time', type: 'Type', hook: 'Hook', tool: 'Tool', reason: 'Reason' }
   },
   statCard: { period: 'Last 30 days' },
-  loading: { default: 'Loading…' }
+  loading: { default: 'Loading…' },
+  common: { justNow: 'just now', minutesAgo: 'm ago', hoursAgo: 'h ago' },
+  drilldown: {
+    close: '×',
+    denials: 'denials',
+    warnings: 'warnings',
+    triggeredByTool: 'Triggered by tool',
+    triggeredByGuard: 'Triggered by guard',
+    recentEvents: 'Recent Events',
+    empty: 'No events in this period.',
+    viewEvent: 'View'
+  },
+  detail: {
+    title: 'Event Detail',
+    close: 'Close',
+    prev: '← Prev',
+    next: 'Next →',
+    guard: 'Guard',
+    tool: 'Tool',
+    project: 'Project',
+    reason: 'Reason',
+    time: 'Time',
+    of: 'of'
+  }
 }
