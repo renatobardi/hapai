@@ -4,11 +4,13 @@
   import EmptyState from './EmptyState.svelte'
 
   let {
-    type     = 'guard',   // 'guard' | 'tool' | 'project'
-    name     = '',
-    denials  = [],        // all events from dashboardStore.denials
-    onclose  = null,      // () => void
-    onselect = null       // (event) => void — open EventDetail
+    type          = 'guard',   // 'guard' | 'tool' | 'project'
+    name          = '',
+    denials       = [],        // client-side fallback (all events from dashboardStore.denials)
+    detail        = null,      // server-side detail from loadDrilldownDetail (or null)
+    detailLoading = false,     // true while hook_detail / tool_detail is in flight
+    onclose       = null,      // () => void
+    onselect      = null       // (event) => void — open EventDetail
   } = $props()
 
   const fmtTime = ts => {
@@ -21,22 +23,26 @@
     return d.toLocaleDateString($locale, { month: 'short', day: 'numeric' })
   }
 
-  // Filter events to the selected entity
-  let events = $derived(
+  // Client-side fallback: filter events to the selected entity
+  let clientEvents = $derived(
     type === 'guard'   ? denials.filter(r => r.hook === name) :
     type === 'tool'    ? denials.filter(r => r.tool === name) :
     /* project */        denials.filter(r => r.project === name)
   )
 
-  let denyCount = $derived(events.filter(r => r.event === 'deny').length)
-  let warnCount = $derived(events.filter(r => r.event === 'warn').length)
+  // Stats: prefer server-side detail, fall back to client-side counts
+  let denyCount = $derived(detail ? (detail.deny_count ?? 0) : clientEvents.filter(r => r.event === 'deny').length)
+  let warnCount = $derived(detail ? (detail.warn_count ?? 0) : clientEvents.filter(r => r.event === 'warn').length)
+  let total     = $derived(detail ? (detail.total ?? 0)      : clientEvents.length)
+  let denyRate  = $derived(total > 0 ? Math.round((denyCount / total) * 100) : 0)
 
-  // Breakdown: for guard → count by tool; for tool/project → count by guard
+  // Breakdown: prefer server-side detail, fall back to client-side computation
   let breakdownKey = $derived(type === 'guard' ? 'tool' : 'hook')
 
   let breakdown = $derived.by(() => {
+    if (detail?.breakdown?.length) return detail.breakdown
     const counts = {}
-    for (const e of events) {
+    for (const e of clientEvents) {
       const k = e[breakdownKey] || '(unknown)'
       counts[k] = (counts[k] || 0) + 1
     }
@@ -48,11 +54,18 @@
 
   let maxCount = $derived(breakdown[0]?.count ?? 1)
 
-  let recent = $derived(events.slice(0, 8))
+  // Recent events: prefer server-side detail, fall back to client-side slice
+  let recent = $derived(detail?.recent?.length ? detail.recent : clientEvents.slice(0, 8))
+
+  // Mini-timeline from server-side detail (CSS bars, no Chart.js)
+  let miniTimeline = $derived(detail?.timeline ?? [])
+  let miniMax      = $derived(Math.max(...miniTimeline.map(d => d.count), 1))
 
   let breakdownLabel = $derived(
     type === 'guard' ? $t('drilldown.triggeredByTool') : $t('drilldown.triggeredByGuard')
   )
+
+  let hasData = $derived(detail ? total > 0 : clientEvents.length > 0)
 </script>
 
 <div class="panel" role="region" aria-label="drill-down">
@@ -62,33 +75,53 @@
       <span class="counts">
         {denyCount} {$t('drilldown.denials')}
         {#if warnCount > 0}· {warnCount} {$t('drilldown.warnings')}{/if}
+        {#if total > 0}· {denyRate}% {$t('drilldown.denyRate')}{/if}
       </span>
     </div>
     <button class="close-btn" onclick={onclose} aria-label="close">{$t('drilldown.close')}</button>
   </div>
 
   <div class="panel-body">
-    {#if events.length === 0}
+    {#if detailLoading && !detail}
+      <div class="detail-loading">{$t('drilldown.loading')}</div>
+    {:else if !hasData}
       <EmptyState message={$t('drilldown.empty')} />
     {:else}
       <div class="two-col">
 
-        {#if breakdown.length > 0}
-          <div class="breakdown">
-            <div class="section-label">{breakdownLabel}</div>
-            <div class="bars">
-              {#each breakdown as item}
-                <div class="bar-row">
-                  <span class="bar-label mono">{item.label}</span>
-                  <div class="bar-track">
-                    <div class="bar-fill" style="width: {Math.round((item.count / maxCount) * 100)}%"></div>
-                  </div>
-                  <span class="bar-count">{item.count}</span>
-                </div>
+        <div class="left-col">
+          <!-- Mini timeline (server-side, CSS bars) -->
+          {#if miniTimeline.length > 1}
+            <div class="section-label">{$t('drilldown.activity')}</div>
+            <div class="mini-timeline">
+              {#each miniTimeline as day}
+                <div
+                  class="mini-bar"
+                  style="height: {Math.max(3, Math.round((day.count / miniMax) * 40))}px"
+                  title="{day.day}: {day.count}"
+                ></div>
               {/each}
             </div>
-          </div>
-        {/if}
+          {/if}
+
+          <!-- Breakdown bars -->
+          {#if breakdown.length > 0}
+            <div class="breakdown">
+              <div class="section-label">{breakdownLabel}</div>
+              <div class="bars">
+                {#each breakdown as item}
+                  <div class="bar-row">
+                    <span class="bar-label mono">{item.label}</span>
+                    <div class="bar-track">
+                      <div class="bar-fill" style="width: {Math.round((item.count / maxCount) * 100)}%"></div>
+                    </div>
+                    <span class="bar-count">{item.count}</span>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        </div>
 
         <div class="recent">
           <div class="section-label">{$t('drilldown.recentEvents')}</div>
@@ -144,13 +177,28 @@
 
   .panel-body { padding: var(--space-3); }
 
+  .detail-loading { font-size: 12px; color: var(--color-meta-gray); padding: var(--space-2) 0; }
+
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
   @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 
+  .left-col { display: flex; flex-direction: column; gap: var(--space-3); }
+
   .section-label {
     font-size: 10px; font-weight: var(--weight-bold); text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--color-meta-gray); margin-bottom: var(--space-2);
+    letter-spacing: 0.1em; color: var(--color-meta-gray); margin-bottom: var(--space-1);
   }
+
+  /* Mini timeline */
+  .mini-timeline {
+    display: flex; align-items: flex-end; gap: 2px; height: 44px;
+    border-bottom: 1px solid var(--color-light-gray); padding-bottom: 2px;
+  }
+  .mini-bar {
+    flex: 1; background: var(--color-blue); opacity: 0.7; min-width: 3px;
+    transition: opacity var(--transition-fast);
+  }
+  .mini-bar:hover { opacity: 1; }
 
   /* Breakdown bars */
   .bars { display: flex; flex-direction: column; gap: 10px; }

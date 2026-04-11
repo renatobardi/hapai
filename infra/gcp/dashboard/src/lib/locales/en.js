@@ -211,9 +211,10 @@ export default {
     filterTool: 'All tools',
     clearFilters: 'Clear filters',
     viewAll: 'View all events',
+    loadMore: 'Load more from server',
     cols: { time: 'Time', type: 'Type', hook: 'Hook', tool: 'Tool', reason: 'Reason' }
   },
-  statCard: { period: 'Last 30 days' },
+  statCard: { period: 'Last 30 days', period7d: 'Last 7 days', period14d: 'Last 14 days', allowRate: 'Allow Rate', denyRate: 'Deny Rate' },
   loading: { default: 'Loading…' },
   common: { justNow: 'just now', minutesAgo: 'm ago', hoursAgo: 'h ago' },
   drilldown: {
@@ -224,7 +225,10 @@ export default {
     triggeredByGuard: 'Triggered by guard',
     recentEvents: 'Recent Events',
     empty: 'No events in this period.',
-    viewEvent: 'View'
+    viewEvent: 'View',
+    loading: 'Loading…',
+    activity: 'Activity',
+    denyRate: 'deny rate'
   },
   detail: {
     title: 'Event Detail',

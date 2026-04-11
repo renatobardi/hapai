@@ -238,97 +238,281 @@ _ALLOWED_ORIGINS = {
     "https://renatobardi.github.io",
 }
 
+
 def _get_table_ref(table_name: str) -> str:
-    """Get parameterized table reference using current project ID"""
+    """Get parameterized table reference using current project ID."""
     return f"`{PROJECT_ID}.{DATASET_ID}.{table_name}`"
 
 
-_QUERY_TEMPLATES = {
-    "stats": """
+def _validate_period(body: dict) -> int:
+    """Validate period param. Returns 7, 14, or 30 (default 30)."""
+    period = body.get("period", 30)
+    try:
+        period = int(period)
+    except (TypeError, ValueError):
+        return 30
+    return period if period in (7, 14, 30) else 30
+
+
+def _validate_safe_string(value, max_len: int = 100):
+    """Validate a string for use as a BigQuery query parameter."""
+    if not value or not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or len(value) > max_len:
+        return None
+    return value
+
+
+def _validate_limit(body: dict, default: int = 100) -> int:
+    limit = body.get("limit", default)
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return default
+    return max(10, min(200, limit))
+
+
+def _validate_offset(body: dict) -> int:
+    offset = body.get("offset", 0)
+    try:
+        offset = int(offset)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(10000, offset))
+
+
+def _run_query(sql: str, params=None) -> list:
+    """Run a BigQuery query, optionally with parameterized inputs."""
+    job_config = bigquery.QueryJobConfig(query_parameters=params) if params else None
+    result = bigquery_client.query(sql, job_config=job_config).result()
+    return [dict(row) for row in result]
+
+
+def _query_stats(period: int) -> list:
+    ref = _get_table_ref(TABLE_ID)
+    sql = f"""
         SELECT
-          COUNTIF(result = 'deny')  AS denials,
-          COUNTIF(result = 'warn')  AS warnings
-        FROM {table_ref}
-        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-    """,
-    "timeline": """
+          COUNTIF(result = 'deny')        AS denials,
+          COUNTIF(result = 'warn')        AS warnings,
+          COUNTIF(result = 'allow')       AS allow_count,
+          CAST(COUNT(*) AS INT64)         AS total_events
+        FROM {ref}
+        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
+    """
+    return _run_query(sql)
+
+
+def _query_timeline(period: int) -> list:
+    ref = _get_table_ref(TABLE_ID)
+    sql = f"""
         SELECT
           FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day,
           result                            AS event,
           CAST(COUNT(*) AS INT64)           AS count
-        FROM {table_ref}
-        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+        FROM {ref}
+        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
           AND result IN ('allow', 'deny', 'warn')
         GROUP BY day, result
         ORDER BY day
-    """,
-    "hooks": """
+    """
+    return _run_query(sql)
+
+
+def _query_hooks(period: int) -> list:
+    ref = _get_table_ref(TABLE_ID)
+    sql = f"""
         SELECT
           hook,
           CAST(COUNT(*) AS INT64) AS blocks
-        FROM {table_ref}
+        FROM {ref}
         WHERE result = 'deny'
-          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
         GROUP BY hook
         ORDER BY blocks DESC
         LIMIT 10
-    """,
-    "denials": """
-        SELECT
-          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', ts) AS ts,
-          event, hook, tool, result
-        FROM {table_ref}
-        WHERE result IN ('deny', 'warn')
-        ORDER BY ts DESC
-        LIMIT 50
-    """,
-    "tools": """
+    """
+    return _run_query(sql)
+
+
+def _query_tools(period: int) -> list:
+    ref = _get_table_ref(TABLE_ID)
+    sql = f"""
         SELECT
           tool,
           CAST(COUNT(*) AS INT64) AS count
-        FROM {table_ref}
+        FROM {ref}
         WHERE result = 'deny'
-          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
         GROUP BY tool
         ORDER BY count DESC
-    """,
-    "projects": """
+    """
+    return _run_query(sql)
+
+
+def _query_projects(period: int) -> list:
+    ref = _get_table_ref(TABLE_ID)
+    sql = f"""
         SELECT
           project,
           CAST(COUNT(*) AS INT64) AS count
-        FROM {table_ref}
+        FROM {ref}
         WHERE result = 'deny'
-          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
           AND project IS NOT NULL
         GROUP BY project
         ORDER BY count DESC
         LIMIT 10
-    """,
-    "trends": """
+    """
+    return _run_query(sql)
+
+
+def _query_denials(
+    limit: int,
+    offset: int,
+    event_filter: str = None,
+    hook_filter: str = None,
+    tool_filter: str = None,
+) -> list:
+    ref = _get_table_ref(TABLE_ID)
+    where = ["result IN ('deny', 'warn')"]
+    params: List[Any] = []
+
+    if event_filter:
+        where.append("result = @event_filter")
+        params.append(bigquery.ScalarQueryParameter("event_filter", "STRING", event_filter))
+    if hook_filter:
+        where.append("hook = @hook_filter")
+        params.append(bigquery.ScalarQueryParameter("hook_filter", "STRING", hook_filter))
+    if tool_filter:
+        where.append("tool = @tool_filter")
+        params.append(bigquery.ScalarQueryParameter("tool_filter", "STRING", tool_filter))
+
+    params.append(bigquery.ScalarQueryParameter("q_limit",  "INT64", limit))
+    params.append(bigquery.ScalarQueryParameter("q_offset", "INT64", offset))
+
+    sql = f"""
         SELECT
-          FORMAT_DATE('%Y-%m-%d', DATE(ts))        AS day,
-          CAST(COUNTIF(result = 'deny') AS INT64)  AS denies
-        FROM {table_ref}
-        WHERE ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-        GROUP BY day
-        ORDER BY day
-    """,
-}
+          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', ts) AS ts,
+          event, hook, tool, result, project
+        FROM {ref}
+        WHERE {" AND ".join(where)}
+        ORDER BY ts DESC
+        LIMIT @q_limit
+        OFFSET @q_offset
+    """
+    return _run_query(sql, params)
 
 
-def get_query(query_name: str) -> str:
-    """Get a query template with project ID substituted"""
-    template = _QUERY_TEMPLATES.get(query_name)
-    if not template:
-        return None
-    return template.format(table_ref=_get_table_ref(TABLE_ID))
+def _query_hook_detail(hook_name: str, period: int) -> dict:
+    """Mini-timeline + tool breakdown + recent events for a specific guard."""
+    ref = _get_table_ref(TABLE_ID)
+    p = [bigquery.ScalarQueryParameter("hook_name", "STRING", hook_name)]
+
+    timeline = _run_query(f"""
+        SELECT
+          FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day,
+          CAST(COUNT(*) AS INT64)           AS count
+        FROM {ref}
+        WHERE hook = @hook_name
+          AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
+        GROUP BY day ORDER BY day
+    """, p)
+
+    breakdown = _run_query(f"""
+        SELECT
+          tool                    AS label,
+          CAST(COUNT(*) AS INT64) AS count
+        FROM {ref}
+        WHERE hook = @hook_name
+          AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
+        GROUP BY tool ORDER BY count DESC LIMIT 8
+    """, p)
+
+    recent = _run_query(f"""
+        SELECT
+          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', ts) AS ts,
+          event, hook, tool, result, project
+        FROM {ref}
+        WHERE hook = @hook_name
+          AND result IN ('deny', 'warn')
+        ORDER BY ts DESC LIMIT 10
+    """, p)
+
+    stats_row = _run_query(f"""
+        SELECT
+          CAST(COUNT(*) AS INT64)                 AS total,
+          CAST(COUNTIF(result = 'deny') AS INT64) AS deny_count,
+          CAST(COUNTIF(result = 'warn') AS INT64) AS warn_count
+        FROM {ref}
+        WHERE hook = @hook_name
+          AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
+    """, p)
+
+    s = stats_row[0] if stats_row else {"total": 0, "deny_count": 0, "warn_count": 0}
+    return {"timeline": timeline, "breakdown": breakdown, "recent": recent, **s}
+
+
+def _query_tool_detail(tool_name: str, period: int) -> dict:
+    """Mini-timeline + hook breakdown + recent events for a specific tool."""
+    ref = _get_table_ref(TABLE_ID)
+    p = [bigquery.ScalarQueryParameter("tool_name", "STRING", tool_name)]
+
+    timeline = _run_query(f"""
+        SELECT
+          FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day,
+          CAST(COUNT(*) AS INT64)           AS count
+        FROM {ref}
+        WHERE tool = @tool_name
+          AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
+        GROUP BY day ORDER BY day
+    """, p)
+
+    breakdown = _run_query(f"""
+        SELECT
+          hook                    AS label,
+          CAST(COUNT(*) AS INT64) AS count
+        FROM {ref}
+        WHERE tool = @tool_name
+          AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
+        GROUP BY hook ORDER BY count DESC LIMIT 8
+    """, p)
+
+    recent = _run_query(f"""
+        SELECT
+          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', ts) AS ts,
+          event, hook, tool, result, project
+        FROM {ref}
+        WHERE tool = @tool_name
+          AND result IN ('deny', 'warn')
+        ORDER BY ts DESC LIMIT 10
+    """, p)
+
+    stats_row = _run_query(f"""
+        SELECT
+          CAST(COUNT(*) AS INT64)                 AS total,
+          CAST(COUNTIF(result = 'deny') AS INT64) AS deny_count,
+          CAST(COUNTIF(result = 'warn') AS INT64) AS warn_count
+        FROM {ref}
+        WHERE tool = @tool_name
+          AND result IN ('deny', 'warn')
+          AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {period} DAY)
+    """, p)
+
+    s = stats_row[0] if stats_row else {"total": 0, "deny_count": 0, "warn_count": 0}
+    return {"timeline": timeline, "breakdown": breakdown, "recent": recent, **s}
 
 
 @functions_framework.http
 def bq_query(request):
     """
     HTTP endpoint: validates Firebase ID token, runs a named BigQuery query.
-    Frontend sends: POST { "query_name": "stats" }
+    Frontend sends: POST { "query_name": "stats", "period": 30, ... }
     Authorization: Bearer <firebase-id-token>
     """
     origin = request.headers.get("Origin", "")
@@ -355,13 +539,54 @@ def bq_query(request):
 
     body = request.get_json(silent=True) or {}
     query_name = body.get("query_name")
-    query = get_query(query_name)
-    if not query:
-        return ({"error": f"Unknown query: {query_name}"}, 400, cors)
+    if not query_name:
+        return ({"error": "Missing query_name"}, 400, cors)
+
+    period = _validate_period(body)
 
     try:
-        rows = [dict(row) for row in bigquery_client.query(query).result()]
-        return (rows, 200, cors)
+        if query_name == "stats":
+            result = _query_stats(period)
+
+        elif query_name == "timeline":
+            result = _query_timeline(period)
+
+        elif query_name == "hooks":
+            result = _query_hooks(period)
+
+        elif query_name == "tools":
+            result = _query_tools(period)
+
+        elif query_name == "projects":
+            result = _query_projects(period)
+
+        elif query_name == "denials":
+            limit  = _validate_limit(body)
+            offset = _validate_offset(body)
+            event_filter = _validate_safe_string(body.get("event_filter"), max_len=10)
+            hook_filter  = _validate_safe_string(body.get("hook_filter"),  max_len=100)
+            tool_filter  = _validate_safe_string(body.get("tool_filter"),  max_len=100)
+            if event_filter and event_filter not in ("deny", "warn"):
+                event_filter = None
+            result = _query_denials(limit, offset, event_filter, hook_filter, tool_filter)
+
+        elif query_name == "hook_detail":
+            hook_name = _validate_safe_string(body.get("hook_name"))
+            if not hook_name:
+                return ({"error": "Missing or invalid hook_name"}, 400, cors)
+            result = _query_hook_detail(hook_name, period)
+
+        elif query_name == "tool_detail":
+            tool_name = _validate_safe_string(body.get("tool_name"))
+            if not tool_name:
+                return ({"error": "Missing or invalid tool_name"}, 400, cors)
+            result = _query_tool_detail(tool_name, period)
+
+        else:
+            return ({"error": f"Unknown query: {query_name}"}, 400, cors)
+
+        return (result, 200, cors)
+
     except Exception as e:
         logger.error(f"BigQuery query '{query_name}' failed: {e}", exc_info=True)
         return ({"error": "Query failed"}, 500, cors)

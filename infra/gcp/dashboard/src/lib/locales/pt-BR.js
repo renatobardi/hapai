@@ -211,9 +211,10 @@ export default {
     filterTool: 'Todas as ferramentas',
     clearFilters: 'Limpar filtros',
     viewAll: 'Ver todos os eventos',
+    loadMore: 'Carregar mais do servidor',
     cols: { time: 'Hora', type: 'Tipo', hook: 'Hook', tool: 'Ferramenta', reason: 'Motivo' }
   },
-  statCard: { period: 'Últimos 30 dias' },
+  statCard: { period: 'Últimos 30 dias', period7d: 'Últimos 7 dias', period14d: 'Últimos 14 dias', allowRate: 'Taxa de Permissão', denyRate: 'Taxa de Bloqueio' },
   loading: { default: 'Carregando…' },
   common: { justNow: 'agora', minutesAgo: 'm atrás', hoursAgo: 'h atrás' },
   drilldown: {
@@ -224,7 +225,10 @@ export default {
     triggeredByGuard: 'Acionado por guard',
     recentEvents: 'Eventos Recentes',
     empty: 'Sem eventos neste período.',
-    viewEvent: 'Ver'
+    viewEvent: 'Ver',
+    loading: 'Carregando…',
+    activity: 'Atividade',
+    denyRate: 'taxa de bloqueio'
   },
   detail: {
     title: 'Detalhe do Evento',

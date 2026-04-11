@@ -2,9 +2,16 @@
   import { t } from '../stores/i18n.js'
   import { onMount } from 'svelte'
 
-  let { label = '', value = 0, accent = 'default', sparklineData = [], trend = null } = $props()
+  let { label = '', value = 0, accent = 'default', sparklineData = [], trend = null, format = 'number', period = 30 } = $props()
 
   let canvas = $state()
+
+  let displayValue = $derived(format === 'percent' ? value.toFixed(1) + '%' : value.toLocaleString())
+  let periodLabel  = $derived(
+    period === 7  ? $t('statCard.period7d') :
+    period === 14 ? $t('statCard.period14d') :
+    $t('statCard.period')
+  )
 
   function drawSparkline() {
     if (!canvas || sparklineData.length < 2) return
@@ -40,10 +47,10 @@
   let trendAbs = $derived(trend === null ? '' : (trend > 0 ? '+' : '') + Math.round(trend) + '%')
 </script>
 
-<div class="card" class:deny={accent==='deny'} class:warn={accent==='warn'}>
+<div class="card" class:deny={accent==='deny'} class:warn={accent==='warn'} class:allow={accent==='allow'}>
   <div class="label">{label}</div>
   <div class="value-row">
-    <div class="value" class:vdeny={accent==='deny'} class:vwarn={accent==='warn'}>{value}</div>
+    <div class="value" class:vdeny={accent==='deny'} class:vwarn={accent==='warn'} class:vallow={accent==='allow'}>{displayValue}</div>
     {#if trendDir !== null}
       <div class="trend" class:up={trendDir==='up'} class:down={trendDir==='down'} class:flat={trendDir==='flat'}>
         {trendDir === 'up' ? '↗' : trendDir === 'down' ? '↘' : '→'} {trendAbs}
@@ -53,18 +60,20 @@
   {#if sparklineData.length > 1}
     <canvas bind:this={canvas} width={80} height={24} class="sparkline"></canvas>
   {/if}
-  <div class="period">{$t('statCard.period')}</div>
+  <div class="period">{periodLabel}</div>
 </div>
 
 <style>
   .card { background: var(--color-white); border: 1px solid var(--color-light-gray); border-top: 3px solid var(--color-light-gray); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); }
-  .deny { border-top-color: var(--color-deny); }
-  .warn { border-top-color: var(--color-warn); }
+  .deny  { border-top-color: var(--color-deny); }
+  .warn  { border-top-color: var(--color-warn); }
+  .allow { border-top-color: var(--color-allow); }
   .label { font-size: 11px; font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-meta-gray); }
   .value-row { display: flex; align-items: baseline; gap: 8px; }
   .value { font-size: 56px; font-weight: var(--weight-light); color: var(--color-near-black); line-height: 1; }
-  .vdeny { color: var(--color-deny); }
-  .vwarn { color: var(--color-warn); }
+  .vdeny  { color: var(--color-deny); }
+  .vwarn  { color: var(--color-warn); }
+  .vallow { color: var(--color-allow); }
   .trend { font-size: 11px; font-weight: var(--weight-bold); letter-spacing: 0.04em; white-space: nowrap; }
   .trend.up   { color: var(--color-trend-up); }
   .trend.down { color: var(--color-trend-down); }

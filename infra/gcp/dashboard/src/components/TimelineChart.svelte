@@ -5,10 +5,9 @@
   import { t, locale } from '../stores/i18n.js'
   Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Filler, Tooltip, Legend)
 
-  let { data = [] } = $props()
+  let { data = [], period = 30, onperiod = null } = $props()
 
   let canvas = $state()
-  let period = $state(30)
   let chart
 
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() }
@@ -32,8 +31,9 @@
       if (r.event === 'deny') byDay[r.day].denies = r.count
       if (r.event === 'warn') byDay[r.day].warns  = r.count
     }
+    // BQ already returns only the requested period; no client-side slicing needed
     const all  = Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b))
-    const days = period < 30 ? all.slice(-period) : all
+    const days = all
 
     if (chart) chart.destroy()
     chart = new Chart(canvas, {
@@ -69,18 +69,20 @@
   }
 
   $effect(() => { if (canvas && data.length) { $locale; build() } })
-  $effect(() => { period; if (canvas && data.length) build() })
+  $effect(() => { period; if (canvas && data.length) build() })  // rebuild when period prop changes
   onMount(build)
   onDestroy(() => chart?.destroy())
+
+  function changePeriod(p) { onperiod ? onperiod(p) : build() }
 </script>
 
 <div class="card">
   <div class="header">
     <div class="card-title">{$t('charts.timeline')}</div>
     <div class="periods">
-      <button class:active={period===7}  onclick={() => period=7}>7d</button>
-      <button class:active={period===14} onclick={() => period=14}>14d</button>
-      <button class:active={period===30} onclick={() => period=30}>30d</button>
+      <button class:active={period===7}  onclick={() => changePeriod(7)}>7d</button>
+      <button class:active={period===14} onclick={() => changePeriod(14)}>14d</button>
+      <button class:active={period===30} onclick={() => changePeriod(30)}>30d</button>
     </div>
   </div>
   <div class="w"><canvas bind:this={canvas}></canvas></div>
