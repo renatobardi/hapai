@@ -253,126 +253,202 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 ### Templates & Exporters
 
 - `templates/settings.hooks.json` — hook registration template for Claude Code
-- `templates/claude.md.inject` — markdown block injected into project CLAUDE.md on install (wrapped in `<!-- hapai:start -->...<!-- hapai:end -->`)
-- `templates/guardrails-rules.md` — human-readable guardrails reference
-- `hooks/git/post-commit.sh` — git post-commit hook installed via `hapai install --git-hooks`; fires `hapai sync` in background after each commit; works with any AI coding tool that commits via git
 
-**Exporters** (`exporters/`):
+## Cloud Functions (Python)
 
-| Script | Output path | Target tool |
-|---|---|---|
-| `export-cursor.sh` | `.cursor/rules/hapai.mdc` | Cursor |
-| `export-copilot.sh` | `.github/copilot-instructions.md` | GitHub Copilot |
-| `export-windsurf.sh` | `.windsurf/rules/hapai.md` | Windsurf |
-| `export-devin.sh` | `AGENTS.md` | Devin |
-| `export-trae.sh` | `.trae/rules/hapai.md` | Trae |
-| `export-antigravity.sh` | `GEMINI.md` + `AGENTS.md` | Antigravity/Gemini |
-| `export-universal.sh` | `AGENTS.md` | Cross-tool fallback |
+**Location:** `infra/gcp/functions/main.py` — Cloud Function that loads audit logs from Cloud Storage to BigQuery.
 
-## Claude Code Integration
+**Trigger:** Cloud Storage `finalizeCreate` event on `hapai-audit-*` buckets.
 
-### Hook Event Types & Exit Codes
+**Key responsibilities:**
+- Parse JSONL audit logs from `~/.hapai/audit.jsonl` (uploaded by `hapai sync`)
+- Validate identifiers and bucket names using regex patterns
+- Load events into BigQuery `hapai_dataset.events` table via MERGE (dedup on `event_id`)
+- Handle legacy rows without `event_id` and new rows with UUID-based dedup keys
 
-| Event | Directory | Purpose |
-|---|---|---|
-| `PreToolUse` | `hooks/pre-tool-use/` | Block before Claude executes a tool |
-| `PostToolUse` | `hooks/post-tool-use/` | Automations after tool execution |
-| `Stop` | `hooks/stop/` | Cleanup and cost tracking at session end |
-| `SessionStart` | `hooks/session-start/` | Load context, scan TODOs/issues on session init |
-| `UserPromptSubmit` | `hooks/user-prompt-submit/` | Warn on production keywords before any tool runs |
-| `PreCompact` | `hooks/pre-compact/` | Backup transcript before context compaction |
-| `Notification` | `hooks/notification/` | Sound alerts on guardrail events |
-| `PermissionRequest` | `hooks/permission-request/` | Auto-allow read-only operations |
+**Schema:** 13 fields including `event_id` (dedup key), `ts`, `hook`, `tool`, `result`, `reason`, `project`. See `infra/gcp/bigquery-schema.json` for full details.
 
-Exit codes follow the Claude Code hook API:
-- `0` — Allow execution
-- `2` — Deny execution (show error to user)
+**Setup:** Deployed via Terraform/Cloud Functions console. See `infra/gcp/SETUP.md` for GCP infrastructure setup.
 
-All other exits are treated as `0` (fail-open trap in `_lib.sh` prevents hook crashes).
-
-### PR Review System
-
-When `guardrails.pr_review.enabled = true`, a background review pipeline activates on `gh pr create` or `git push -u`:
-
-1. **`post-tool-use/pr-review-trigger.sh`** — Detects the push/PR command, spawns `_pr-review-agent.sh` in background
-2. **`hooks/_pr-review-agent.sh`** — Runs `claude` CLI (Haiku model by default) to review the diff; writes findings to `~/.hapai/state/pr_review_issues`
-3. **`pre-tool-use/guard-pr-review.sh`** — On subsequent `git push` or merge, blocks if unresolved issues exist
-4. **`hooks/_pr-fix-agent.sh`** — Optional auto-fixer (Sonnet model); activated when `auto_fix.enabled = true`
-
-The review is fire-and-forget — it never blocks the original push. Only follow-up pushes are gated.
-
-### Installation Modes
-
-**Global installation** (`hapai install --global`):
-- Hooks copied to `~/.hapai/hooks/`
-- Settings registered in `~/.claude/settings.json`
-- Applies to ALL projects using Claude Code on this machine
-- Configuration: `~/.hapai/hapai.yaml` or built-in defaults
-
-**Project installation** (`hapai install --project` or `cd project && hapai install`):
-- Hooks copied to `.claude/hooks/hapai/`
-- Settings registered in `.claude/settings.json` (project-local)
-- Applies only to this project
-- Configuration: `hapai.yaml` (checked into git) → `~/.hapai/hapai.yaml` → defaults
-
-**For hapai development:** Install globally, then test using project-local overrides in `hapai.yaml`.
-
-## Development Workflows
+## Developer Workflows
 
 ### Adding a New Guardrail
 
-1. Create `hooks/pre-tool-use/guard-{name}.sh` — source `_lib.sh`, call `read_input`, exit 0 or 2
-2. Add config entry in `hapai.defaults.yaml` under `guardrails.{name}`
-3. Test in isolation: `echo '...' | bash hooks/pre-tool-use/guard-{name}.sh`
-4. Add assertions in `tests/run-tests.sh`
-5. Run full test suite: `bash tests/run-tests.sh`
+1. **Create the hook script** in `hooks/pre-tool-use/guard-{name}.sh`
+   - Source `hooks/_lib.sh` for utilities (`deny()`, `allow()`, `warn()`, `config_get()`, `audit_log()`)
+   - Read JSON input via `read_input()` and `get_field()`
+   - Exit 0 to allow, 2 to deny
+   - Add config key to `hapai.defaults.yaml`
 
-### Testing the CLI Installation
+2. **Register in settings.json template:**
+   - Update `templates/settings.hooks.json` with the new hook under `hooks` array
+   - Specify `if:` condition to match relevant tool calls
+   - Set `gate: block` for hard deny, `gate: warn` for soft warn
 
-When developing hapai itself, use **development mode** to test changes without permanently installing:
+3. **Add tests** to `tests/run-tests.sh`:
+   - Test both allow and deny cases
+   - Test with different config values (`fail_open: true/false`)
+   - Use isolated `HAPAI_HOME` for each test group
 
+4. **Document** in `CLAUDE.md` under Architecture → Hook System or add to guardrails table in README
+
+### Modifying Configuration
+
+**Project-local settings** (`hapai.yaml`):
+- Checked into repo; overrides global defaults
+- Use for team-wide policies (required branch prefixes, protected branches, etc.)
+- Syntax: YAML with nested keys like `guardrails.guard_name.enabled`
+
+**User-global settings** (`~/.hapai/hapai.yaml`):
+- Per-user overrides; never committed
+- Takes precedence over project config; used for local testing
+
+**Defaults** (`hapai.defaults.yaml`):
+- Built-in fallback; master source of truth for all options
+- Modifications here require tests and release notes
+
+### Testing During Development
+
+**Run all tests:**
 ```bash
-# Test installer logic without installing
-HAPAI_DEV=1 bash install.sh
-
-# This clones the installer but sources from the local ./bin/hapai instead of downloaded binary
+bash tests/run-tests.sh
 ```
 
-**Working on the hapai repo:**
+**Test a single hook:**
+```bash
+# Pre-compile your hook input JSON
+HOOK_INPUT='{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m test"}}'
+echo "$HOOK_INPUT" | bash hooks/pre-tool-use/guard-branch.sh
+echo "Exit code: $?"
+```
 
-1. Make changes to hooks, CLI, or tests
-2. Run tests: `bash tests/run-tests.sh`
-3. Test CLI commands against local hooks: `./bin/hapai status`
-4. For full end-to-end testing, install globally, then override with project config:
+**Test with custom config:**
+```bash
+export HAPAI_HOME="$(mktemp -d)"
+mkdir -p "$HAPAI_HOME/state"
+cp hapai.defaults.yaml "$HAPAI_HOME/hapai.yaml"
+# Edit $HAPAI_HOME/hapai.yaml as needed
+echo "$HOOK_INPUT" | bash hooks/pre-tool-use/guard-branch.sh
+```
+
+**Watch tests during development:**
+```bash
+while inotifywait -e modify hooks/ tests/; do bash tests/run-tests.sh; done
+```
+
+## Dashboard Local Development
+
+**Environment setup:**
+```bash
+cd infra/gcp/dashboard
+npm ci  # Install dependencies
+```
+
+**Create `.env` file:**
+```
+VITE_FIREBASE_API_KEY=xxx
+VITE_FIREBASE_AUTH_DOMAIN=xxx
+VITE_FIREBASE_PROJECT_ID=xxx
+VITE_FIREBASE_APP_ID=xxx
+VITE_BQ_PROXY_URL=https://your-cloud-functions-url
+```
+
+Get these values from your Firebase project (`infra/gcp/SETUP.md`).
+
+**Local dev server:**
+```bash
+npm run dev  # Runs on http://localhost:5173
+```
+
+Svelte 5 uses runes syntax (`$state()`, `$derived()`, `$effect()`) — see components in `src/` for patterns.
+
+**Important:** Svelte templates with literal `{...}` in strings must escape as `&#123;...&#125;` to avoid parse errors (see `src/lib/locales/` for examples).
+
+**Build production:**
+```bash
+npm run build  # Outputs to _site/ with base path /hapai/
+```
+
+**i18n:** Three locales in `src/lib/locales/` (en.js, pt-BR.js, es-ES.js). Use `$t('key')` in components. Language persists to localStorage.
+
+## Common Tasks
+
+### Debugging Hook Execution
+
+1. **Check audit logs:**
    ```bash
-   bash install.sh --global     # installs to ~/.hapai/
-   hapai validate
-   hapai status
    hapai audit
    ```
-5. Create a test project, install locally, and verify behavior
+   Shows recent allow/deny events with timestamps and reasons.
 
-**Important:** When developing the guardrails system itself (not using it), commit to `docs/`, `feat/`, `fix/` branches, never to `main`. The hooks enforce this via `guard-branch.sh`.
+2. **Review hook registration:**
+   ```bash
+   hapai list-hooks
+   ```
+   Shows which hooks are installed and active.
 
-### Cloud Setup (GCP/BigQuery)
+3. **Inspect hook state:**
+   ```bash
+   cat ~/.hapai/state/*
+   ```
+   View cooldown counters and rate-limit state.
 
-See `infra/gcp/SETUP.md`. Enabled via `hapai sync` after GCP setup. Key steps: Firebase project, GitHub OAuth provider, Cloud Functions for BigQuery streaming, OIDC Workload Identity Federation.
+4. **Test configuration loading:**
+   ```bash
+   HAPAI_HOME=/tmp/test_hapai bash -c '
+     source hooks/_lib.sh
+     config_get "guardrails.branch_protection.enabled"
+   '
+   ```
 
-## GitHub Actions Workflows
+### Working with Branches Under Guardrails
 
-- **`ci.yml`** — Runs `bash tests/run-tests.sh` on push to main and all PRs (Ubuntu + macOS)
-- **`deploy-dashboard.yml`** — Builds and deploys dashboard to GitHub Pages when `infra/gcp/dashboard/**` changes
-- **`hapai-sync.yml`** — Syncs audit logs to Cloud Storage and triggers BigQuery ingestion (requires GCP setup)
-- **`release.yml`** — Creates releases and publishes to Homebrew tap
+- **Always use taxonomy prefixes** (feat/, fix/, chore/, docs/, refactor/, test/, perf/, style/, ci/, build/, release/, hotfix/)
+- **Create feature branches from main:**
+  ```bash
+  git checkout main && git pull
+  git checkout -b feat/my-feature
+  ```
+- **Never commit to protected branches** (main, master) — guard-branch.sh will block
+- **Squash or rebase before PR** if needed, but avoid touching many files per commit
 
-## Conventions
+### Syncing Audit Logs to GCP
 
-- All scripts use `set -euo pipefail`
-- Exit codes follow Claude Code hook API: `0` = allow, `2` = deny
-- JSON output constructed via `jq -n` (safe against injection); strings always passed via `--arg`
-- User-facing messages go to stderr, structured output to stdout
-- Hook timeouts: PreToolUse=7s, PostToolUse=5s, Stop=10s
-- Each guardrail is one file, one concern, 50-100 LOC
-- Hooks must never crash — all internal errors exit 0 (fail-open via global ERR trap in `_lib.sh`)
-- Bash portability: uses POSIX grep/sed; tested on Ubuntu + macOS in CI
+```bash
+hapai sync  # Upload ~/.hapai/audit.jsonl to Cloud Storage
+```
 
+Requires GCP credentials and `GOOGLE_APPLICATION_CREDENTIALS` set. See `infra/gcp/SETUP.md`.
+
+## Resources
+
+- **README.md** — Feature overview, quick start, guardrail table
+- **CHANGELOG.md** — Release notes and what changed in each version
+- **infra/gcp/SETUP.md** — GCP project setup (Firebase, BigQuery, Cloud Storage, Cloud Functions)
+- **infra/gcp/OIDC-SETUP.md** — GitHub OAuth setup for dashboard
+- **hapai.defaults.yaml** — Master configuration reference with all available options
+
+## Running Tests in CI
+
+CI runs `bash tests/run-tests.sh` on both Ubuntu and macOS (see `.github/workflows/ci.yml`). Tests:
+- Use bash assertions, no framework
+- Create isolated `HAPAI_HOME` temp directories
+- Validate all guardrails and core utilities
+- Run in parallel on multiple OS versions
+
+Add tests for any new feature or bug fix.
+
+<!-- hapai:start -->
+## Hapai Guardrails (enforced by hooks)
+
+These rules are deterministically enforced by hapai hooks. Violations are blocked before execution.
+
+- NEVER commit directly to protected branches (main, master)
+- NEVER add Co-Authored-By or mention AI/Claude/Anthropic in commits, PRs, or docs
+- NEVER run destructive commands (rm -rf, force-push, git reset --hard, DROP TABLE)
+- NEVER edit .env, lockfiles, or CI workflow files without explicit permission
+- ALWAYS create a feature branch before making changes
+- ALWAYS keep commits focused — avoid touching many files/packages in a single commit
+- ALWAYS use taxonomy prefix when creating branches: feat/, fix/, chore/, docs/, refactor/, test/, perf/, style/, ci/, build/, release/, hotfix/
+- ALWAYS follow trunk-based workflow: short-lived branches from main, merged back to main via PR — no long-lived branches
+<!-- hapai:end -->
