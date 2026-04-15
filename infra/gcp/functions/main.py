@@ -409,7 +409,8 @@ def _dedup_cte(ref: str, period: int) -> str:
     - Rows WITH event_id: keep only one row per event_id (pick the earliest ts).
       This handles any duplicates that slipped past the MERGE (e.g. legacy rows
       re-ingested before P3 was deployed, or rows from the bq CLI load path).
-    - Rows WITHOUT event_id (legacy): kept as-is — no dedup possible.
+    - Rows WITHOUT event_id (legacy): deduplicated by composite key (ts, hook, tool, result).
+      For each unique combination of these fields, keeps only the earliest row.
 
     Usage: prefix your query with _dedup_cte(ref, period) and query `deduped` instead
     of the raw table.
