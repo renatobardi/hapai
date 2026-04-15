@@ -387,6 +387,21 @@ _audit_event_id() {
   echo "${epoch_ms}-${hook_name}-${rand}"
 }
 
+# Resolve the calling hook script name by walking BASH_SOURCE[] and
+# skipping _lib.sh entries (which appear when called via allow/deny/warn wrappers).
+# Returns the basename without .sh extension, e.g. "guard-branch".
+_get_calling_hook() {
+  local i src
+  for i in "${!BASH_SOURCE[@]}"; do
+    src="$(basename "${BASH_SOURCE[$i]:-}" .sh 2>/dev/null)"
+    # Skip _lib itself and empty/unknown entries
+    [[ -z "$src" || "$src" == "_lib" ]] && continue
+    echo "$src"
+    return
+  done
+  echo "unknown"
+}
+
 # Log an event to the audit JSONL file — safe JSON via jq.
 # Every entry gets a unique event_id for deduplication at the BigQuery layer.
 # Usage: audit_log "deny" "Blocked commit to main"
@@ -398,7 +413,7 @@ audit_log() {
   local hook_event
   hook_event="$(get_hook_event 2>/dev/null || echo "unknown")"
   local hook_name
-  hook_name="$(basename "${BASH_SOURCE[1]:-unknown}" .sh 2>/dev/null || echo "unknown")"
+  hook_name="$(_get_calling_hook)"
   local project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
   local timestamp
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")"
