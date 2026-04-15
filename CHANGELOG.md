@@ -1,5 +1,19 @@
 # hapai Changelog
 
+## v1.6.3 (2026-04-15) — Security: Close gh api Branch Deletion Bypass
+
+### 🔒 Security
+
+**Close `gh api` branch deletion bypass in `guard-branch.sh` (#48)**
+- `guard-branch.sh` protected branches via `git push/commit/merge/rebase` pattern matching, but `gh api repos/.../git/refs/heads/BRANCH -X DELETE` achieved the same result without being intercepted — a REST-layer bypass
+- Root cause: the `if: "Bash(git *)"` filter in `settings.hooks.json` prevented the hook from being invoked for `gh` commands at all
+- Extended `guard-branch.sh` to detect and deny `gh api .../git/refs/heads/BRANCH -X DELETE` and `--method DELETE` (case-insensitive), extracting the branch name from the URL and checking against `is_protected_branch()`
+- Added `blocklist_check` for the `gh api` path, consistent with the existing `git` path
+- Split `settings.hooks.json` `if` filter into two separate entries (`Bash(git *)` and `Bash(gh api*)`) instead of relying on unverified `|` syntax inside `Bash(...)` conditionals
+- 135/135 tests passing (+7 new cases: `-X DELETE`, `--method DELETE`, `-X delete` lowercase, `--method delete` lowercase, non-protected allow, GET read allow, `&&` chained deny)
+
+---
+
 ## v1.6.2 (2026-04-11) — Dashboard Drill-Down, Event Detail & BQ Parameterization
 
 ### ✅ Delivered

@@ -36,7 +36,7 @@ export default {
       note: 'Cada guard suporta o modo fail_open — defina como true para avisos suaves ou false para bloqueios rígidos.',
       link: 'Ver configuração completa →',
       guards: {
-        branchProtection: 'Bloqueia commits e pushes para main, master ou qualquer branch protegida.',
+        branchProtection: 'Bloqueia commits, pushes e exclusões via gh api em main, master ou qualquer branch protegida.',
         branchTaxonomy: 'Aplica convenções de nomenclatura: feat/, fix/, chore/, docs/, hotfix/.',
         branchRules: 'Valida descrições de branch e rastreamento de origem.',
         commitHygiene: 'Remove atribuições de IA: Co-Authored-By, "Generated with Claude".',
@@ -101,7 +101,7 @@ export default {
         heading: 'Guardrails',
         intro: 'Os guardrails bloqueiam violações antes da execução. Todos suportam fail_open:',
         guards: [
-          'Branch Protection — Commits/pushes em branches protegidas (main, master)',
+          'Branch Protection — Commits, pushes e exclusões gh api em branches protegidas (main, master)',
           'Branch Taxonomy — Aplica convenções de nomenclatura (feat/, fix/, chore/, etc.)',
           'Commit Hygiene — Bloqueia Co-Authored-By, menções a IA, "Generated with Claude"',
           'File Protection — Impede escrita em .env, lockfiles, arquivos de workflow CI',
