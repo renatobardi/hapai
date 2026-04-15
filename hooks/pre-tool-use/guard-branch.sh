@@ -26,9 +26,9 @@ fi
 #         gh api repos/.../git/refs/heads/BRANCH --method DELETE
 is_gh_api_branch_delete=0
 gh_api_branch=""
-if echo "$command" | grep -qE '(^|;|\||&&)\s*gh\s+api\s+\S+/git/refs/heads/[^[:space:]/]+.*(-X[[:space:]]+DELETE|--method[[:space:]]+DELETE)'; then
+if echo "$command" | grep -qiE '(^|;|\||&&)\s*gh\s+api\s+\S+/git/refs/heads/[^[:space:]/]+.*(-X[[:space:]]+DELETE|--method[[:space:]]+DELETE)'; then
   is_gh_api_branch_delete=1
-  gh_api_branch="$(echo "$command" | grep -oE '\S+/git/refs/heads/[^[:space:]/]+' | sed -E 's|.*/git/refs/heads/([^[:space:]/"]+)|\1|' | head -1)"
+  gh_api_branch="$(echo "$command" | grep -oiE '\S+/git/refs/heads/[^[:space:]/]+' | sed -E 's|.*/git/refs/heads/([^[:space:]/"]+)|\1|' | head -1)"
 fi
 
 [[ $is_git_write -eq 0 && $is_gh_api_branch_delete -eq 0 ]] && exit 0
@@ -37,8 +37,12 @@ fi
 enabled="$(config_get "guardrails.branch_protection.enabled" "true")"
 [[ "$enabled" != "true" ]] && allow
 
-# Block gh api deletion of protected branches
+# Block gh api deletion of protected or blocklisted branches
 if [[ $is_gh_api_branch_delete -eq 1 && -n "$gh_api_branch" ]]; then
+  if blocklist_check "$gh_api_branch" "branch" 2>/dev/null; then
+    state_increment "guard-branch.deny_count"
+    deny "hapai: Branch '$gh_api_branch' is in the temporary blocklist. Run 'hapai unblock $gh_api_branch' to remove."
+  fi
   if is_protected_branch "$gh_api_branch"; then
     state_increment "guard-branch.deny_count"
     deny "hapai: Remote branch deletion blocked — '$gh_api_branch' is a protected branch. The 'gh api -X DELETE' path bypasses git hooks. Delete non-protected branches only."
