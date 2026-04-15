@@ -21,11 +21,29 @@ is_git_write=0
 if echo "$command" | grep -qE '(^|;|\||&&)\s*git\s+(commit|push|merge|rebase)\b'; then
   is_git_write=1
 fi
-[[ $is_git_write -eq 0 ]] && exit 0
+# Detect gh api branch deletion bypass (REST-layer equivalent of git push --delete)
+# Covers: gh api repos/.../git/refs/heads/BRANCH -X DELETE
+#         gh api repos/.../git/refs/heads/BRANCH --method DELETE
+is_gh_api_branch_delete=0
+gh_api_branch=""
+if echo "$command" | grep -qE '(^|;|\||&&)\s*gh\s+api\s+\S+/git/refs/heads/[^[:space:]/]+.*(-X[[:space:]]+DELETE|--method[[:space:]]+DELETE)'; then
+  is_gh_api_branch_delete=1
+  gh_api_branch="$(echo "$command" | grep -oE '\S+/git/refs/heads/[^[:space:]/]+' | sed -E 's|.*/git/refs/heads/([^[:space:]/"]+)|\1|' | head -1)"
+fi
+
+[[ $is_git_write -eq 0 && $is_gh_api_branch_delete -eq 0 ]] && exit 0
 
 # Check if branch protection is enabled
 enabled="$(config_get "guardrails.branch_protection.enabled" "true")"
 [[ "$enabled" != "true" ]] && allow
+
+# Block gh api deletion of protected branches
+if [[ $is_gh_api_branch_delete -eq 1 && -n "$gh_api_branch" ]]; then
+  if is_protected_branch "$gh_api_branch"; then
+    state_increment "guard-branch.deny_count"
+    deny "hapai: Remote branch deletion blocked — '$gh_api_branch' is a protected branch. The 'gh api -X DELETE' path bypasses git hooks. Delete non-protected branches only."
+  fi
+fi
 
 # Get current branch
 branch="$(git_current_branch)"
