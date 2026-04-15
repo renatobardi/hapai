@@ -37,17 +37,12 @@ fi
 enabled="$(config_get "guardrails.branch_protection.enabled" "true")"
 [[ "$enabled" != "true" ]] && allow
 
-<<<<<<< HEAD
 # Block gh api deletion of protected or blocklisted branches
 if [[ $is_gh_api_branch_delete -eq 1 && -n "$gh_api_branch" ]]; then
   if blocklist_check "$gh_api_branch" "branch" 2>/dev/null; then
     state_increment "guard-branch.deny_count"
     deny "hapai: Branch '$gh_api_branch' is in the temporary blocklist. Run 'hapai unblock $gh_api_branch' to remove."
   fi
-=======
-# Block gh api deletion of protected branches
-if [[ $is_gh_api_branch_delete -eq 1 && -n "$gh_api_branch" ]]; then
->>>>>>> 87db2ba (fix(guard-branch): block gh api branch deletion bypass)
   if is_protected_branch "$gh_api_branch"; then
     state_increment "guard-branch.deny_count"
     deny "hapai: Remote branch deletion blocked — '$gh_api_branch' is a protected branch. The 'gh api -X DELETE' path bypasses git hooks. Delete non-protected branches only."

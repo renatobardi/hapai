@@ -161,7 +161,9 @@ assert_allowed "$output" "Allows gh api read (GET) on protected branch"
 # Test: gh api -X DELETE chained with && → deny
 output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo done && gh api repos/owner/repo/git/refs/heads/main -X DELETE"}}')"
 assert_blocked "$output" "Blocks gh api -X DELETE chained with && on protected branch"
+
 # ═══════════════════════════════════════════════════════════════════════════
+
 echo -e "\n${BOLD}guard-commit-msg.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
 
