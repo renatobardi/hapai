@@ -209,8 +209,9 @@ def load_jsonl_to_bigquery(
 def _merge_rows_by_event_id(rows: List[Dict], table_id: str) -> int:
     """
     Insert rows using BigQuery MERGE so rows with a known event_id are never duplicated.
-    Uses a VALUES clause built from the batch — no temp table needed for small batches.
-    Falls back to streaming insert for batches > 500 rows (MERGE SQL size limit).
+    Uses a VALUES clause built from the batch — no temp table needed.
+    For batches > 500 rows, splits into chunks of 500 and recurses.
+    Falls back to streaming insert only if the MERGE query itself fails (error fallback, not size fallback).
     Returns the number of rows inserted.
     """
     MERGE_BATCH_LIMIT = 500
@@ -225,8 +226,16 @@ def _merge_rows_by_event_id(rows: List[Dict], table_id: str) -> int:
     # Build MERGE SQL with inline VALUES
     # Each row becomes: ('event_id', TIMESTAMP('ts'), 'event', 'hook', ...)
     def _escape(s: str) -> str:
-        """Escape a string for safe inclusion in BigQuery SQL literals."""
-        return s.replace("\\", "\\\\").replace("'", "\\'")
+        """Escape a string for safe inclusion in BigQuery SQL string literals."""
+        if not isinstance(s, str):
+            s = str(s) if s is not None else ''
+        return (s
+            .replace("\\", "\\\\")    # backslash first (order matters)
+            .replace("'", "\\'")      # single quote
+            .replace("\n", "\\n")     # newline (common in error messages)
+            .replace("\r", "\\r")     # carriage return
+            .replace("\x00", "")      # null bytes not valid in BigQuery STRING
+        )
 
     value_rows = []
     for r in rows:

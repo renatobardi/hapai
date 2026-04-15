@@ -899,6 +899,13 @@ cmd_sync() {
   local total_lines
   total_lines="$(wc -l < "$audit_file" | tr -d '[:space:]')"
 
+  # Detect truncation/rotation: cursor is ahead of the file
+  if [[ "$total_lines" -lt "$last_line" ]]; then
+    log_warn "audit.jsonl truncated or rotated (cursor=$last_line, lines=$total_lines) — resetting cursor"
+    echo "0" > "$cursor_file"
+    last_line=0
+  fi
+
   if [[ "$total_lines" -le "$last_line" ]]; then
     log_info "No new audit entries since last sync (cursor: $last_line, total: $total_lines)"
     return 0
@@ -960,7 +967,11 @@ cmd_sync() {
 
   rm -f "$delta_file"
 
-  # Load into BigQuery
+  # Load into BigQuery via bq CLI (optional, fallback if Cloud Function not available)
+  # NOTE: bq load is an append operation (not idempotent). If this sync is a retry after
+  # GCS upload but before cursor update, duplicate rows may be inserted. The _dedup_cte()
+  # in dashboard queries mitigates overcounting, but storage bloat may occur. To ensure
+  # idempotent dedup, prefer the Cloud Function (GCS finalizeCreate trigger) instead.
   if command -v bq &>/dev/null; then
     local bq_table="${project_id}:hapai_dataset.events"
     log_info "Loading into BigQuery: $bq_table"
