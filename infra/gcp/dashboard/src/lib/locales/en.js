@@ -36,7 +36,7 @@ export default {
       note: 'Every guard supports fail_open mode — set to true for soft warnings, false for hard blocks.',
       link: 'See full configuration →',
       guards: {
-        branchProtection: 'Blocks commits and pushes to main, master, or any protected branch.',
+        branchProtection: 'Blocks commits, pushes, and gh api deletions on main, master, or any protected branch.',
         branchTaxonomy: 'Enforces naming conventions: feat/, fix/, chore/, docs/, hotfix/.',
         branchRules: 'Validates branch descriptions and origin tracking.',
         commitHygiene: 'Strips AI attribution: Co-Authored-By, "Generated with Claude".',
@@ -101,7 +101,7 @@ export default {
         heading: 'Guardrails',
         intro: 'Guardrails block violations before execution. All support fail_open:',
         guards: [
-          'Branch Protection — Commits/pushes to protected branches (main, master)',
+          'Branch Protection — Commits, pushes, and gh api deletions on protected branches (main, master)',
           'Branch Taxonomy — Enforces naming conventions (feat/, fix/, chore/, etc.)',
           'Commit Hygiene — Blocks Co-Authored-By, AI mentions, "Generated with Claude"',
           'File Protection — Prevents writes to .env, lockfiles, CI workflow files',

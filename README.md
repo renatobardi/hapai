@@ -54,7 +54,7 @@ hapai validate
 
 | Guardrail | What it prevents | Config key |
 |-----------|-----------------|-----------|
-| **Branch Protection** | Commits/pushes to protected branches (main, master, etc.) | `branch_protection.protected` |
+| **Branch Protection** | Commits/pushes/`gh api` deletions on protected branches (main, master, etc.) | `branch_protection.protected` |
 | **Branch Taxonomy** | Enforces naming conventions (feat/, fix/, chore/, etc.) | `branch_taxonomy.allowed_prefixes` |
 | **Branch Rules** | Validates description + origin branch | `branch_rules.enabled` |
 | **Commit Hygiene** | Co-Authored-By, AI mentions, "Generated with Claude" | `commit_hygiene.blocked_patterns` |

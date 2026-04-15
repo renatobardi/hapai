@@ -141,6 +141,35 @@ assert_allowed "$output" "Ignores non-git commands"
 output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/tmp/test"}}')"
 assert_allowed "$output" "Ignores non-Bash tools"
 
+# Test: gh api -X DELETE on protected branch main → deny
+cd "$MOCK_REPO" && git checkout main -q 2>/dev/null
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh api repos/owner/repo/git/refs/heads/main -X DELETE"}}')"
+assert_blocked "$output" "Blocks gh api -X DELETE on protected branch main"
+
+# Test: gh api --method DELETE on protected branch master → deny
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh api repos/owner/repo/git/refs/heads/master --method DELETE"}}')"
+assert_blocked "$output" "Blocks gh api --method DELETE on protected branch master"
+
+# Test: gh api -X DELETE on non-protected branch → allow
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh api repos/owner/repo/git/refs/heads/feat/old-branch -X DELETE"}}')"
+assert_allowed "$output" "Allows gh api DELETE on non-protected branch"
+
+# Test: gh api GET on protected branch (no DELETE) → allow
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh api repos/owner/repo/git/refs/heads/main"}}')"
+assert_allowed "$output" "Allows gh api read (GET) on protected branch"
+
+# Test: gh api -X DELETE chained with && → deny
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo done && gh api repos/owner/repo/git/refs/heads/main -X DELETE"}}')"
+assert_blocked "$output" "Blocks gh api -X DELETE chained with && on protected branch"
+
+# Test: gh api -X delete (lowercase) on protected branch → deny
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh api repos/owner/repo/git/refs/heads/main -X delete"}}')"
+assert_blocked "$output" "Blocks gh api -X delete (lowercase) on protected branch"
+
+# Test: gh api --method delete (lowercase) on protected branch → deny
+output="$(run_hook_check "pre-tool-use/guard-branch.sh" '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh api repos/owner/repo/git/refs/heads/main --method delete"}}')"
+assert_blocked "$output" "Blocks gh api --method delete (lowercase) on protected branch"
+
 # ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}guard-commit-msg.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
