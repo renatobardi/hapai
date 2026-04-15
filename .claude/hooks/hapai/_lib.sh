@@ -84,49 +84,6 @@ allow() {
   exit 0
 }
 
-# ─── Flow Coordination ──────────────────────────────────────────────────────
-
-# Returns 0 (true) if the calling hook should defer to flow-dispatcher.
-#
-# How it works:
-#   - flow-dispatcher.sh sets HAPAI_FLOW_EXECUTOR=1 in the environment BEFORE
-#     calling flow_run_step(), which execs hooks as subprocesses.
-#   - When a hook is executed by flow_run_step(), HAPAI_FLOW_EXECUTOR=1 is
-#     present → _is_flow_managed returns 1 (false) → hook runs normally.
-#   - When the same hook fires as a standalone Claude Code hook (registered in
-#     settings.hooks.json), HAPAI_FLOW_EXECUTOR is unset → if flows.enabled=true
-#     and this hook is in the active flow, _is_flow_managed returns 0 (true)
-#     → hook exits silently, preventing double-logging.
-#
-# Usage (in guard-*.sh, right after read_input):
-#   _is_flow_managed && exit 0
-_is_flow_managed() {
-  # If we're already inside a flow_run_step() invocation, do NOT skip.
-  # flow-dispatcher.sh exports HAPAI_FLOW_EXECUTOR=1 before each step.
-  [[ "${HAPAI_FLOW_EXECUTOR:-}" == "1" ]] && return 1
-
-  local enabled
-  enabled="$(config_get "flows.enabled" "false" 2>/dev/null)"
-  [[ "$enabled" != "true" ]] && return 1
-
-  local active_flow
-  active_flow="$(config_get "flows.active" "" 2>/dev/null)"
-  [[ -z "$active_flow" ]] && return 1
-
-  # Get calling hook's basename (BASH_SOURCE[1] is the guard-*.sh file)
-  local calling_hook
-  calling_hook="$(basename "${BASH_SOURCE[1]:-unknown}" .sh 2>/dev/null)"
-  [[ -z "$calling_hook" || "$calling_hook" == "unknown" ]] && return 1
-
-  # Check if calling hook appears in the active flow's steps
-  local step_hooks
-  step_hooks="$(config_get_flow_steps "$active_flow" 2>/dev/null | \
-    jq -r '.hook // empty' 2>/dev/null || true)"
-  [[ -z "$step_hooks" ]] && return 1
-
-  echo "$step_hooks" | grep -qxF "$calling_hook"
-}
-
 # ─── Configuration ──────────────────────────────────────────────────────────
 
 # Find hapai.yaml: project-local first, then global
@@ -369,26 +326,7 @@ config_get_list() {
 
 # ─── Audit Log ──────────────────────────────────────────────────────────────
 
-# Generate a unique event ID for deduplication across the pipeline.
-# Format: <epoch_ms>-<hook_basename>-<random4hex>
-# Stays pure-bash (no uuidgen dependency); collision probability ~1:65536 per ms per hook.
-_audit_event_id() {
-  local hook_name="${1:-unknown}"
-  local epoch_ms
-  # date %N gives nanoseconds on Linux; on macOS BSD date produces literal '3N' suffix (exits 0 but wrong output)
-  epoch_ms="$(date -u +%s%3N 2>/dev/null)"
-  # Validate output is purely numeric; macOS fallback needed if not
-  [[ ! "$epoch_ms" =~ ^[0-9]+$ ]] && \
-    epoch_ms="$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null)"
-  [[ ! "$epoch_ms" =~ ^[0-9]+$ ]] && \
-    epoch_ms="$(date -u +%s)000"
-  local rand
-  rand="$(printf '%04x' $((RANDOM % 65536)))"
-  echo "${epoch_ms}-${hook_name}-${rand}"
-}
-
 # Log an event to the audit JSONL file — safe JSON via jq.
-# Every entry gets a unique event_id for deduplication at the BigQuery layer.
 # Usage: audit_log "deny" "Blocked commit to main"
 audit_log() {
   local result="${1:-unknown}"
@@ -402,14 +340,11 @@ audit_log() {
   local project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
   local timestamp
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")"
-  local event_id
-  event_id="$(_audit_event_id "$hook_name")"
 
   # Safe JSON construction via jq (handles all special chars, tabs, control chars)
   # Pass reason directly to jq --arg to handle escaping (jq will limit length internally)
   {
     jq -n -c \
-      --arg event_id "$event_id" \
       --arg ts "$timestamp" \
       --arg event "$hook_event" \
       --arg hook "$hook_name" \
@@ -417,7 +352,7 @@ audit_log() {
       --arg result "$result" \
       --arg reason "${reason:0:500}" \
       --arg project "$project_dir" \
-      '{event_id: $event_id, ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
+      '{ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
   } >> "$HAPAI_AUDIT_LOG" 2>/dev/null || true
 }
 

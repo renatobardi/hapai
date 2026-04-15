@@ -8,9 +8,6 @@ source "${SCRIPT_DIR}/../_lib.sh"
 
 read_input
 
-# Skip if this hook is already being orchestrated by flow-dispatcher (avoids double-logging)
-_is_flow_managed && exit 0
-
 # Only care about Bash tool (defense-in-depth: 'if' filter also pre-screens)
 tool_name="$(get_tool_name)"
 [[ "$tool_name" != "Bash" ]] && exit 0
@@ -25,13 +22,11 @@ if echo "$command" | grep -qE '(^|;|\||&&)\s*git\s+(commit|push|merge|rebase)\b'
   is_git_write=1
 fi
 # Detect gh api branch deletion bypass (REST-layer equivalent of git push --delete)
-# Covers: gh api repos/.../git/refs/heads/BRANCH -X DELETE (space-separated)
-#         gh api repos/.../git/refs/heads/BRANCH -XDELETE (merged, POSIX short-option form)
+# Covers: gh api repos/.../git/refs/heads/BRANCH -X DELETE
 #         gh api repos/.../git/refs/heads/BRANCH --method DELETE
-#         gh api repos/.../git/refs/heads/BRANCH --method=DELETE
 is_gh_api_branch_delete=0
 gh_api_branch=""
-if echo "$command" | grep -qiE '(^|;|\||&&)\s*gh\s+api\s+\S+/git/refs/heads/[^[:space:]/]+.*(-X[[:space:]]*DELETE|-XDELETE|--method[[:space:]]*DELETE|--method=DELETE)'; then
+if echo "$command" | grep -qiE '(^|;|\||&&)\s*gh\s+api\s+\S+/git/refs/heads/[^[:space:]/]+.*(-X[[:space:]]+DELETE|--method[[:space:]]+DELETE)'; then
   is_gh_api_branch_delete=1
   gh_api_branch="$(echo "$command" | grep -oiE '\S+/git/refs/heads/[^[:space:]/]+' | sed -E 's|.*/git/refs/heads/([^[:space:]/"]+)|\1|' | head -1)"
 fi

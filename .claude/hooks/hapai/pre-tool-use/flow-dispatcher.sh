@@ -68,16 +68,8 @@ while IFS= read -r step_json; do
 
   hook_path="${HAPAI_HOOK_ROOT}/pre-tool-use/${hook_name}.sh"
 
-  # Signal to the hook subprocess that it is running inside flow-dispatcher,
-  # not as a standalone settings.json hook. This prevents _is_flow_managed()
-  # from short-circuiting the hook and causing the deny to be swallowed.
-  export HAPAI_FLOW_EXECUTOR=1
-
   # flow_run_step is defined in _lib.sh — sets _FLOW_DENIED/_FLOW_WARNED/_FLOW_WARNINGS
   flow_run_step "$hook_path" "$gate"
-
-  # Unset after each step so it doesn't leak into non-flow subprocesses
-  unset HAPAI_FLOW_EXECUTOR
 
   # Hard denial — stop chain immediately
   if [[ $_FLOW_DENIED -eq 1 ]]; then

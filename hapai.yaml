@@ -1,0 +1,249 @@
+# hapai.yaml — Guardrails configuration
+# Copy this file as hapai.yaml in your project root to customize per project.
+# Values here are the defaults used when no project config exists.
+#
+# Docs: https://github.com/renatobardi/hapai
+
+version: "1.0"
+risk_tier: medium  # low | medium | high | critical
+
+# ─── Guardrails (PreToolUse — block before execution) ───────────────────────
+
+guardrails:
+  branch_protection:
+    enabled: true
+    protected: [main, master]
+    fail_open: false
+
+  commit_hygiene:
+    enabled: true
+    blocked_patterns:
+      - "Co-Authored-By:"
+      - "Generated with Claude"
+      - "noreply@anthropic.com"
+      - "Claude Code"
+      - "Anthropic"
+    fail_open: false
+
+  file_protection:
+    enabled: true
+    protected:
+      - ".env"
+      - ".env.*"
+      - "*.lock"
+      - "package-lock.json"
+      - "pnpm-lock.yaml"
+      - "poetry.lock"
+      - "uv.lock"
+      - ".github/workflows/*"
+    unprotected:
+      - ".env.example"
+      - ".env.sample"
+    fail_open: false
+
+  command_safety:
+    enabled: true
+    blocked:
+      - "rm -rf"
+      - "git push --force"
+      - "git push -f"
+      - "git reset --hard"
+      - "DROP TABLE"
+      - "DROP DATABASE"
+      - "TRUNCATE"
+      - "chmod 777"
+    fail_open: false
+
+  blast_radius:
+    enabled: true
+    max_files: 10
+    max_packages: 2
+    fail_open: true  # warn but don't block
+
+  uncommitted_changes:
+    enabled: true
+    fail_open: true  # warn but don't block
+
+  pr_review:
+    enabled: false               # opt-in: requires 'claude' CLI installed and authenticated
+    model: "claude-haiku-4-5-20251001"  # model used for background review agent
+    fail_open: false             # false = deny push on issues; true = warn only
+    review_timeout_seconds: 300  # treat a pending review as stale after 5 minutes
+    max_diff_chars: 8000         # truncate diff sent to the model (token cost guard)
+    base_branch: ""              # base branch for diff (auto-detect main/master if empty)
+    auto_fix:
+      enabled: false             # opt-in: auto-fix issues before blocking
+      model: "claude-sonnet-4-6" # more capable model for applying fixes
+      max_fix_attempts: 2        # max rounds of fix → re-review → fix
+      severities:                # which severity levels to auto-fix
+        - critical
+        - high
+        - medium
+        - low
+
+  branch_taxonomy:
+    enabled: true
+    allowed_prefixes:
+      - feat
+      - fix
+      - chore
+      - docs
+      - refactor
+      - test
+      - perf
+      - style
+      - ci
+      - build
+      - release
+      - hotfix
+    require_description: true   # require text after prefix/ (kebab-case)
+    fail_open: false             # false = block; true = warn only
+
+  git_workflow:
+    enabled: false               # disabled by default — opt in per project
+    model: trunk                 # trunk | gitflow
+    fail_open: true              # true = warn (recommended for gradual adoption)
+    trunk:
+      max_branch_age_days: 7     # warn if branch is older than N days on commit
+      require_up_to_date: true   # warn if branch is behind main before push
+
+# ─── Automation (PostToolUse — run after execution) ─────────────────────────
+
+automation:
+  auto_checkpoint:
+    enabled: false
+    squash_on_stop: true
+    commit_prefix: "checkpoint:"
+
+  auto_format:
+    enabled: false
+    python: "ruff format {file}"
+    javascript: "prettier --write {file}"
+    on_extensions: [".py", ".ts", ".tsx", ".js", ".jsx", ".svelte", ".css"]
+
+  auto_lint:
+    enabled: false
+    python: "ruff check {file}"
+    javascript: "eslint {file}"
+
+# ─── Observability ──────────────────────────────────────────────────────────
+
+observability:
+  audit_log:
+    enabled: true
+    path: "~/.hapai/audit.jsonl"
+    retention_days: 30
+
+  state:
+    enabled: true
+    path: "~/.hapai/state/"
+
+  require_tests:
+    enabled: false         # enable per-project for test enforcement
+    test_commands: ["vitest", "pytest", "jest", "mocha", "cargo test", "go test"]
+    fail_open: true        # true = warn, false = block session completion
+
+  backup_transcripts:
+    enabled: true          # save transcripts before context compaction
+    retention_days: 30
+
+  notifications:
+    sound_enabled: false   # play sound when Claude needs input
+    sound_command: ""      # custom command (leave empty for platform default)
+
+  auto_allow_readonly:
+    enabled: false         # auto-approve Read/Glob/Grep and safe bash commands
+
+# ─── Intelligence (Phase 5 — session awareness) ────────────────────────────
+
+intelligence:
+  production_warning:
+    enabled: true          # warn when prompts mention prod/deploy/release
+    keywords: ["prod", "production", "deploy", "deployment", "--prod", "release", "hotfix", "rollback"]
+
+  load_context:
+    enabled: false         # load git status, TODOs, issues at session start
+    scan_todos: true       # scan codebase for TODO/FIXME
+    scan_issues: false     # query GitHub issues (requires gh CLI)
+
+  audit_trail:
+    enabled: false         # log every tool execution to audit-trail.jsonl
+
+  cost_tracker:
+    enabled: false         # estimate session cost and warn on thresholds
+    max_tool_calls: 200    # warn if session exceeds N tool calls
+    max_cost_cents: 500    # warn if estimated cost exceeds (in cents)
+
+# ─── Hook timeouts (seconds) ───────────────────────────────────────────────
+
+hooks:
+  timeouts:
+    pre_tool_use: 7
+    post_tool_use: 5
+    stop: 10
+    pre_compact: 10
+
+# ─── Hook Flows (sequential chains with conditional gates) ──────────────────
+# Enable this to use flow-dispatcher.sh instead of individual hooks.
+# Set flows.active to the name of the flow you want to run.
+
+flows:
+  enabled: false          # set true to activate flow-dispatcher
+  active: pre_commit_review
+
+  pre_commit_review:
+    event: PreToolUse
+    matcher: "Bash(git commit*)"
+    steps:
+      - hook: guard-branch
+        gate: block         # deny stops the chain
+      - hook: guard-commit-msg
+        gate: block
+      - hook: guard-blast-radius
+        gate: warn          # deny becomes a warning, chain continues
+
+  write_safety:
+    event: PreToolUse
+    matcher: "Write|Edit|MultiEdit"
+    steps:
+      - hook: guard-files
+        gate: block
+      - hook: guard-uncommitted
+        gate: warn
+
+# ─── Blocklist (temporary pattern blocks) ───────────────────────────────────
+# Managed via: hapai block <pattern> --for <duration> --type <type>
+
+blocklist:
+  enabled: true
+
+# ─── Cooldown (escalate fail_open to fail_closed after repeated denials) ────
+# After threshold denials in window_minutes, hook enters cooldown for cooldown_minutes.
+
+cooldown:
+  enabled: false
+  guard-blast-radius:
+    threshold: 3
+    window_minutes: 5
+    cooldown_minutes: 20
+  guard-uncommitted:
+    threshold: 5
+    window_minutes: 10
+    cooldown_minutes: 30
+
+# ─── Export targets ─────────────────────────────────────────────────────────
+
+export:
+  targets: [claude, cursor, copilot]
+
+# ─── Cloud Logging (v1.3 — Dashboard) ───────────────────────────────────────
+
+gcp:
+  enabled: false                    # set true to enable GCP sync
+  project_id: ""                    # GCP project ID (e.g., hapai-oute)
+  bucket: ""                        # Cloud Storage bucket (e.g., hapai-audit-username)
+  region: "us-east1"                # GCP region
+  retention_days: 90                # BigQuery partition expiration
+  auto_sync:
+    enabled: false                  # Claude Code: upload audit.jsonl at session end (stop hook)
+                                    # Other tools: hapai install --git-hooks (post-commit)

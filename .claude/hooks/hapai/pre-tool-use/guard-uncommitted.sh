@@ -10,9 +10,6 @@ source "${SCRIPT_DIR}/../_lib.sh"
 
 read_input
 
-# Skip if this hook is already being orchestrated by flow-dispatcher (avoids double-logging)
-_is_flow_managed && exit 0
-
 tool_name="$(get_tool_name)"
 case "$tool_name" in
   Write|Edit|MultiEdit) ;;

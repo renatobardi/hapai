@@ -6,59 +6,53 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/flow-dispatcher.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/flow-dispatcher.sh",
             "timeout": 7
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-branch-taxonomy.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-branch-taxonomy.sh",
             "timeout": 7,
             "if": "Bash(git *)"
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-git-workflow.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-git-workflow.sh",
             "timeout": 7,
             "if": "Bash(git *)"
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-branch.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-branch.sh",
             "timeout": 7,
             "if": "Bash(git *)"
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-branch.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-branch.sh",
             "timeout": 7,
             "if": "Bash(gh api*)"
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-branch.sh",
-            "timeout": 7,
-            "if": "Bash(gh api*)"
-          },
-          {
-            "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-commit-msg.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-commit-msg.sh",
             "timeout": 7,
             "if": "Bash(git commit*)"
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-destructive.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-destructive.sh",
             "timeout": 7
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-blast-radius.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-blast-radius.sh",
             "timeout": 7,
             "if": "Bash(git commit*)"
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-pr-review.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-pr-review.sh",
             "timeout": 7
           }
         ]
@@ -68,12 +62,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-files.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-files.sh",
             "timeout": 7
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-tool-use/guard-uncommitted.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-tool-use/guard-uncommitted.sh",
             "timeout": 7
           }
         ]
@@ -85,17 +79,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/post-tool-use/auto-format.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/post-tool-use/auto-format.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/post-tool-use/auto-lint.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/post-tool-use/auto-lint.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/post-tool-use/auto-checkpoint.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/post-tool-use/auto-checkpoint.sh",
             "timeout": 5
           }
         ]
@@ -105,7 +99,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/post-tool-use/audit-trail.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/post-tool-use/audit-trail.sh",
             "timeout": 3
           }
         ]
@@ -115,7 +109,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/post-tool-use/pr-review-trigger.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/post-tool-use/pr-review-trigger.sh",
             "timeout": 5
           }
         ]
@@ -127,22 +121,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/stop/squash-checkpoints.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/stop/squash-checkpoints.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/stop/require-tests.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/stop/require-tests.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/stop/cost-tracker.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/stop/cost-tracker.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/stop/auto-sync.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/stop/auto-sync.sh",
             "timeout": 10
           }
         ]
@@ -154,7 +148,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/user-prompt-submit/warn-production.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/user-prompt-submit/warn-production.sh",
             "timeout": 5
           }
         ]
@@ -166,7 +160,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/session-start/load-context.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/session-start/load-context.sh",
             "timeout": 10
           }
         ]
@@ -178,7 +172,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/pre-compact/backup-transcript.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/pre-compact/backup-transcript.sh",
             "timeout": 10
           }
         ]
@@ -190,7 +184,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/notification/sound-alert.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/notification/sound-alert.sh",
             "timeout": 5
           }
         ]
@@ -202,7 +196,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash __HAPAI_HOOKS__/permission-request/auto-allow-readonly.sh",
+            "command": "bash /Users/bardi/Projetos/hapai/.claude/hooks/hapai/permission-request/auto-allow-readonly.sh",
             "timeout": 5
           }
         ]
