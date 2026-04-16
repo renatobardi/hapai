@@ -188,7 +188,7 @@ hooks:
 # Set flows.active to the name of the flow you want to run.
 
 flows:
-  enabled: false          # set true to activate flow-dispatcher
+  enabled: true          # set true to activate flow-dispatcher
   active: pre_commit_review
 
   pre_commit_review:
@@ -221,7 +221,7 @@ blocklist:
 # After threshold denials in window_minutes, hook enters cooldown for cooldown_minutes.
 
 cooldown:
-  enabled: false
+  enabled: true
   guard-blast-radius:
     threshold: 3
     window_minutes: 5
@@ -239,9 +239,9 @@ export:
 # ─── Cloud Logging (v1.3 — Dashboard) ───────────────────────────────────────
 
 gcp:
-  enabled: false                    # set true to enable GCP sync
-  project_id: ""                    # GCP project ID (e.g., hapai-oute)
-  bucket: ""                        # Cloud Storage bucket (e.g., hapai-audit-username)
+  enabled: true                    # set true to enable GCP sync
+  project_id: "hapai-oute"                    # GCP project ID (e.g., hapai-oute)
+  bucket: "hapai-audit-bardi"                        # Cloud Storage bucket (e.g., hapai-audit-username)
   region: "us-east1"                # GCP region
   retention_days: 90                # BigQuery partition expiration
   auto_sync:
