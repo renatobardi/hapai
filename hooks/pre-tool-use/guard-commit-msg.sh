@@ -68,7 +68,11 @@ for pattern in "${DEFAULT_PATTERNS[@]}"; do
   pattern_lower="$(echo "$pattern" | tr '[:upper:]' '[:lower:]')"
   if echo "$commit_msg_lower" | grep -qi "$pattern_lower" 2>/dev/null; then
     state_increment "guard-commit-msg.deny_count"
-    deny "hapai: Commit blocked — contains forbidden pattern '$pattern'. Remove AI attribution from the commit message."
+    ctx="$(_build_context \
+      "forbidden_pattern=$pattern" \
+      "pattern_source=hardcoded" \
+      "commit_msg_length=${#commit_msg}")"
+    deny "hapai: Commit blocked — contains forbidden pattern '$pattern'. Remove AI attribution from the commit message." "$ctx"
   fi
 done
 
@@ -78,7 +82,11 @@ while IFS= read -r pattern; do
   pattern_lower="$(echo "$pattern" | tr '[:upper:]' '[:lower:]')"
   if echo "$commit_msg_lower" | grep -qi "$pattern_lower" 2>/dev/null; then
     state_increment "guard-commit-msg.deny_count"
-    deny "hapai: Commit blocked — contains forbidden pattern '$pattern'. Remove it from the commit message."
+    ctx="$(_build_context \
+      "forbidden_pattern=$pattern" \
+      "pattern_source=config" \
+      "commit_msg_length=${#commit_msg}")"
+    deny "hapai: Commit blocked — contains forbidden pattern '$pattern'. Remove it from the commit message." "$ctx"
   fi
 done <<< "$(config_get_list "guardrails.commit_hygiene.blocked_patterns")"
 

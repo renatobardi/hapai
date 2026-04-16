@@ -52,19 +52,21 @@ get_hook_event() {
 
 # Deny the tool call with a reason message.
 # Uses exit code 2 + stderr (official Claude Code blocking mechanism).
-# Usage: deny "Cannot commit to main branch"
+# Usage: deny "Cannot commit to main branch" [context_json]
 deny() {
   local reason="${1:-Blocked by hapai guardrail}"
-  audit_log "deny" "$reason"
+  local context_json="${2:-}"
+  audit_log "deny" "$reason" "$context_json"
   echo "$reason" >&2
   exit 2
 }
 
 # Allow with an optional warning message (informational, non-blocking).
 # Uses jq for safe JSON construction (no injection risk).
-# Usage: warn "This commit touches 15 files across 3 packages"
+# Usage: warn "This commit touches 15 files across 3 packages" [context_json]
 warn() {
   local message="${1:-}"
+  local context_json="${2:-}"
   if [[ -n "$message" ]]; then
     local hook_event
     hook_event="$(get_hook_event 2>/dev/null || echo "PreToolUse")"
@@ -73,7 +75,7 @@ warn() {
       --arg event "$hook_event" \
       --arg ctx "$message" \
       '{hookSpecificOutput: {hookEventName: $event, permissionDecision: "allow", additionalContext: $ctx}}'
-    audit_log "warn" "$message"
+    audit_log "warn" "$message" "$context_json"
   fi
   exit 0
 }
@@ -387,38 +389,116 @@ _audit_event_id() {
   echo "${epoch_ms}-${hook_name}-${rand}"
 }
 
+# Resolve the calling hook script name by walking BASH_SOURCE[] and
+# skipping _lib.sh entries (which appear when called via allow/deny/warn wrappers).
+# Returns the basename without .sh extension, e.g. "guard-branch".
+_get_calling_hook() {
+  local i src
+  for i in "${!BASH_SOURCE[@]}"; do
+    src="$(basename "${BASH_SOURCE[$i]:-}" .sh 2>/dev/null)"
+    # Skip _lib itself and empty/unknown entries
+    [[ -z "$src" || "$src" == "_lib" ]] && continue
+    echo "$src"
+    return
+  done
+  echo "unknown"
+}
+
 # Log an event to the audit JSONL file — safe JSON via jq.
 # Every entry gets a unique event_id for deduplication at the BigQuery layer.
 # Usage: audit_log "deny" "Blocked commit to main"
+# Usage with context: audit_log "deny" "reason" '{"target_branch":"main","git_op":"commit"}'
 audit_log() {
   local result="${1:-unknown}"
   local reason="${2:-}"
+  local context_json="${3:-}"   # optional structured context (valid JSON object or empty)
   local tool_name
   tool_name="$(get_tool_name 2>/dev/null || echo "unknown")"
   local hook_event
   hook_event="$(get_hook_event 2>/dev/null || echo "unknown")"
   local hook_name
-  hook_name="$(basename "${BASH_SOURCE[1]:-unknown}" .sh 2>/dev/null || echo "unknown")"
+  hook_name="$(_get_calling_hook)"
   local project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
   local timestamp
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")"
   local event_id
   event_id="$(_audit_event_id "$hook_name")"
 
+  # Validate context_json is a valid JSON object (or null it out for safety)
+  if [[ -n "$context_json" ]]; then
+    if ! echo "$context_json" | jq -e 'type == "object"' &>/dev/null; then
+      context_json=""
+    fi
+  fi
+
   # Safe JSON construction via jq (handles all special chars, tabs, control chars)
-  # Pass reason directly to jq --arg to handle escaping (jq will limit length internally)
+  # _context field carries structured hook-specific data for BigQuery analytics
   {
-    jq -n -c \
-      --arg event_id "$event_id" \
-      --arg ts "$timestamp" \
-      --arg event "$hook_event" \
-      --arg hook "$hook_name" \
-      --arg tool "$tool_name" \
-      --arg result "$result" \
-      --arg reason "${reason:0:500}" \
-      --arg project "$project_dir" \
-      '{event_id: $event_id, ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
+    if [[ -n "$context_json" ]]; then
+      jq -n -c \
+        --arg event_id "$event_id" \
+        --arg ts "$timestamp" \
+        --arg event "$hook_event" \
+        --arg hook "$hook_name" \
+        --arg tool "$tool_name" \
+        --arg result "$result" \
+        --arg reason "${reason:0:500}" \
+        --arg project "$project_dir" \
+        --argjson context "$context_json" \
+        '{event_id: $event_id, ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project, _context: $context}'
+    else
+      jq -n -c \
+        --arg event_id "$event_id" \
+        --arg ts "$timestamp" \
+        --arg event "$hook_event" \
+        --arg hook "$hook_name" \
+        --arg tool "$tool_name" \
+        --arg result "$result" \
+        --arg reason "${reason:0:500}" \
+        --arg project "$project_dir" \
+        '{event_id: $event_id, ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
+    fi
   } >> "$HAPAI_AUDIT_LOG" 2>/dev/null || true
+}
+
+# ─── Context helpers ─────────────────────────────────────────────────────────
+
+# Build a JSON context object from key=value pairs.
+# Usage: _build_context "git_op=commit" "target_branch=main" "protection_type=protected"
+# Returns a compact JSON object string suitable for passing to audit_log as $3.
+_build_context() {
+  local obj="{}"
+  local pair key value
+  for pair in "$@"; do
+    key="${pair%%=*}"
+    value="${pair#*=}"
+    # Sanitize key: only alphanumeric and underscore allowed
+    [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] && continue
+    obj="$(echo "$obj" | jq -c --arg k "$key" --arg v "$value" '. + {($k): $v}'  2>/dev/null)" || continue
+  done
+  echo "$obj"
+}
+
+# Like _build_context but for integer values.
+# Usage: _ctx_int "files_count=15" "packages_count=3"
+_ctx_int() {
+  local obj="{}"
+  local pair key value
+  for pair in "$@"; do
+    key="${pair%%=*}"
+    value="${pair#*=}"
+    [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] && continue
+    [[ ! "$value" =~ ^-?[0-9]+$ ]] && continue
+    obj="$(echo "$obj" | jq -c --arg k "$key" --argjson v "$value" '. + {($k): $v}' 2>/dev/null)" || continue
+  done
+  echo "$obj"
+}
+
+# Merge two JSON objects into one.
+# Usage: _ctx_merge "$obj1" "$obj2"
+_ctx_merge() {
+  local a="${1:-{}}" b="${2:-{}}"
+  jq -cn --argjson a "$a" --argjson b "$b" '$a + $b' 2>/dev/null || echo "{}"
 }
 
 # ─── State Management ───────────────────────────────────────────────────────

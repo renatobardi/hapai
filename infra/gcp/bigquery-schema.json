@@ -1,38 +1,196 @@
 [
   {
+    "name": "event_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Unique deduplication key: <epoch_ms>-<hook>-<rand4hex>"
+  },
+  {
     "name": "ts",
     "type": "TIMESTAMP",
     "mode": "REQUIRED",
-    "description": "Event timestamp (RFC 3339 format)"
+    "description": "Event timestamp (RFC 3339 UTC)"
   },
   {
     "name": "event",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "Event type: allow, deny, warn"
+    "description": "Hook event type: PreToolUse, PostToolUse, etc."
   },
   {
     "name": "hook",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "Hook name (guard-branch, guard-files, etc)"
+    "description": "Guard script name (guard-branch, guard-files, guard-destructive, etc.)"
   },
   {
     "name": "tool",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "Tool name (Bash, Read, Write, Edit, etc)"
+    "description": "Claude Code tool name (Bash, Read, Write, Edit, etc.)"
   },
   {
     "name": "result",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "Deny/warn reason or result details"
+    "description": "Guardrail outcome: deny, warn, allow, error"
+  },
+  {
+    "name": "reason",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Human-readable message shown to the user on deny/warn"
   },
   {
     "name": "project",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "Git repository root path"
+    "description": "Git repository root path (CLAUDE_PROJECT_DIR or cwd)"
+  },
+  {
+    "name": "context",
+    "type": "RECORD",
+    "mode": "NULLABLE",
+    "description": "Structured context captured by each guard — enables per-hook analytics",
+    "fields": [
+      {
+        "name": "git_op",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Git subcommand: commit, push, merge, rebase, gh_api_delete"
+      },
+      {
+        "name": "target_branch",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Branch name that triggered the guard (guard-branch)"
+      },
+      {
+        "name": "protection_type",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Why the branch was blocked: protected, blocklist (guard-branch)"
+      },
+      {
+        "name": "enforcement_method",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "How the operation was attempted: git_cli, gh_api (guard-branch)"
+      },
+      {
+        "name": "filename",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Basename of the blocked file (guard-files)"
+      },
+      {
+        "name": "file_category",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "File protection category: environment, lockfile, ci_workflow, custom_pattern, blocklist (guard-files)"
+      },
+      {
+        "name": "file_fullpath",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Resolved absolute path of blocked file (guard-files)"
+      },
+      {
+        "name": "bypass_method",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "How file write was attempted: none, bash_redirect, scripting_api (guard-files)"
+      },
+      {
+        "name": "protection_source",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Where the protection rule came from: hardcoded, config, blocklist (guard-files)"
+      },
+      {
+        "name": "was_symlink",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Whether a symlink bypass was detected: true/false (guard-files)"
+      },
+      {
+        "name": "matched_pattern",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Pattern that triggered the block (guard-files custom, guard-commit-msg, guard-destructive)"
+      },
+      {
+        "name": "risk_category",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Type of destructive risk: filesystem, git, database, system, self_protection (guard-destructive)"
+      },
+      {
+        "name": "command_preview",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "First 120 chars of blocked command (guard-destructive)"
+      },
+      {
+        "name": "files_staged_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "Number of files staged at time of block (guard-blast-radius)"
+      },
+      {
+        "name": "packages_touched_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "Number of monorepo packages touched (guard-blast-radius)"
+      },
+      {
+        "name": "max_files_threshold",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "Configured file count threshold (guard-blast-radius)"
+      },
+      {
+        "name": "max_packages_threshold",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "Configured package count threshold (guard-blast-radius)"
+      },
+      {
+        "name": "packages_list",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Comma-separated list of packages touched (guard-blast-radius)"
+      },
+      {
+        "name": "was_cooldown_escalation",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Whether cooldown escalated warn→block: true/false (guard-blast-radius)"
+      },
+      {
+        "name": "enforcement",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Action taken: warn or block (guard-blast-radius)"
+      },
+      {
+        "name": "forbidden_pattern",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "The AI attribution pattern that triggered the block (guard-commit-msg)"
+      },
+      {
+        "name": "pattern_source",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Where blocked pattern came from: hardcoded, config (guard-commit-msg)"
+      },
+      {
+        "name": "commit_msg_length",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "Character length of the commit message (guard-commit-msg)"
+      }
+    ]
   }
 ]
