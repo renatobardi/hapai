@@ -438,6 +438,7 @@ CI runs `bash tests/run-tests.sh` on both Ubuntu and macOS (see `.github/workflo
 
 Add tests for any new feature or bug fix.
 
+
 <!-- hapai:start -->
 ## Hapai Guardrails (enforced by hooks)
 
