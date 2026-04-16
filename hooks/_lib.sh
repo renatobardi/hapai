@@ -405,9 +405,11 @@ _get_calling_hook() {
 # Log an event to the audit JSONL file — safe JSON via jq.
 # Every entry gets a unique event_id for deduplication at the BigQuery layer.
 # Usage: audit_log "deny" "Blocked commit to main"
+# Usage with context: audit_log "deny" "reason" '{"target_branch":"main","git_op":"commit"}'
 audit_log() {
   local result="${1:-unknown}"
   local reason="${2:-}"
+  local context_json="${3:-}"   # optional structured context (valid JSON object or empty)
   local tool_name
   tool_name="$(get_tool_name 2>/dev/null || echo "unknown")"
   local hook_event
@@ -420,20 +422,81 @@ audit_log() {
   local event_id
   event_id="$(_audit_event_id "$hook_name")"
 
+  # Validate context_json is a valid JSON object (or null it out for safety)
+  if [[ -n "$context_json" ]]; then
+    if ! echo "$context_json" | jq -e 'type == "object"' &>/dev/null; then
+      context_json=""
+    fi
+  fi
+
   # Safe JSON construction via jq (handles all special chars, tabs, control chars)
-  # Pass reason directly to jq --arg to handle escaping (jq will limit length internally)
+  # _context field carries structured hook-specific data for BigQuery analytics
   {
-    jq -n -c \
-      --arg event_id "$event_id" \
-      --arg ts "$timestamp" \
-      --arg event "$hook_event" \
-      --arg hook "$hook_name" \
-      --arg tool "$tool_name" \
-      --arg result "$result" \
-      --arg reason "${reason:0:500}" \
-      --arg project "$project_dir" \
-      '{event_id: $event_id, ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
+    if [[ -n "$context_json" ]]; then
+      jq -n -c \
+        --arg event_id "$event_id" \
+        --arg ts "$timestamp" \
+        --arg event "$hook_event" \
+        --arg hook "$hook_name" \
+        --arg tool "$tool_name" \
+        --arg result "$result" \
+        --arg reason "${reason:0:500}" \
+        --arg project "$project_dir" \
+        --argjson context "$context_json" \
+        '{event_id: $event_id, ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project, _context: $context}'
+    else
+      jq -n -c \
+        --arg event_id "$event_id" \
+        --arg ts "$timestamp" \
+        --arg event "$hook_event" \
+        --arg hook "$hook_name" \
+        --arg tool "$tool_name" \
+        --arg result "$result" \
+        --arg reason "${reason:0:500}" \
+        --arg project "$project_dir" \
+        '{event_id: $event_id, ts: $ts, event: $event, hook: $hook, tool: $tool, result: $result, reason: $reason, project: $project}'
+    fi
   } >> "$HAPAI_AUDIT_LOG" 2>/dev/null || true
+}
+
+# ─── Context helpers ─────────────────────────────────────────────────────────
+
+# Build a JSON context object from key=value pairs.
+# Usage: _build_context "git_op=commit" "target_branch=main" "protection_type=protected"
+# Returns a compact JSON object string suitable for passing to audit_log as $3.
+_build_context() {
+  local obj="{}"
+  local pair key value
+  for pair in "$@"; do
+    key="${pair%%=*}"
+    value="${pair#*=}"
+    # Sanitize key: only alphanumeric and underscore allowed
+    [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] && continue
+    obj="$(echo "$obj" | jq -c --arg k "$key" --arg v "$value" '. + {($k): $v}'  2>/dev/null)" || continue
+  done
+  echo "$obj"
+}
+
+# Like _build_context but for integer values.
+# Usage: _ctx_int "files_count=15" "packages_count=3"
+_ctx_int() {
+  local obj="{}"
+  local pair key value
+  for pair in "$@"; do
+    key="${pair%%=*}"
+    value="${pair#*=}"
+    [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] && continue
+    [[ ! "$value" =~ ^-?[0-9]+$ ]] && continue
+    obj="$(echo "$obj" | jq -c --arg k "$key" --argjson v "$value" '. + {($k): $v}' 2>/dev/null)" || continue
+  done
+  echo "$obj"
+}
+
+# Merge two JSON objects into one.
+# Usage: _ctx_merge "$obj1" "$obj2"
+_ctx_merge() {
+  local a="${1:-{}}" b="${2:-{}}"
+  jq -cn --argjson a "$a" --argjson b "$b" '$a + $b' 2>/dev/null || echo "{}"
 }
 
 # ─── State Management ───────────────────────────────────────────────────────

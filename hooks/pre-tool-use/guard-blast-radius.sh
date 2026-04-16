@@ -39,15 +39,23 @@ max_packages="$(config_get "guardrails.blast_radius.max_packages" "2")"
 fail_open="$(config_get "guardrails.blast_radius.fail_open" "true")"
 
 # Cooldown: if repeated warnings occurred, escalate to fail_closed temporarily
+was_cooldown_escalation="false"
 if cooldown_active "guard-blast-radius" 2>/dev/null; then
   fail_open="false"
+  was_cooldown_escalation="true"
 fi
 
 warnings=""
+triggered_files=0
+triggered_packages=0
+package_dirs=""
+package_count=0
+package_list=""
 
 # Check file count
 if [[ "$file_count" -gt "$max_files" ]]; then
   warnings="⚠️ Blast radius: $file_count files staged (threshold: $max_files)."
+  triggered_files=1
 fi
 
 # Check package/directory spread (monorepo awareness)
@@ -59,7 +67,8 @@ if [[ -n "$staged_files" ]]; then
     package_count="$(echo "$package_dirs" | wc -l | tr -d ' ')"
 
     if [[ "$package_count" -gt "$max_packages" ]]; then
-      package_list="$(echo "$package_dirs" | tr '\n' ', ' | sed 's/,$//')"
+      package_list="$(echo "$package_dirs" | tr '\n' ',' | sed 's/,$//')"
+      triggered_packages=1
       if [[ -n "$warnings" ]]; then
         warnings="$warnings Also touches $package_count packages ($package_list)."
       else
@@ -74,10 +83,22 @@ if [[ -n "$warnings" ]]; then
   state_increment "guard-blast-radius.warn_count"
   cooldown_record "guard-blast-radius" 2>/dev/null || true
 
+  # Build structured context
+  ctx_str="{}"
+  ctx_str="$(_ctx_merge "$ctx_str" "$(_ctx_int \
+    "files_staged_count=$file_count" \
+    "packages_touched_count=$package_count" \
+    "max_files_threshold=$max_files" \
+    "max_packages_threshold=$max_packages")")"
+  ctx_str="$(_ctx_merge "$ctx_str" "$(_build_context \
+    "was_cooldown_escalation=$was_cooldown_escalation" \
+    "enforcement=$([ "$fail_open" == "true" ] && echo warn || echo block)" \
+    "packages_list=$package_list")")"
+
   if [[ "$fail_open" == "true" ]]; then
-    warn "$warnings Consider splitting into smaller, focused commits."
+    warn "$warnings Consider splitting into smaller, focused commits." "$ctx_str"
   else
-    deny "🛑 hapai: $warnings Split into smaller commits before proceeding."
+    deny "🛑 hapai: $warnings Split into smaller commits before proceeding." "$ctx_str"
   fi
 fi
 
