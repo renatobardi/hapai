@@ -308,16 +308,25 @@ def _merge_rows_by_event_id(rows: List[Dict], table_id: str) -> int:
     return len(new_rows)
 
 
-def load_audit_from_gcs(event, context):
+def load_audit_from_gcs(cloud_event):
     """
-    Cloud Function entry point.
+    Cloud Function entry point (Gen2 / Eventarc CloudEvent format).
     Triggered by: gs://hapai-audit-*/**.jsonl (Eventarc/Cloud Storage)
     """
-    logger.info(f"Received event: {json.dumps(event)}")
+    # Gen2 Eventarc delivers a CloudEvent object; data is in cloud_event.data
+    if hasattr(cloud_event, "data"):
+        data = cloud_event.data
+    elif isinstance(cloud_event, dict):
+        data = cloud_event
+    else:
+        logger.error(f"Unexpected event type: {type(cloud_event)}")
+        return {"status": "error", "message": "Unexpected event format"}
+
+    logger.info(f"Received event data: {json.dumps(data)}")
 
     # Parse trigger metadata
-    bucket_name = event.get("bucket")
-    file_path = event.get("name")
+    bucket_name = data.get("bucket")
+    file_path = data.get("name")
 
     if not bucket_name or not file_path:
         logger.error("Missing bucket or file path in event")
