@@ -13,12 +13,23 @@
   import EventDetail from './EventDetail.svelte'
   import LoadingState from './LoadingState.svelte'
 
-  onMount(() => { if ($authStore.idToken) loadDashboard($authStore.idToken, 7) })
-
-  $effect(() => {
-    if ($authStore.idToken && !$dashboardStore.statsComparison && !$dashboardStore.loading) {
+  // Load once on mount — use flag to prevent double-load from $effect
+  let _loaded = false
+  onMount(() => {
+    if ($authStore.idToken && !_loaded) {
+      _loaded = true
       loadDashboard($authStore.idToken, 7)
     }
+  })
+
+  // Fallback: if auth resolves after mount (e.g. page refresh), load then
+  $effect(() => {
+    if ($authStore.idToken && !_loaded && !$dashboardStore.loading) {
+      _loaded = true
+      loadDashboard($authStore.idToken, 7)
+    }
+    // Reset flag on logout so next login reloads
+    if (!$authStore.idToken) _loaded = false
   })
 
   $effect(() => {
