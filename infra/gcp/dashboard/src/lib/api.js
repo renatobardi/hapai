@@ -29,7 +29,14 @@ export async function queryBQ(queryName, idToken, params = {}) {
 
   if (!resp.ok) {
     let detail = ''
-    try { const e = await resp.json(); detail = e.error || '' } catch (_) {}
+    try {
+      const body = await resp.json()
+      detail = body?.error || ''
+    } catch (parseErr) {
+      // JSON parse failed; use HTTP status as fallback detail
+      console.warn('Failed to parse error response:', parseErr)
+      detail = `HTTP ${resp.status}`
+    }
     if (resp.status === 401) throw new Error('Session expired — please sign in again.')
     if (resp.status === 403) throw new Error('Access denied.')
     if (resp.status === 404) throw new Error(`Endpoint not found. Check VITE_BQ_PROXY_URL. (${BQ_URL})`)
