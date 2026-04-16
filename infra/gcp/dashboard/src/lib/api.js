@@ -32,8 +32,9 @@ export async function queryBQ(queryName, idToken, params = {}) {
     try {
       const body = await resp.json()
       detail = body?.error || ''
-    } catch (_) {
+    } catch (parseErr) {
       // JSON parse failed; use HTTP status as fallback detail
+      console.warn('Failed to parse error response:', parseErr)
       detail = `HTTP ${resp.status}`
     }
     if (resp.status === 401) throw new Error('Session expired — please sign in again.')
