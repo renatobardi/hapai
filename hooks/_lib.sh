@@ -52,19 +52,21 @@ get_hook_event() {
 
 # Deny the tool call with a reason message.
 # Uses exit code 2 + stderr (official Claude Code blocking mechanism).
-# Usage: deny "Cannot commit to main branch"
+# Usage: deny "Cannot commit to main branch" [context_json]
 deny() {
   local reason="${1:-Blocked by hapai guardrail}"
-  audit_log "deny" "$reason"
+  local context_json="${2:-}"
+  audit_log "deny" "$reason" "$context_json"
   echo "$reason" >&2
   exit 2
 }
 
 # Allow with an optional warning message (informational, non-blocking).
 # Uses jq for safe JSON construction (no injection risk).
-# Usage: warn "This commit touches 15 files across 3 packages"
+# Usage: warn "This commit touches 15 files across 3 packages" [context_json]
 warn() {
   local message="${1:-}"
+  local context_json="${2:-}"
   if [[ -n "$message" ]]; then
     local hook_event
     hook_event="$(get_hook_event 2>/dev/null || echo "PreToolUse")"
@@ -73,7 +75,7 @@ warn() {
       --arg event "$hook_event" \
       --arg ctx "$message" \
       '{hookSpecificOutput: {hookEventName: $event, permissionDecision: "allow", additionalContext: $ctx}}'
-    audit_log "warn" "$message"
+    audit_log "warn" "$message" "$context_json"
   fi
   exit 0
 }
