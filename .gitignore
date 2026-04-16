@@ -11,9 +11,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Claude Code local settings
+# Claude Code local settings and generated hooks
 .claude/settings.local.json
 .claude/launch.json
+.claude/hooks/hapai/
 infra/gcp/dashboard/.env
 
 # Dashboard build output and dependencies
