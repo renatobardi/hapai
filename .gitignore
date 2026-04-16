@@ -28,3 +28,4 @@ hapai.yaml
 notes/
 *.patch
 500
+.claude/settings.json
