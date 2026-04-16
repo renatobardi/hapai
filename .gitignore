@@ -20,3 +20,13 @@ infra/gcp/dashboard/.env
 # Dashboard build output and dependencies
 _site/
 infra/gcp/dashboard/node_modules/
+
+# Claude Code local hooks (generated during install, not tracked)
+.claude/hooks/
+
+# Development and configuration files (not committed)
+hapai.yaml
+notes/
+*.patch
+500
+.claude/settings.json

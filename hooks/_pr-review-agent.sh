@@ -52,8 +52,8 @@ git rev-parse --is-inside-work-tree &>/dev/null || {
 # Detect base branch: config → git default → main
 base_branch="$(config_get "guardrails.pr_review.base_branch" "")"
 if [[ -z "$base_branch" ]]; then
-  # Try to detect from origin/HEAD
-  base_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||')"
+  # Try to detect from origin/HEAD (may not exist in fresh clones or bare repos)
+  base_branch="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||' || true)"
 fi
 if [[ -z "$base_branch" ]]; then
   base_branch="main"
