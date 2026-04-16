@@ -32,7 +32,7 @@ export async function queryBQ(queryName, idToken, params = {}) {
     try {
       const body = await resp.json()
       detail = body?.error || ''
-    } catch (err) {
+    } catch (_) {
       // JSON parse failed; use HTTP status as fallback detail
       detail = `HTTP ${resp.status}`
     }
