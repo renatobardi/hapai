@@ -115,6 +115,13 @@ git config user.email "test@example.com"
 git commit --allow-empty -m "init" -q
 git checkout -b main -q 2>/dev/null || true
 
+# Setup origin remote and branch for PR review tests
+# Create a fake origin remote (bare repo) so git diff origin/main works
+MOCK_ORIGIN="$(mktemp -d)"
+cd "$MOCK_ORIGIN" && git init --bare -q && cd "$MOCK_REPO"
+git remote add origin "$MOCK_ORIGIN"
+git push -u origin main -q 2>/dev/null || true
+
 # ═══════════════════════════════════════════════════════════════════════════
 echo -e "\n${BOLD}guard-branch.sh${NC}"
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1042,6 +1049,9 @@ guardrails:
 YAML
 
 cd "$MOCK_REPO" && git checkout -b feat/pr-review-test -q 2>/dev/null || git checkout feat/pr-review-test -q 2>/dev/null
+# Add a file change so the PR review agent has something to review
+echo "test change" >> test.txt
+git add . && git commit -m "test change" -q || true
 
 set_review_state() {
   local status="$1" branch="${2:-feat/pr-review-test}"
