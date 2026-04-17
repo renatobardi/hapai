@@ -376,14 +376,46 @@ def load_audit_logs(request):
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 import functions_framework
+import os
 
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
-_ALLOWED_ORIGINS = {
-    "https://hapai.oute.pro",
+_DEFAULT_CORS_ORIGINS = {
     "https://renatobardi.github.io",
+    "http://localhost:5173",
+    "http://localhost:4173",
 }
+
+
+def _validate_cors_origin(origin: str) -> bool:
+    """Validate a single CORS origin URL."""
+    if not origin or not isinstance(origin, str):
+        return False
+    origin = origin.strip()
+    if len(origin) > 256:
+        return False
+    if not origin.startswith(("https://", "http://")):
+        return False
+    if "*" in origin or "/" in origin.rstrip("/"):
+        return False
+    return True
+
+
+def _get_allowed_origins() -> set:
+    """Get allowed CORS origins from env var or defaults."""
+    env_val = os.environ.get("CORS_ORIGINS", "")
+    if env_val:
+        origins = {o.strip() for o in env_val.split(",") if o.strip()}
+        validated = {o for o in origins if _validate_cors_origin(o)}
+        if validated:
+            logger.info(f"Loaded {len(validated)} CORS origins from env var")
+            return validated
+        logger.warning(f"No valid CORS origins in env var; falling back to defaults")
+    return _DEFAULT_CORS_ORIGINS
+
+
+_ALLOWED_ORIGINS = _get_allowed_origins()
 
 
 def _get_table_ref(table_name: str) -> str:

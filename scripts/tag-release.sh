@@ -5,8 +5,10 @@
 # Creates a git tag for a new release and bumps version numbers consistently
 # across bin/hapai and hooks/_lib.sh
 #
-# The tag is created locally; you must push manually:
-#   git push origin main && git push origin v1.0.1
+# The tag is created locally; you must push via GitHub:
+#   1. Create a feature branch (e.g., feat/v1.0.1) for the version bump commit
+#   2. Merge to main via PR
+#   3. Then push the tag: git push origin v1.0.1
 
 set -euo pipefail
 
@@ -80,8 +82,12 @@ log_ok "Release v${VERSION} prepared!"
 log_info ""
 log_info "Next steps:"
 log_info "  1. Review the commit: git log -1"
-log_info "  2. Push to GitHub:"
-log_info "     git push origin main"
+log_info "  2. Create a feature branch for the version bump: git checkout -b feat/v${VERSION}"
+log_info "  3. Push and create a pull request:"
+log_info "     git push -u origin feat/v${VERSION}"
+log_info "     gh pr create --title \"chore(release): bump version to v${VERSION}\""
+log_info "  4. Merge the PR to main"
+log_info "  5. After merge, push the tag:"
 log_info "     git push origin v${VERSION}"
-log_info "  3. GitHub Actions will build a release with tarball + checksums"
+log_info "  6. GitHub Actions will build a release with tarball + checksums"
 log_info ""
