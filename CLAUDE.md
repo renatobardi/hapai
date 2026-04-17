@@ -6,11 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 hapai is a deterministic guardrails system for AI coding assistants (Claude Code, Cursor, Copilot). It enforces security rules via shell-based hooks that intercept tool calls and block violations **before execution** — not probabilistic prompts that can be ignored. Pure Bash, only external dependency is `jq`.
 
+**Current version:** v1.7.0 (2026-04-16) — Dashboard reform, audit dedup pipeline, hook enrichment with context analytics
+
 The system combines:
 - **Hook enforcement** — Shell scripts that run before/after tool execution
-- **Svelte 5 Analytics Dashboard** — Real-time guardrail event visualization
-- **Cloud integration** — BigQuery + Cloud Storage + GitHub Pages deployment
+- **Svelte 5 Analytics Dashboard** — Real-time guardrail event visualization with tabbed layout, drill-down analytics, and 7+ new BigQuery queries
+- **Cloud integration** — BigQuery + Cloud Storage + GitHub Pages deployment with 4-layer dedup pipeline
 - **Multi-tool exporters** — Export guardrails to Cursor, Copilot, Windsurf, etc.
+
+**v1.7.0 Highlights:**
+- **Dedup pipeline** — Eliminates duplicate events: event_id generation → flow-dispatcher guard → incremental sync → BigQuery MERGE
+- **Hook enrichment** — 22-field context RECORD in BigQuery (git op, branch, file category, risk tier, enforcement method, etc.)
+- **Dashboard redesign** — Tabbed layout (Overview, Projects, Guardrails, Events) with project health scores, denial reasons, guardrail glossary, hotspots, and drill-down panels
+- **API hardening** — 30s timeout, per-status error messages, SonarQube-compliant exception handling
 
 ## Prerequisites
 
@@ -267,6 +275,16 @@ VITE_BQ_PROXY_URL        # HTTP Cloud Function endpoint (hapai-bq-query)
 
 **Location:** `infra/gcp/functions/main.py` — Two Cloud Functions in a single module.
 
+**Prerequisites:** Python 3.12+, pip, and Google Cloud SDK.
+
+**Setup for local development:**
+```bash
+cd infra/gcp/functions
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
 ### `load_audit_from_gcs` (Storage Trigger)
 
 **Trigger:** Gen2 CloudEvent (`google.cloud.storage.object.v1.finalized`) on `hapai-audit-*` buckets.
@@ -274,7 +292,7 @@ VITE_BQ_PROXY_URL        # HTTP Cloud Function endpoint (hapai-bq-query)
 **Key responsibilities:**
 - Parse JSONL audit logs from `~/.hapai/audit.jsonl` (uploaded by `hapai sync` — incremental, cursor-based)
 - Validate identifiers and bucket names using regex patterns
-- Batch-level Python dedup before BigQuery write
+- Batch-level Python dedup before BigQuery write (P0-P3 dedup pipeline in v1.7+)
 - Load events into BigQuery `hapai_dataset.events` table via `MERGE WHEN NOT MATCHED INSERT` keyed on `event_id`
 - Fallback to streaming insert via `_merge_rows_by_event_id()` if MERGE job fails
 - Handle legacy rows without `event_id`
@@ -307,11 +325,23 @@ VITE_BQ_PROXY_URL        # HTTP Cloud Function endpoint (hapai-bq-query)
 
 ### Schema
 
-BigQuery table `hapai_dataset.events` — 8 top-level fields + 22-field `context` RECORD:
+BigQuery table `hapai_dataset.events` — 8 top-level fields + 22-field `context` RECORD (v1.7+):
 
 **Top-level:** `event_id` (dedup key), `ts`, `event`, `hook`, `tool`, `result`, `reason`, `project`
 
-**Context RECORD:** `git_op`, `target_branch`, `protection_type`, `enforcement_method`, `filename`, `file_category`, `file_fullpath`, `bypass_method`, `protection_source`, `was_symlink`, `matched_pattern`, `risk_category`, `command_preview`, `files_staged_count`, `packages_touched_count`, `max_files_threshold`, `max_packages_threshold`, `packages_list`, `was_cooldown_escalation`, `enforcement`, `forbidden_pattern`, `pattern_source`, `commit_msg_length`
+**Context RECORD (22 fields):** Structured metadata for analytics across git operations, files, packages, and risk assessment:
+- **Git**: `git_op`, `target_branch`, `protection_type`
+- **File**: `filename`, `file_category`, `file_fullpath`, `bypass_method`, `protection_source`, `was_symlink`
+- **Enforcement**: `enforcement_method`, `enforcement`, `matched_pattern`, `pattern_source`
+- **Risk**: `risk_category`, `was_cooldown_escalation`
+- **Command**: `command_preview`, `commit_msg_length`
+- **Impact**: `files_staged_count`, `packages_touched_count`, `max_files_threshold`, `max_packages_threshold`, `packages_list`
+
+**Dedup strategy (v1.7+):** 4-layer pipeline ensures `event_id` uniqueness:
+1. **P0 — Generation**: `_audit_event_id()` in `_lib.sh` creates `<epoch_ms>-<hook>-<rand4hex>`
+2. **P1 — Flow-dispatcher**: `HAPAI_FLOW_EXECUTOR=1` environment flag prevents double-logging when hooks invoked via flow
+3. **P2 — Incremental sync**: `hapai sync` maintains cursor in `~/.hapai/state/sync_cursor`; only sends delta
+4. **P3 — BigQuery MERGE**: Cloud Function merges on `event_id`; batch dedup before MERGE; fallback streaming insert
 
 **Setup:** Deployed via Cloud Functions console (Gen2 runtime, Python 3.12). See `infra/gcp/SETUP.md` for GCP infrastructure setup.
 
@@ -380,6 +410,50 @@ echo "$HOOK_INPUT" | bash hooks/pre-tool-use/guard-branch.sh
 ```bash
 while inotifywait -e modify hooks/ tests/; do bash tests/run-tests.sh; done
 ```
+
+## Cloud Functions Local Development
+
+**Environment setup:**
+```bash
+cd infra/gcp/functions
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Testing Cloud Function locally:**
+```bash
+# Test load_audit_from_gcs with mock event
+python3 -m functions_framework --target load_audit_from_gcs --debug --port 8081
+
+# In another terminal, send mock CloudEvent:
+curl -X POST http://localhost:8081 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {
+      "name": "audit.jsonl",
+      "bucket": "hapai-audit-dev"
+    }
+  }'
+```
+
+**Testing hapai_bq_query:**
+```bash
+# Start function server
+python3 -m functions_framework --target hapai_bq_query --debug --port 8082
+
+# Test stats query
+curl -X POST http://localhost:8082 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_FIREBASE_TOKEN" \
+  -d '{"query_name": "stats_comparison", "period": 7}'
+```
+
+**Key dependencies** (see `requirements.txt`):
+- `google-cloud-storage` — GCS bucket access for audit logs
+- `google-cloud-bigquery` — BigQuery dataset/table access
+- `firebase-admin` — Token validation for dashboard auth
+- `functions-framework` — Local dev server
 
 ## Dashboard Local Development
 
