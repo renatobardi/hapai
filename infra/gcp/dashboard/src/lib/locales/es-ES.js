@@ -62,7 +62,7 @@ export default {
       label: 'Analytics',
       heading: 'Observa qué está haciendo tu IA.',
       desc: 'hapai registra cada acción — denegaciones, advertencias y permisos — en un registro de auditoría append-only. Sincroniza con BigQuery para analytics empresarial, o usa el dashboard integrado para visualizar la actividad de los guardrails en todos tus proyectos.',
-      features: 'Línea de tiempo de 30 días · Drill-down por guard y herramienta · Tarjetas de tasa Allow/Deny · Desglose por proyecto · Drawer de detalle del evento',
+      features: 'KPI bar con comparación de período · Línea de tiempo de 7/14/30 días · Drill-down por guard y herramienta · Scores de salud por proyecto · Analytics de contexto · Drawer de detalle del evento',
       cta: 'Iniciar sesión con GitHub',
       signingIn: 'Iniciando sesión…',
       signInError: 'Error al iniciar sesión. Inténtalo de nuevo.',
@@ -72,7 +72,7 @@ export default {
       heading: 'Deja de esperar que la IA siga las reglas. Hazlas cumplir.',
       cta: 'Empezar',
       links: { github: 'GitHub', docs: 'Documentación', changelog: 'Changelog' },
-      note: 'hapai v1.6.2 · Bash puro. Cero dependencias. Seguridad determinística.'
+      note: 'hapai v1.7.0 · Bash puro. Cero dependencias. Seguridad determinística.'
     }
   },
   docs: {
@@ -141,17 +141,20 @@ export default {
         heading: 'Dashboard de Analytics',
         intro: 'Este dashboard muestra eventos de guardrail en tiempo real de tus registros de auditoría:',
         features: [
-          'Timeline — Recuentos diarios de denegaciones/advertencias (ventana deslizante de 30 días)',
-          'Top Blocking Hooks — Qué guardrails están más activos',
-          'Recent Events — Feed en vivo de denegaciones y advertencias',
-          'Tool Distribution — Qué herramientas activan más guards',
-          'Project Breakdown — Estadísticas por proyecto',
-          'Deny Rate Trend — Análisis histórico'
+          'KPI Bar — Denegaciones, advertencias, permisos, tasas deny/allow con comparación de período y sparklines',
+          'Timeline — Tasas diarias de denegación/advertencia (ventana de 7/14/30 días, cambio de período server-side)',
+          'Salud de Proyectos — Tasa de denegación por proyecto, guard principal, conteo de eventos y score',
+          'Motivos de Denegación — Motivos agregados por frecuencia con drill-down por guard',
+          'Glosario de Guardrails — Todos los guards con descripción, conteos deny/warn y drill-down',
+          'Drill-down (L2) — Mini-timeline, barras de breakdown y eventos recientes por guard o herramienta',
+          'Detalle del Evento (L3) — Drawer a pantalla completa con todos los campos y navegación Anterior/Siguiente',
+          'Analytics de Contexto — Categorías de archivo, tiers de riesgo, ramas del contexto enriquecido de hooks'
         ],
         setupTitle: 'Configuración:',
         setup: [
           'Crea un proyecto Firebase con GitHub OAuth',
-          'Configura los secretos de GitHub Actions (VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID)',
+          'Despliega las Cloud Functions: load_audit_from_gcs (Storage trigger) + hapai-bq-query (HTTP)',
+          'Configura los secretos de GitHub Actions (VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID, VITE_BQ_PROXY_URL)',
           'Haz push a main → GitHub Actions construye y despliega en GitHub Pages',
           'Dashboard disponible en: https://owner.github.io/repo/'
         ]

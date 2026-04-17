@@ -157,7 +157,9 @@ hapai/
 - `state_get()` / `state_set()` / `state_increment()` — persistent counters in `~/.hapai/state/`
 - `blocklist_add()` / `blocklist_check()` / `blocklist_clean()` — TTL-based pattern blocking
 - `cooldown_active()` / `cooldown_record()` — after N denials in a window, escalate to fail-open
-- `audit_log()` — appends JSONL entry to `~/.hapai/audit.jsonl`
+- `audit_log()` — appends JSONL entry to `~/.hapai/audit.jsonl` (includes `event_id` and optional `context_json`)
+- `_audit_event_id()` — generates unique event ID: `<epoch_ms>-<hook>-<rand4hex>` (dedup key for BigQuery MERGE)
+- `_is_flow_managed()` — returns true if `HAPAI_FLOW_EXECUTOR=1` (prevents double-logging when invoked via flow-dispatcher)
 
 ### Environment Variables
 
@@ -199,8 +201,9 @@ Configuration files are resolved in this order (first match wins):
 
 **State storage:**
 
-- `~/.hapai/audit.jsonl` — Append-only JSONL log of all hook executions (allow/deny/warn)
+- `~/.hapai/audit.jsonl` — Append-only JSONL log of all hook executions (allow/deny/warn); each entry has `event_id` + optional `context` object
 - `~/.hapai/state/` — Per-hook counters (used by cooldown and rate limiting)
+- `~/.hapai/state/sync_cursor` — Line count from last `hapai sync` (enables incremental delta sync)
 - `~/.hapai/hapai.yaml` — User's global config overrides
 
 **For hapai development:** Project config lives in `hapai.yaml` (checked in), not in `~/.hapai/`.
@@ -209,30 +212,36 @@ Configuration files are resolved in this order (first match wins):
 
 **Location:** `infra/gcp/dashboard/` — Svelte 5 app that visualizes guardrail events from BigQuery.
 
-**Tech stack:** Svelte 5 (runes syntax: `$state()`, `$derived()`, `$effect()`), Vite 6, Firebase SDK (GitHub OAuth), Chart.js. No Tailwind — uses `app.css`.
+**Tech stack:** Svelte 5 (runes syntax: `$state()`, `$derived()`, `$effect()`), Vite 6, Firebase SDK (GitHub OAuth). No Tailwind — uses `app.css` with 22+ CSS custom properties (design tokens).
 
 **Routing:** Hash-based (`#/docs`, `#/config`, etc.) via `stores/route.js`. `App.svelte` is the router. Unauthenticated visitors see `LandingPage.svelte`; authenticated users see `Dashboard.svelte`.
 
 **Store layer** (`src/stores/`):
 - `auth.js` — `authStore` with shape `{ user, idToken, loading }`; wraps Firebase `onAuthStateChanged`
-- `dashboard.js` — `dashboardStore` with shape `{ loading, error, stats, timeline, hooks, denials, tools, projects, trends }`; `loadDashboard(idToken)` fetches from BigQuery proxy
+- `dashboard.js` — `dashboardStore` with shape `{ loading, error, period, statsComparison, timeline, projectHealth, hooks, denialReasons, contextBreakdown, denials, denialsOffset, denialsHasMore, drilldownDetail, drilldownDetailLoading, drilldownDetailError }`
+  - `loadDashboard(idToken, period)` — fetches all 7 queries in parallel via `Promise.all`
+  - `setPeriod(idToken, period)` — reloads all data for the selected period (7/14/30 days)
+  - `loadMoreDenials(idToken, period)` — server-side pagination for events table
+  - `loadDrilldownDetail(type, name, idToken, period)` — fetches `hook_detail` or `tool_detail` for drill-down
 - `i18n.js` — `locale` (writable), `setLocale()`, and `t` (derived store returning a translation function); browser language auto-detected, persisted to localStorage
-- `route.js` — `currentRoute` writable store; updated by `hashchange` events
+- `route.js` — `route` writable store; updated by `hashchange` events; `navigate(hash)` for programmatic routing
 
 **i18n:** Three locales in `src/lib/locales/` (`en.js`, `pt-BR.js`, `es-ES.js`) — JavaScript modules with `export default {}`. Translation keys are dot-separated (e.g. `header.nav.docs`). The `t` store is a derived store — use `$t('key')` in components. Language toggle is in `Header.svelte`. In Svelte template `{...}` blocks, literal curly braces in strings must be escaped as `&#123;` / `&#125;` to avoid parse errors.
 
 **Key components** (`src/`):
 - `App.svelte` — router shell
-- `LandingPage.svelte` — unauthenticated landing page
-- `Dashboard.svelte` — authenticated metrics container
+- `LandingPage.svelte` — unauthenticated landing page (hero, problem, solution, guardrails, ecosystem, quick start)
+- `Dashboard.svelte` — tabbed dashboard (Overview, Projects, Guardrails, Events) with `_loaded` flag to prevent race condition between `onMount` and `$effect`
 - `Header.svelte` — nav + GitHub sign-in/out + language toggle (EN/PT/ES)
-- `HowItWorksPage.svelte` — docs page (`#/docs`)
-- Chart/data components: `StatCard`, `TimelineChart`, `HooksChart`, `DenialsTable`, `ToolsChart`, `ProjectsChart`, `TrendChart`
-- UI helpers: `Logo.svelte`, `LoadingState.svelte`
+- `HowItWorksPage.svelte` — docs page (`#/docs`) with scroll-spy sidebar
+- KPI & overview: `KpiBar`, `StatCard` (with sparklines), `TimelineChart`
+- Analytics: `ProjectHealth`, `DenialReasons`, `GuardrailGlossary`, `HooksChart`, `Hotspots`
+- Events: `DenialsTable` (server-side pagination), `DrillDown` (L2 inline panel), `EventDetail` (L3 full-screen drawer)
+- Shared UI: `Button`, `Card`, `Badge`, `EmptyState`, `LoadingState`, `Logo`
 
 **API layer** (`src/lib/`):
 - `firebase.js` — exports `auth`, `signIn()`, `signOut()`, `onAuthStateChanged` (GitHub OAuth provider)
-- `api.js` — `queryBQ(idToken)` POSTs to `VITE_BQ_PROXY_URL` Cloud Functions proxy with Bearer token
+- `api.js` — `queryBQ(queryName, idToken, params)` POSTs to `VITE_BQ_PROXY_URL` with Bearer token; 30s timeout via `AbortController`; per-status error messages (401/403/404); SonarQube-compliant exception handling
 
 **Environment variables** (Vite, set in `infra/gcp/dashboard/.env`):
 ```
@@ -240,7 +249,7 @@ VITE_FIREBASE_API_KEY
 VITE_FIREBASE_AUTH_DOMAIN
 VITE_FIREBASE_PROJECT_ID
 VITE_FIREBASE_APP_ID
-VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
+VITE_BQ_PROXY_URL        # HTTP Cloud Function endpoint (hapai-bq-query)
 ```
 
 **Build & deployment:**
@@ -256,19 +265,55 @@ VITE_BQ_PROXY_URL        # Cloud Functions proxy endpoint for BigQuery
 
 ## Cloud Functions (Python)
 
-**Location:** `infra/gcp/functions/main.py` — Cloud Function that loads audit logs from Cloud Storage to BigQuery.
+**Location:** `infra/gcp/functions/main.py` — Two Cloud Functions in a single module.
 
-**Trigger:** Cloud Storage `finalizeCreate` event on `hapai-audit-*` buckets.
+### `load_audit_from_gcs` (Storage Trigger)
+
+**Trigger:** Gen2 CloudEvent (`google.cloud.storage.object.v1.finalized`) on `hapai-audit-*` buckets.
 
 **Key responsibilities:**
-- Parse JSONL audit logs from `~/.hapai/audit.jsonl` (uploaded by `hapai sync`)
+- Parse JSONL audit logs from `~/.hapai/audit.jsonl` (uploaded by `hapai sync` — incremental, cursor-based)
 - Validate identifiers and bucket names using regex patterns
-- Load events into BigQuery `hapai_dataset.events` table via MERGE (dedup on `event_id`)
-- Handle legacy rows without `event_id` and new rows with UUID-based dedup keys
+- Batch-level Python dedup before BigQuery write
+- Load events into BigQuery `hapai_dataset.events` table via `MERGE WHEN NOT MATCHED INSERT` keyed on `event_id`
+- Fallback to streaming insert via `_merge_rows_by_event_id()` if MERGE job fails
+- Handle legacy rows without `event_id`
 
-**Schema:** 13 fields including `event_id` (dedup key), `ts`, `hook`, `tool`, `result`, `reason`, `project`. See `infra/gcp/bigquery-schema.json` for full details.
+### `hapai_bq_query` (HTTP Trigger)
 
-**Setup:** Deployed via Terraform/Cloud Functions console. See `infra/gcp/SETUP.md` for GCP infrastructure setup.
+**Trigger:** HTTP POST with Firebase Bearer token.
+
+**Key responsibilities:**
+- Dispatches to 10+ query functions based on `query_name` parameter
+- All queries use dedup CTE: `ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY ts DESC)`
+- Parameterized via `bigquery.ScalarQueryParameter` (injection-safe)
+- Input validation: `_validate_period()`, `_validate_safe_string()`, `_validate_limit()`, `_validate_offset()`
+- CORS headers for dashboard cross-origin requests
+
+**Available queries:**
+| Query Name | Description |
+|---|---|
+| `stats_comparison` | Current vs previous period KPIs (denials, warnings, allows, rates) |
+| `timeline` | Daily deny/warn counts for chart |
+| `hooks` | Top guards by denial count |
+| `tools` | Top tools triggering guards |
+| `projects` | Per-project event counts |
+| `denials` | Paginated event feed (`limit`/`offset`) |
+| `project_health` | Per-project deny rate, top guard, health score |
+| `denial_reasons` | Aggregated denial reasons ranked by frequency |
+| `context_breakdown` | File categories, risk tiers, branches from context RECORD |
+| `hook_detail` | Drill-down: mini-timeline + breakdown + recent events per guard |
+| `tool_detail` | Drill-down: mini-timeline + breakdown + recent events per tool |
+
+### Schema
+
+BigQuery table `hapai_dataset.events` — 8 top-level fields + 22-field `context` RECORD:
+
+**Top-level:** `event_id` (dedup key), `ts`, `event`, `hook`, `tool`, `result`, `reason`, `project`
+
+**Context RECORD:** `git_op`, `target_branch`, `protection_type`, `enforcement_method`, `filename`, `file_category`, `file_fullpath`, `bypass_method`, `protection_source`, `was_symlink`, `matched_pattern`, `risk_category`, `command_preview`, `files_staged_count`, `packages_touched_count`, `max_files_threshold`, `max_packages_threshold`, `packages_list`, `was_cooldown_escalation`, `enforcement`, `forbidden_pattern`, `pattern_source`, `commit_msg_length`
+
+**Setup:** Deployed via Cloud Functions console (Gen2 runtime, Python 3.12). See `infra/gcp/SETUP.md` for GCP infrastructure setup.
 
 ## Developer Workflows
 
