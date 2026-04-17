@@ -428,7 +428,7 @@ guardrails:
 - Uses OIDC service account authentication
 
 **Dashboard**
-- GitHub Pages: `https://hapai.oute.pro`
+- GitHub Pages: `https://renatobardi.github.io/hapai`
 - OAuth2 sign-in (Google)
 - Analytics panels:
   - Timeline (denials/warns per day)
@@ -461,7 +461,7 @@ BigQuery (hapai_dataset.events)
     ↓
 Dashboard (GitHub Pages)
     ↓
-https://hapai.oute.pro
+https://renatobardi.github.io/hapai
 ```
 
 ### 🧪 Testing

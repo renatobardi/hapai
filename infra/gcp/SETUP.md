@@ -24,7 +24,7 @@ BigQuery (hapai_dataset.events table)
     ↓
 GitHub Pages Dashboard (OAuth2 → BigQuery REST API)
     ↓
-https://hapai.oute.pro (custom domain)
+https://renatobardi.github.io/hapai
 ```
 
 ---
@@ -226,13 +226,8 @@ tail -f ~/.hapai/sync.log
 # Create gh-pages branch from main
 git checkout -b gh-pages
 
-# Create CNAME file for custom domain
-echo "hapai.oute.pro" > CNAME
-
-# Commit
-git add CNAME
-git commit -m "setup: github pages cname"
-git push -u origin gh-pages
+# Note: For custom domain setup (optional), see section 4.3 below
+# git add CNAME && git commit -m "setup: github pages cname" && git push -u origin gh-pages
 
 # Switch back to main
 git checkout main
@@ -245,24 +240,23 @@ git checkout main
    - **Source**: Deploy from a branch
    - **Branch**: gh-pages
    - **Folder**: / (root)
-3. **Custom domain**: Enter `hapai.oute.pro`
-4. Check **Enforce HTTPS**
+3. Check **Enforce HTTPS**
 
-### 4.3 Configure Custom Domain (DNS)
+### 4.3 (Optional) Configure Custom Domain (DNS)
+
+If you want to use a custom domain (e.g., `hapai.oute.pro`) instead of the default GitHub Pages URL:
 
 On your domain registrar (e.g., Route53, Cloudflare):
-
-Add CNAME record:
-```
-Name: hapai.oute.pro
-Type: CNAME
-Value: renatobardi.github.io
-```
+1. Create a CNAME file: `echo "your-domain.com" > CNAME`
+2. Add CNAME record to your registrar:
+   - Name: your-domain.com
+   - Type: CNAME
+   - Value: renatobardi.github.io
 
 Wait for DNS propagation (usually < 5 minutes):
 
 ```bash
-dig hapai.oute.pro
+dig your-domain.com
 # Should resolve to 185.199.108.153 (GitHub Pages)
 ```
 
@@ -323,7 +317,7 @@ bq query --use_legacy_sql=false '
 
 ### 6.3 Visit Dashboard
 
-Open: https://hapai.oute.pro or https://renatobardi.github.io/hapai
+Open: https://renatobardi.github.io/hapai
 
 1. Click "Sign in with GitHub"
 2. Authorize the application via GitHub

@@ -112,7 +112,7 @@ Deploy a real-time analytics dashboard to GitHub Pages to monitor guardrail even
 
 ### Live Demo
 
-**[🚀 View Live Demo](https://hapai.oute.pro)** — Real-time dashboard showing guardrail enforcement across teams.
+**[🚀 View Live Demo](https://renatobardi.github.io/hapai)** — Real-time dashboard showing guardrail enforcement across teams.
 
 ![hapai Dashboard Overview](.docs/images/dashboard-overview.svg)
 
@@ -189,7 +189,7 @@ Timestamp     Hook                Tool    Project    Result    Reason
 4. Merge to main → GitHub Actions builds and deploys to GitHub Pages
 5. Dashboard live at: `https://{owner}.github.io/{repo}/`
 
-**Live Demo:** https://hapai.oute.pro (requires GitHub OAuth login)
+**Live Demo:** https://renatobardi.github.io/hapai (requires GitHub OAuth login)
 
 See [`infra/gcp/SETUP.md`](infra/gcp/SETUP.md) for complete setup guide.
 
