@@ -19,6 +19,17 @@ HAPAI_VERSION="1.0.0"
 HAPAI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HAPAI_HOME="${HAPAI_HOME:-$HOME/.hapai}"
 
+# Fallback: if running as installed binary (not inside repo), use HAPAI_HOME
+if [[ ! -d "$HAPAI_ROOT/hooks" ]]; then
+  if [[ -d "$HAPAI_HOME/hooks" ]]; then
+    HAPAI_ROOT="$HAPAI_HOME"
+  else
+    echo "hapai: hooks not found at $HAPAI_ROOT or $HAPAI_HOME" >&2
+    echo "Run: curl -fsSL https://raw.githubusercontent.com/renatobardi/hapai/main/install.sh | bash" >&2
+    exit 1
+  fi
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -52,7 +63,13 @@ log_error() { echo -e "${RED}✗${NC} $*"; }
 
 ensure_jq() {
   if ! command -v jq &>/dev/null; then
-    log_error "jq is required but not installed. Install with: brew install jq"
+    local os_hint
+    case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
+      darwin*) os_hint="brew install jq" ;;
+      linux*)  os_hint="apt-get install -y jq  # or: dnf install jq / pacman -S jq" ;;
+      *)       os_hint="see https://jqlang.github.io/jq/download/" ;;
+    esac
+    log_error "jq is required but not installed. Install: $os_hint"
     exit 1
   fi
 
@@ -820,6 +837,10 @@ cmd_sync() {
   done
 
   # Load config
+  if [[ ! -f "$HAPAI_ROOT/hooks/_lib.sh" ]]; then
+    log_error "hooks/_lib.sh not found. Run: hapai install --global"
+    exit 1
+  fi
   source "$HAPAI_ROOT/hooks/_lib.sh" || {
     log_error "Failed to load config library"
     exit 1
