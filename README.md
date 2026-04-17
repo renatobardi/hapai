@@ -7,6 +7,10 @@
         guardrails for AI coding assistants
 ```
 
+[![Pure Bash](https://img.shields.io/badge/Pure%20Bash-Yes-green?style=flat-square)](https://github.com/renatobardi/hapai)
+[![CI/CD](https://img.shields.io/github/actions/workflow/status/renatobardi/hapai/ci.yml?style=flat-square)](https://github.com/renatobardi/hapai/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/renatobardi/hapai?style=flat-square)](LICENSE)
+
 > Deterministic guardrails for AI coding assistants. Hooks that enforce rules **before execution** — not probabilistic prompts that get ignored.
 
 **hapai** v1.7+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
@@ -368,15 +372,23 @@ MIT — See LICENSE file.
 
 ## Contributing
 
-Contributions welcome. Please:
-1. Add tests for new features
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- How to set up your development environment
+- How to write and test new guardrails
+- Commit conventions and PR process
+- Philosophy and design principles
+
+Quick checklist:
+1. Add tests for new features (`bash tests/run-tests.sh`)
 2. Follow bash conventions (`set -euo pipefail`, shellcheck)
 3. Keep modules modular (50-100 LOC)
 4. Document config keys in `hapai.defaults.yaml`
+5. Update CHANGELOG.md
 
-## Support
+## Community
 
-- **Issues:** [GitHub Issues](https://github.com/renatobardi/hapai/issues)
+- **Report a bug:** [GitHub Issues](https://github.com/renatobardi/hapai/issues/new?template=bug_report.md)
+- **Request a feature:** [GitHub Issues](https://github.com/renatobardi/hapai/issues/new?template=feature_request.md)
 - **Setup Guide:** [infra/gcp/SETUP.md](infra/gcp/SETUP.md)
 - **Developer Guide:** [CLAUDE.md](CLAUDE.md)
-- **Examples:** [USAGE.md](USAGE.md) (Portuguese)
+- **Usage Examples:** [USAGE.md](USAGE.md) (Portuguese)
