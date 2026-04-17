@@ -13,19 +13,17 @@
 
 > Deterministic guardrails for AI coding assistants. Hooks that enforce rules **before execution** — not probabilistic prompts that get ignored.
 
-**hapai** v1.6+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
+**hapai** v1.7+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
 
-## What's New in v1.6.2
+## What's New in v1.7.0
 
-- **Drill-down analytics (L2)** — Click any guard bar or hotspot to open an inline panel with mini-timeline, breakdown bars (by tool or by guard), and recent events list
-- **Event detail drawer (L3)** — Click any event to open a full detail drawer with ← Previous / Next → navigation and Escape key support
-- **Rate cards** — Two new KPI cards: Allow Rate and Deny Rate (percentages), calculated from `allow_count` / `total_events` returned by BigQuery
-- **Backend parameterization** — All BigQuery queries now accept `period` (7/14/30 days), `limit`/`offset` for pagination, and per-entity filters; injection-safe via `bigquery.ScalarQueryParameter`
-- **Period selector connected to BQ** — Switching 7d/14d/30d triggers a real reload from BigQuery, not a client-side slice
-- **Server-side drilldown detail** — `hook_detail` and `tool_detail` BQ queries return timeline + breakdown + recent events + stats for the selected entity
-- **Load more from server** — Events table supports server-side pagination (`offset`-based) beyond the initial 100 rows
-- **StatCard sparklines** — Trend sparkline (80×24px canvas) and directional arrow (↗/↘/→) on each KPI card
-- **Dead code removed** — `TrendChart`, `ToolsChart`, and `ProjectsChart` deleted; superseded by sparklines, `TimelineChart`, and `Hotspots` tabs
+- **Dashboard reform** — Tabbed layout (Overview, Projects, Guardrails, Events) with KPI bar, project health scores, denial reasons, and guardrail glossary
+- **Audit dedup pipeline** — 4-layer dedup: unique `event_id` per event, flow-dispatcher guard, incremental sync with cursor, BigQuery MERGE on `event_id`
+- **Hook enrichment** — 22-field `context` RECORD in BigQuery: git op, branch, file category, risk tier, enforcement method, and more — enables deep analytics
+- **7 new BigQuery queries** — `stats_comparison`, `project_health`, `denial_reasons`, `context_breakdown`, `hook_detail`, `tool_detail` + dedup CTE on all queries
+- **API hardening** — 30s timeout, per-status error messages, SonarQube-compliant exception handling
+- **Hook name resolution** — `audit_log()` resolves hook via `BASH_SOURCE[]` walk (fixes `_lib` pollution in audit logs)
+- **Gen2 Cloud Function** — `load_audit_from_gcs` updated for Gen2 CloudEvent format; separate `hapai-bq-query` HTTP function for dashboard
 
 ## The Problem
 
@@ -112,19 +110,35 @@ Deploy a real-time analytics dashboard to GitHub Pages to monitor guardrail even
 
 ### Features
 
-- **Timeline** — Daily denial/warning counts (30-day rolling window)
-- **Top Blocking Hooks** — Which guardrails are most active
-- **Guardrail Activity** — Live feed of all blocked actions and warnings
-- **Tool Distribution** — Which tools trigger guards most
-- **Project Breakdown** — Per-project statistics
-- **Deny Rate Trend** — Historical deny rate analysis
+- **KPI Bar** — Denials, warnings, allows, deny rate, allow rate — with period comparison (current vs previous), trend arrows, and sparklines
+- **Timeline** — Daily denial/warning rates (7/14/30-day rolling window, server-side period switching)
+- **Project Health** — Per-project deny rate, top guard, event counts, and health score
+- **Denial Reasons** — Top denial reasons aggregated by frequency with guard drill-down
+- **Guardrail Glossary** — All guards with descriptions, deny/warn counts, and inline drill-down
+- **Drill-down (L2)** — Click any guard or tool to see mini-timeline, breakdown bars, and recent events (server-side via `hook_detail`/`tool_detail` queries)
+- **Event Detail (L3)** — Full-screen drawer with all event fields, ← Previous / Next → navigation
+- **Events Feed** — Server-side paginated event table with load-more support
+- **Context Analytics** — File categories, risk tiers, branches, patterns — powered by the 22-field `context` RECORD in BigQuery
+
+### Architecture
+
+```
+~/.hapai/audit.jsonl (with event_id + context)
+    ↓ hapai sync (incremental, cursor-based)
+gs://hapai-audit-{name}/YYYY-MM/DD-offset-N.jsonl
+    ↓ load_audit_from_gcs (Gen2 Cloud Function, Storage trigger)
+hapai_dataset.events (BigQuery, MERGE dedup on event_id)
+    ↓ hapai-bq-query (HTTP Cloud Function, Firebase auth)
+Dashboard (Svelte 5, GitHub Pages)
+```
 
 ### Setup
 
 1. Create Firebase project with GitHub OAuth provider
-2. Set GitHub Actions secrets (VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID, VITE_BQ_PROXY_URL)
-3. Merge to main → GitHub Actions builds and deploys to GitHub Pages
-4. Dashboard live at: `https://{owner}.github.io/{repo}/`
+2. Deploy two Cloud Functions: `load_audit_from_gcs` (Storage trigger) + `hapai-bq-query` (HTTP trigger)
+3. Set GitHub Actions secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_APP_ID`, `VITE_BQ_PROXY_URL`)
+4. Merge to main → GitHub Actions builds and deploys to GitHub Pages
+5. Dashboard live at: `https://{owner}.github.io/{repo}/`
 
 See [`infra/gcp/SETUP.md`](infra/gcp/SETUP.md) for complete setup guide.
 
@@ -134,13 +148,13 @@ Sync audit logs to GCP for enterprise analytics and compliance.
 
 **Architecture:**
 ```
-~/.hapai/audit.jsonl
-    ↓ hapai sync (local — ADC or service account key)
-gs://hapai-audit-{name}/YYYY-MM/DD.jsonl
-    ↓ bq load (part of hapai sync, or daily via hapai-sync.yml CI workflow)
-hapai_dataset.events  (BigQuery)
-    ↓ Cloud Function bq-query (Firebase auth required)
-Analytics Dashboard  (GitHub Pages)
+~/.hapai/audit.jsonl (event_id + context per entry)
+    ↓ hapai sync (incremental — cursor-based, delta only)
+gs://hapai-audit-{name}/YYYY-MM/DD-offset-N.jsonl
+    ↓ load_audit_from_gcs (Gen2 Cloud Function, Storage trigger)
+hapai_dataset.events (BigQuery — MERGE dedup on event_id)
+    ↓ hapai-bq-query (HTTP Cloud Function, Firebase auth)
+Analytics Dashboard (Svelte 5, GitHub Pages)
 ```
 
 **Auto-sync — get data to GCS automatically:**

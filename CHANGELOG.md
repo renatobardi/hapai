@@ -1,5 +1,79 @@
 # hapai Changelog
 
+## v1.7.0 (2026-04-16) — Dashboard Reform, Dedup Pipeline & Hook Enrichment
+
+### Dashboard Complete Reform (PRs #51, #55, #56)
+
+**Redesigned dashboard with tabbed layout and 7 new BigQuery queries**
+- New tabbed navigation: Overview, Projects, Guardrails, Events — replaces single-scroll layout
+- `KpiBar` component with period comparison (current vs previous), trend arrows, and sparklines
+- `ProjectHealth` component — per-project health scores with deny rate, top guard, and event counts
+- `DenialReasons` component — aggregated denial reasons ranked by frequency
+- `GuardrailGlossary` component — all guards with descriptions, deny/warn counts, and drill-down links
+- `Hotspots` component — tabbed guard/tool/project hotspot view (replaces removed ToolsChart + ProjectsChart)
+- Dashboard.svelte refactored: `_loaded` flag prevents race condition between `onMount` and `$effect`; logout resets flag
+
+**New BigQuery queries (Cloud Function `hapai-bq-query`)**
+- `stats_comparison` — current vs previous period KPIs (denials, warnings, allows, rates)
+- `project_health` — per-project deny rate, top guard, event timeline
+- `denial_reasons` — top denial reasons with counts and percentages
+- `context_breakdown` — file categories, risk categories, branches, patterns (from context RECORD)
+- `hook_detail` — drill-down: mini-timeline + breakdown + recent events + stats per guard
+- `tool_detail` — drill-down: mini-timeline + breakdown + recent events + stats per tool
+- All queries use dedup CTE (`ROW_NUMBER() OVER PARTITION BY event_id`) and accept `period` parameter
+
+**API layer hardened (PR #56)**
+- 30-second fetch timeout with `AbortController` — prevents hung requests
+- Per-HTTP-status error messages (401 session expired, 403 denied, 404 endpoint check)
+- SonarQube-compliant exception handling (no empty catch blocks)
+- Correct `VITE_BQ_PROXY_URL` pointing to `hapai-bq-query` Cloud Function
+
+### Audit Dedup Pipeline (PR #49)
+
+**Eliminated duplicate events across the full pipeline — 4 layers**
+- **P0 — event_id generation**: `_audit_event_id()` in `_lib.sh` generates unique IDs: `<epoch_ms>-<hook>-<rand4hex>`
+- **P1 — Flow-dispatcher guard**: `flow-dispatcher.sh` exports `HAPAI_FLOW_EXECUTOR=1`; guard hooks call `_is_flow_managed && exit 0` to avoid double-logging when invoked both standalone and via flow
+- **P2 — Incremental sync**: `hapai sync` maintains `~/.hapai/state/sync_cursor` (line count); only sends delta. GCS path includes offset for idempotency
+- **P3 — BigQuery MERGE**: Cloud Function uses `MERGE WHEN NOT MATCHED INSERT` keyed on `event_id`; batch-level Python dedup before MERGE; `_merge_rows_by_event_id()` with streaming insert fallback
+
+### Hook Enrichment — Context Analytics (PR #52)
+
+**Structured context RECORD in BigQuery for deep analytics**
+- `deny()` and `warn()` now pass `context_json` through to `audit_log()` — every denial/warning carries structured metadata
+- 22-field context schema: `git_op`, `target_branch`, `protection_type`, `enforcement_method`, `filename`, `file_category`, `risk_category`, `command_preview`, `files_staged_count`, `packages_touched_count`, and more
+- All guard hooks enriched: guard-branch, guard-files, guard-blast-radius, guard-commit-msg, guard-destructive, guard-uncommitted emit context
+- Enables dashboard analytics by file category, risk tier, branch, and enforcement method
+
+### Hook Name Resolution (PR #50)
+
+- `audit_log()` now resolves hook name via `BASH_SOURCE[]` array walk instead of `$0`
+- Fixes `hook: "_lib"` pollution in audit logs (was 2.4M rows in BigQuery)
+- All hooks now correctly identify themselves in audit entries
+
+### Cloud Function Fixes (PRs #53, #54)
+
+- **Gen2 CloudEvent format** — `load_audit_from_gcs` updated for Gen2 runtime (`cloud_event.data` instead of legacy format)
+- **GCP sync enabled** — `hapai.yaml` project config now has `gcp.auto_sync.enabled: true`
+- **Two Cloud Functions**: `load_audit_from_gcs` (Storage trigger) + `hapai-bq-query` (HTTP trigger for dashboard)
+
+### Repo Hygiene
+
+- `.claude/settings.json` and `.claude/hooks/` removed from version control and added to `.gitignore`
+- PR review test setup restored after merge conflicts
+
+### Key Commits
+
+- `ae9d5b0` — fix(audit): eliminate duplicate events across the full pipeline (#49)
+- `4496c05` — fix(audit): resolve hook name via BASH_SOURCE[] walk (#50)
+- `96c1a81` — feat(dashboard): complete reform — hook enrichment + BigQuery context + redesigned dashboard (#51)
+- `b9c62b0` — fix(_lib): pass context_json through deny() and warn() to audit_log (#52)
+- `8739589` — fix(gcf): use Gen2 CloudEvent format in load_audit_from_gcs (#53)
+- `beea4d4` — fix(config): enable GCP sync in project hapai.yaml (#54)
+- `5f341fd` — fix(dashboard): correct BQ endpoint URL, add timeout and error diagnostics (#56)
+- `fa6269d` — fix(sonar): handle JSON parse exception with logging
+
+---
+
 ## v1.6.3 (2026-04-15) — Security: Close gh api Branch Deletion Bypass
 
 ### 🔒 Security

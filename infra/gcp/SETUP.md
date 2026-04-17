@@ -413,6 +413,34 @@ gcloud functions deploy hapai-load-audit \
 
 ---
 
+## Self-Hosting the Dashboard
+
+By default, CORS is allowed from `renatobardi.github.io` and localhost (for development).
+
+To allow your own domain, set the env var when deploying the `hapai-bq-query` Cloud Function:
+
+```bash
+gcloud functions deploy hapai-bq-query \
+  --source ./infra/gcp/functions \
+  --entry-point hapai_bq_query \
+  --runtime python312 \
+  --set-env-vars CORS_ORIGINS=https://yourdomain.com
+```
+
+For multiple origins (comma-separated):
+
+```bash
+gcloud functions deploy hapai-bq-query \
+  --source ./infra/gcp/functions \
+  --entry-point hapai_bq_query \
+  --runtime python312 \
+  --set-env-vars CORS_ORIGINS=https://yourdomain.com,https://another.domain.com
+```
+
+The function will use your custom origins instead of the defaults.
+
+---
+
 ## Security Notes
 
 - Keep `~/.config/gcp-sa-key.json` **private** and in `.gitignore`

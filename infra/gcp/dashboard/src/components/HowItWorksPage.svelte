@@ -213,17 +213,13 @@ hapai export --all               # Export for all tools</code></pre>
       <h2>{$t('docs.sections.cloudLogging.heading')}</h2>
       <p>{$t('docs.sections.cloudLogging.p1')}</p>
       <p><strong>{$t('docs.sections.cloudLogging.archTitle')}</strong></p>
-      <pre><code>hapai audit logs (local)
-    ↓
-GitHub Actions OIDC (keyless auth)
-    ↓
-Cloud Storage bucket
-    ↓
-Cloud Function (triggered on upload)
-    ↓
-BigQuery dataset
-    ↓
-Analytics Dashboard</code></pre>
+      <pre><code>~/.hapai/audit.jsonl (event_id + context per entry)
+    ↓ hapai sync (incremental, cursor-based)
+Cloud Storage bucket (delta files)
+    ↓ load_audit_from_gcs (Gen2 Cloud Function)
+BigQuery (MERGE dedup on event_id)
+    ↓ hapai-bq-query (HTTP Cloud Function)
+Analytics Dashboard (Svelte 5)</code></pre>
       <p><strong>{$t('docs.sections.cloudLogging.enableTitle')}</strong></p>
       <pre><code>gcp:
   enabled: true
