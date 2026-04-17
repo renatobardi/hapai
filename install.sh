@@ -38,9 +38,31 @@ setup_path() {
   local dir="$1"
   [[ ":$PATH:" == *":$dir:"* ]] && return 0
 
-  # ~/.profile is sourced by bash, zsh, sh, and dash as a login shell — no
-  # shell-specific config needed
-  local profile="$HOME/.profile"
+  # Detect shell and choose appropriate RC file for PATH setup
+  # For zsh: ~/.zprofile (login shell), or ~/.zshrc (interactive shell)
+  # For bash: ~/.bash_profile, then ~/.profile, then ~/.bashrc
+  # Fallback: ~/.profile (POSIX standard)
+  local profile
+
+  if [[ "$SHELL" == *"zsh"* ]]; then
+    # zsh users: prefer ~/.zprofile (login shell) over ~/.profile
+    if [[ -f "$HOME/.zprofile" ]]; then
+      profile="$HOME/.zprofile"
+    else
+      profile="$HOME/.zshrc"
+    fi
+  elif [[ "$SHELL" == *"bash"* ]]; then
+    # bash users: check ~/.bash_profile (login shell), fallback to ~/.bashrc
+    if [[ -f "$HOME/.bash_profile" ]]; then
+      profile="$HOME/.bash_profile"
+    else
+      profile="$HOME/.bashrc"
+    fi
+  else
+    # Other shells: use POSIX ~/.profile
+    profile="$HOME/.profile"
+  fi
+
   if ! grep -qF "$dir" "$profile" 2>/dev/null; then
     printf '\n# hapai — added by installer\nexport PATH="%s:$PATH"\n' "$dir" >> "$profile"
     log_ok "Added $dir to PATH in $profile"
@@ -71,6 +93,15 @@ detect_os() {
 check_deps() {
   local missing=()
 
+  # Bash 4+ — required for BASH_REMATCH and other constructs used in _lib.sh
+  local bash_version
+  bash_version="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
+  if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+    log_error "Bash 4+ required (you have $bash_version)"
+    log_info "Install with: brew install bash  (macOS) or apt-get install bash (Linux)"
+    exit 1
+  fi
+
   command -v git  &>/dev/null || missing+=(git)
   command -v jq   &>/dev/null || missing+=(jq)
   command -v curl &>/dev/null || { command -v wget &>/dev/null || missing+=(curl); }
@@ -86,7 +117,7 @@ check_deps() {
     exit 1
   fi
 
-  log_ok "Dependencies: bash, git, jq — OK"
+  log_ok "Dependencies: bash 4+, git, jq — OK"
 }
 
 # ─── Resolve version ─────────────────────────────────────────────────────────
@@ -123,9 +154,18 @@ install_from_source() {
   cp -r "$src_dir/templates" "$HAPAI_HOME/"
   cp -r "$src_dir/exporters" "$HAPAI_HOME/" 2>/dev/null || true
 
-  # Install binary
-  mkdir -p "$INSTALL_DIR"
-  cp "$src_dir/bin/hapai" "$INSTALL_DIR/hapai"
+  # Install binary with fallback on permission error
+  if ! mkdir -p "$INSTALL_DIR" 2>/dev/null || ! cp "$src_dir/bin/hapai" "$INSTALL_DIR/hapai" 2>/dev/null; then
+    log_warn "Cannot write to $INSTALL_DIR (permission denied)"
+
+    # Fallback: use ~/.local/bin
+    INSTALL_DIR="$HOME/.local/bin"
+    log_info "Falling back to $INSTALL_DIR"
+
+    mkdir -p "$INSTALL_DIR" || die "Cannot create $INSTALL_DIR either"
+    cp "$src_dir/bin/hapai" "$INSTALL_DIR/hapai" || die "Failed to copy binary to $INSTALL_DIR"
+  fi
+
   chmod +x "$INSTALL_DIR/hapai"
   setup_path "$INSTALL_DIR"
 }
@@ -188,9 +228,18 @@ install_from_github() {
   cp -r "$extracted_dir/templates" "$HAPAI_HOME/"
   cp -r "$extracted_dir/exporters" "$HAPAI_HOME/" 2>/dev/null || true
 
-  # Install binary
-  mkdir -p "$INSTALL_DIR"
-  cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai"
+  # Install binary with fallback on permission error
+  if ! mkdir -p "$INSTALL_DIR" 2>/dev/null || ! cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai" 2>/dev/null; then
+    log_warn "Cannot write to $INSTALL_DIR (permission denied)"
+
+    # Fallback: use ~/.local/bin
+    INSTALL_DIR="$HOME/.local/bin"
+    log_info "Falling back to $INSTALL_DIR"
+
+    mkdir -p "$INSTALL_DIR" || die "Cannot create $INSTALL_DIR either"
+    cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai" || die "Failed to copy binary to $INSTALL_DIR"
+  fi
+
   chmod +x "$INSTALL_DIR/hapai"
   setup_path "$INSTALL_DIR"
 }

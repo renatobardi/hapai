@@ -1348,6 +1348,123 @@ rm -f "$WORKFLOW_CONFIG"
 cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Installer Tests (install.sh)
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo ""
+echo -e "${BOLD}Testing installer (install.sh)${NC}"
+
+# Test 1: Verify installer checks Bash version in install.sh
+test_bash_version_check() {
+  # This test verifies that install.sh has the Bash 4+ check in check_deps()
+  if grep -q 'if \[\[ "${BASH_VERSINFO\[0\]}" -lt 4 \]\]' "$HAPAI_ROOT/install.sh"; then
+    echo -e "  ${GREEN}✓${NC} install.sh contains Bash 4+ version check"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${RED}✗${NC} install.sh missing Bash 4+ version check"
+    FAIL=$((FAIL + 1))
+  fi
+  TOTAL=$((TOTAL + 1))
+}
+
+# Test 2: setup_path() detects zsh and uses .zprofile
+test_zsh_path_detection() {
+  local temp_home
+  temp_home="$(mktemp -d)"
+
+  # Simulate zsh with ~/.zprofile
+  touch "$temp_home/.zprofile"
+
+  local output
+  local test_script="$(mktemp)"
+  cat > "$test_script" << 'PATH_TEST'
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOME="$1"
+SHELL="/bin/zsh"
+
+setup_path() {
+  local dir="$2"
+  local profile
+
+  if [[ "$SHELL" == *"zsh"* ]]; then
+    if [[ -f "$HOME/.zprofile" ]]; then
+      profile="$HOME/.zprofile"
+    else
+      profile="$HOME/.zshrc"
+    fi
+  else
+    profile="$HOME/.profile"
+  fi
+
+  echo "$profile"
+}
+
+setup_path "$@"
+PATH_TEST
+
+  output="$(bash "$test_script" "$temp_home" ~/.local/bin)"
+  if [[ "$output" == "$temp_home/.zprofile" ]]; then
+    echo -e "  ${GREEN}✓${NC} setup_path() detects zsh and uses .zprofile"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${RED}✗${NC} setup_path() did not detect zsh correctly (got: $output)"
+    FAIL=$((FAIL + 1))
+  fi
+  TOTAL=$((TOTAL + 1))
+  rm -f "$test_script" && rm -rf "$temp_home"
+}
+
+# Test 3: setup_path() falls back to .bashrc for bash
+test_bash_path_detection() {
+  local temp_home
+  temp_home="$(mktemp -d)"
+
+  local test_script="$(mktemp)"
+  cat > "$test_script" << 'BASH_PATH_TEST'
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOME="$1"
+SHELL="/bin/bash"
+
+setup_path() {
+  local dir="$2"
+  local profile
+
+  if [[ "$SHELL" == *"bash"* ]]; then
+    if [[ -f "$HOME/.bash_profile" ]]; then
+      profile="$HOME/.bash_profile"
+    else
+      profile="$HOME/.bashrc"
+    fi
+  fi
+
+  echo "$profile"
+}
+
+setup_path "$@"
+BASH_PATH_TEST
+
+  output="$(bash "$test_script" "$temp_home" ~/.local/bin)"
+  if [[ "$output" == "$temp_home/.bashrc" ]]; then
+    echo -e "  ${GREEN}✓${NC} setup_path() uses .bashrc for bash (no .bash_profile)"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${RED}✗${NC} setup_path() did not detect bash correctly (got: $output)"
+    FAIL=$((FAIL + 1))
+  fi
+  TOTAL=$((TOTAL + 1))
+  rm -f "$test_script" && rm -rf "$temp_home"
+}
+
+# Run installer tests
+test_bash_version_check
+test_zsh_path_detection
+test_bash_path_detection
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Summary
 # ═══════════════════════════════════════════════════════════════════════════
 
