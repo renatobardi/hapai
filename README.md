@@ -38,11 +38,11 @@ AI coding tools frequently ignore markdown instructions and safety guidelines. T
 ## Quick Start
 
 ```bash
-# Clone
-git clone https://github.com/renatobardi/hapai.git ~/hapai
+# Install (no sudo required)
+curl -fsSL https://raw.githubusercontent.com/renatobardi/hapai/main/install.sh | bash
 
-# Add to PATH
-ln -sf ~/hapai/bin/hapai /usr/local/bin/hapai
+# Reload PATH
+source ~/.profile
 
 # Install globally (all projects)
 hapai install --global
@@ -325,7 +325,7 @@ automation:
 ## Architecture
 
 **Technology Stack:**
-- **Hooks**: Pure Bash 4+ (~1,550 LOC)
+- **Hooks**: Pure Bash (~1,550 LOC)
 - **CLI**: Pure Bash (~645 LOC)
 - **Dashboard**: Svelte 5 + Vite
 - **Backend**: Python Cloud Functions
@@ -374,7 +374,7 @@ Pure bash assertions (no test framework). ~200 assertions covering:
 
 ## Requirements
 
-- **bash 4+** (check: `bash --version`)
+- **bash** (macOS default bash 3.2+ works fine)
 - **jq** (JSON parser)
 - **git** (for guard scripts)
 - **Node.js 24+** (for GitHub Actions workflows only)

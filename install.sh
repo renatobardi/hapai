@@ -5,14 +5,14 @@
 # Environment variables:
 #   HAPAI_VERSION   — pin a specific version (default: latest)
 #   HAPAI_HOME      — hapai state directory (default: ~/.hapai)
-#   INSTALL_DIR     — where to install the hapai binary (default: /usr/local/bin)
+#   INSTALL_DIR     — where to install the hapai binary (default: ~/.local/bin)
 #   HAPAI_DEV       — set to "1" to install from local source (for development)
 
 set -euo pipefail
 
 HAPAI_VERSION="${HAPAI_VERSION:-latest}"
 HAPAI_HOME="${HAPAI_HOME:-$HOME/.hapai}"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 HAPAI_REPO="renatobardi/hapai"
 HAPAI_REPO_URL="https://github.com/${HAPAI_REPO}"
 HAPAI_RAW_URL="https://raw.githubusercontent.com/${HAPAI_REPO}"
@@ -31,6 +31,21 @@ log_ok()    { echo -e "${GREEN}✓${NC} $*"; }
 log_warn()  { echo -e "${YELLOW}⚠${NC} $*"; }
 log_error() { echo -e "${RED}✗${NC} $*" >&2; }
 die()       { log_error "$*"; exit 1; }
+
+# ─── PATH setup ─────────────────────────────────────────────────────────────
+
+setup_path() {
+  local dir="$1"
+  [[ ":$PATH:" == *":$dir:"* ]] && return 0
+
+  # ~/.profile is sourced by bash, zsh, sh, and dash as a login shell — no
+  # shell-specific config needed
+  local profile="$HOME/.profile"
+  if ! grep -qF "$dir" "$profile" 2>/dev/null; then
+    printf '\n# hapai — added by installer\nexport PATH="%s:$PATH"\n' "$dir" >> "$profile"
+    log_ok "Added $dir to PATH in $profile"
+  fi
+}
 
 # ─── Detect OS ──────────────────────────────────────────────────────────────
 
@@ -55,23 +70,6 @@ detect_os() {
 
 check_deps() {
   local missing=()
-
-  # bash version check (need 4+)
-  local bash_major="${BASH_VERSINFO[0]:-3}"
-  if [[ "$bash_major" -lt 4 ]]; then
-    local os
-    os="$(detect_os)"
-    if [[ "$os" == "darwin" ]]; then
-      log_error "Bash ${BASH_VERSION} detected. hapai requires Bash 4+."
-      log_info "macOS ships with Bash 3.2 (GPL license constraint). Fix:"
-      log_info "  brew install bash"
-      log_info "Then re-run:"
-      log_info '  /opt/homebrew/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/renatobardi/hapai/main/install.sh)"'
-      exit 1
-    else
-      log_warn "Bash ${BASH_VERSION} detected (4+ recommended)."
-    fi
-  fi
 
   command -v git  &>/dev/null || missing+=(git)
   command -v jq   &>/dev/null || missing+=(jq)
@@ -126,9 +124,10 @@ install_from_source() {
   cp -r "$src_dir/exporters" "$HAPAI_HOME/" 2>/dev/null || true
 
   # Install binary
-  mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+  mkdir -p "$INSTALL_DIR"
   cp "$src_dir/bin/hapai" "$INSTALL_DIR/hapai"
   chmod +x "$INSTALL_DIR/hapai"
+  setup_path "$INSTALL_DIR"
 }
 
 install_from_github() {
@@ -190,36 +189,10 @@ install_from_github() {
   cp -r "$extracted_dir/exporters" "$HAPAI_HOME/" 2>/dev/null || true
 
   # Install binary
-  mkdir -p "$INSTALL_DIR" 2>/dev/null || true
-  if ! cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai" 2>/dev/null; then
-    # Try with sudo if permission denied
-    if command -v sudo &>/dev/null; then
-      log_warn "Permission denied — trying with sudo..."
-      sudo cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai"
-    else
-      # Fallback: install to ~/.local/bin
-      INSTALL_DIR="$HOME/.local/bin"
-      mkdir -p "$INSTALL_DIR"
-      cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai"
-      log_warn "Installed to $INSTALL_DIR (not in PATH — auto-updating shell config...)"
-
-      # Auto-fix PATH
-      local shell_rc=""
-      case "$(basename "${SHELL:-bash}")" in
-        zsh)  shell_rc="$HOME/.zshrc" ;;
-        bash) shell_rc="$HOME/.bashrc" ;;
-        fish) shell_rc="$HOME/.config/fish/config.fish" ;;
-      esac
-      if [[ -n "$shell_rc" ]] && [[ -f "$shell_rc" ]]; then
-        if ! grep -q 'HOME/.local/bin' "$shell_rc" 2>/dev/null; then
-          printf '\n# hapai — added by installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$shell_rc"
-          log_ok "Added ~/.local/bin to PATH in $shell_rc"
-          log_warn "Restart your terminal or run: source $shell_rc"
-        fi
-      fi
-    fi
-  fi
+  mkdir -p "$INSTALL_DIR"
+  cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai"
   chmod +x "$INSTALL_DIR/hapai"
+  setup_path "$INSTALL_DIR"
 }
 
 # ─── Post-install setup ──────────────────────────────────────────────────────
@@ -255,7 +228,7 @@ verify_install() {
   elif [[ -x "$INSTALL_DIR/hapai" ]]; then
     log_ok "hapai installed at $INSTALL_DIR/hapai"
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-      log_warn "$INSTALL_DIR is not in PATH. Add it with: export PATH=\"$INSTALL_DIR:\$PATH\""
+      log_warn "Run: source ~/.profile  (or open a new terminal) to use hapai in this session"
     fi
   else
     log_warn "Could not verify installation. Check that $INSTALL_DIR is in PATH."
