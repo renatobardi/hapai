@@ -8,8 +8,10 @@
 ```
 
 [![Pure Bash](https://img.shields.io/badge/Pure%20Bash-Yes-green?style=flat-square)](https://github.com/renatobardi/hapai)
-[![CI/CD](https://img.shields.io/github/actions/workflow/status/renatobardi/hapai/ci.yml?style=flat-square)](https://github.com/renatobardi/hapai/actions/workflows/ci.yml)
+[![CI/CD](https://img.shields.io/github/actions/workflow/status/renatobardi/hapai/ci.yml?style=flat-square&branch=main)](https://github.com/renatobardi/hapai/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/Tests-133%2F133-green?style=flat-square)](tests/run-tests.sh)
 [![License](https://img.shields.io/github/license/renatobardi/hapai?style=flat-square)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/renatobardi/hapai?style=flat-square)](https://github.com/renatobardi/hapai/releases)
 
 > Deterministic guardrails for AI coding assistants. Hooks that enforce rules **before execution** — not probabilistic prompts that get ignored.
 
