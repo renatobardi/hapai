@@ -5,6 +5,7 @@ Triggered by: Cloud Storage finalizeCreate event on hapai-audit-* buckets
 
 import json
 import logging
+import os
 import re
 from datetime import datetime
 from typing import Dict, List, Any
@@ -380,10 +381,20 @@ import functions_framework
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
-_ALLOWED_ORIGINS = {
-    "https://hapai.oute.pro",
+_DEFAULT_CORS_ORIGINS = {
     "https://renatobardi.github.io",
+    "http://localhost:5173",
+    "http://localhost:4173",
 }
+
+def _get_allowed_origins() -> set:
+    """Get allowed CORS origins from env var or defaults."""
+    env_val = os.environ.get("CORS_ORIGINS", "")
+    if env_val:
+        return {o.strip() for o in env_val.split(",") if o.strip()}
+    return _DEFAULT_CORS_ORIGINS
+
+_ALLOWED_ORIGINS = _get_allowed_origins()
 
 
 def _get_table_ref(table_name: str) -> str:
