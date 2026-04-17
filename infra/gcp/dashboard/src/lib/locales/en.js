@@ -62,7 +62,7 @@ export default {
       label: 'Analytics',
       heading: 'See what your AI is doing.',
       desc: 'hapai logs every action — denials, warnings, and allows — to an append-only audit trail. Sync to BigQuery for enterprise analytics, or use the built-in dashboard to visualize guardrail activity across all your projects.',
-      features: '30-day timeline · Drill-down per guard & tool · Allow/Deny rate cards · Per-project breakdown · Event detail drawer',
+      features: 'KPI bar with trend comparison · 7/14/30-day timeline · Drill-down per guard & tool · Project health scores · Context analytics · Event detail drawer',
       cta: 'Sign in with GitHub',
       signingIn: 'Signing in…',
       signInError: 'Sign in failed. Try again.',
@@ -72,7 +72,7 @@ export default {
       heading: 'Stop hoping the AI will follow the rules. Enforce them.',
       cta: 'Get Started',
       links: { github: 'GitHub', docs: 'Documentation', changelog: 'Changelog' },
-      note: 'hapai v1.6.2 · Pure bash. Zero dependencies. Deterministic safety.'
+      note: 'hapai v1.7.0 · Pure bash. Zero dependencies. Deterministic safety.'
     }
   },
   docs: {
@@ -141,17 +141,20 @@ export default {
         heading: 'Analytics Dashboard',
         intro: 'This dashboard displays real-time guardrail events from your audit logs:',
         features: [
-          'Timeline — Daily denial/warning counts (30-day rolling window)',
-          'Top Blocking Hooks — Which guardrails are most active',
-          'Recent Events — Live feed of denials and warnings',
-          'Tool Distribution — Which tools trigger guards most',
-          'Project Breakdown — Per-project statistics',
-          'Deny Rate Trend — Historical analysis'
+          'KPI Bar — Denials, warnings, allows, deny/allow rate with period comparison and sparklines',
+          'Timeline — Daily denial/warning rates (7/14/30-day rolling window, server-side period switching)',
+          'Project Health — Per-project deny rate, top guard, event counts, and health score',
+          'Denial Reasons — Top reasons aggregated by frequency with guard drill-down',
+          'Guardrail Glossary — All guards with descriptions, deny/warn counts, and drill-down',
+          'Drill-down (L2) — Mini-timeline, breakdown bars, and recent events per guard or tool',
+          'Event Detail (L3) — Full-screen drawer with all fields and Previous/Next navigation',
+          'Context Analytics — File categories, risk tiers, branches from enriched hook context'
         ],
         setupTitle: 'Setup:',
         setup: [
           'Create Firebase project with GitHub OAuth',
-          'Set GitHub Actions secrets (VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID)',
+          'Deploy Cloud Functions: load_audit_from_gcs (Storage trigger) + hapai-bq-query (HTTP)',
+          'Set GitHub Actions secrets (VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID, VITE_BQ_PROXY_URL)',
           'Push to main → GitHub Actions builds and deploys to GitHub Pages',
           'Dashboard live at: https://owner.github.io/repo/'
         ]

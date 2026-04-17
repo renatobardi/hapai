@@ -59,7 +59,18 @@ check_deps() {
   # bash version check (need 4+)
   local bash_major="${BASH_VERSINFO[0]:-3}"
   if [[ "$bash_major" -lt 4 ]]; then
-    log_warn "bash ${BASH_VERSION} detected (4+ recommended). On macOS, run: brew install bash"
+    local os
+    os="$(detect_os)"
+    if [[ "$os" == "darwin" ]]; then
+      log_error "Bash ${BASH_VERSION} detected. hapai requires Bash 4+."
+      log_info "macOS ships with Bash 3.2 (GPL license constraint). Fix:"
+      log_info "  brew install bash"
+      log_info "Then re-run:"
+      log_info '  /opt/homebrew/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/renatobardi/hapai/main/install.sh)"'
+      exit 1
+    else
+      log_warn "Bash ${BASH_VERSION} detected (4+ recommended)."
+    fi
   fi
 
   command -v git  &>/dev/null || missing+=(git)
@@ -190,7 +201,22 @@ install_from_github() {
       INSTALL_DIR="$HOME/.local/bin"
       mkdir -p "$INSTALL_DIR"
       cp "$extracted_dir/bin/hapai" "$INSTALL_DIR/hapai"
-      log_warn "Installed to $INSTALL_DIR (not in PATH — add it with: export PATH=\"\$HOME/.local/bin:\$PATH\")"
+      log_warn "Installed to $INSTALL_DIR (not in PATH — auto-updating shell config...)"
+
+      # Auto-fix PATH
+      local shell_rc=""
+      case "$(basename "${SHELL:-bash}")" in
+        zsh)  shell_rc="$HOME/.zshrc" ;;
+        bash) shell_rc="$HOME/.bashrc" ;;
+        fish) shell_rc="$HOME/.config/fish/config.fish" ;;
+      esac
+      if [[ -n "$shell_rc" ]] && [[ -f "$shell_rc" ]]; then
+        if ! grep -q 'HOME/.local/bin' "$shell_rc" 2>/dev/null; then
+          printf '\n# hapai — added by installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$shell_rc"
+          log_ok "Added ~/.local/bin to PATH in $shell_rc"
+          log_warn "Restart your terminal or run: source $shell_rc"
+        fi
+      fi
     fi
   fi
   chmod +x "$INSTALL_DIR/hapai"
@@ -205,6 +231,14 @@ post_install() {
   # Initialize state directories and audit log
   mkdir -p "$HAPAI_HOME/state" "$HAPAI_HOME/state/cooldown" 2>/dev/null || true
   touch "$HAPAI_HOME/audit.jsonl" 2>/dev/null || true
+
+  # Verify hooks were copied
+  local hook_count
+  hook_count="$(find "$HAPAI_HOME/hooks" -name "*.sh" -type f 2>/dev/null | wc -l | tr -d ' ')"
+  if [[ "$hook_count" -eq 0 ]]; then
+    die "Installation failed: no hooks found in $HAPAI_HOME/hooks — the download may be incomplete"
+  fi
+  log_ok "Hooks verified: $hook_count scripts installed"
 
   # Copy default config if not already present
   if [[ ! -f "$HAPAI_HOME/hapai.yaml" ]]; then
