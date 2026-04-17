@@ -15,11 +15,11 @@ The system combines:
 ## Prerequisites
 
 Before working on this codebase, ensure:
+- **Bash 4+** (CRITICAL) — All hook scripts and installer require Bash 4+ for `BASH_REMATCH`, `set -euo pipefail`, and other constructs. Install: `brew install bash` (macOS comes with Bash 3.2)
 - **jq 1.6+** — Required for all hook scripts and validation. Install: `brew install jq`
 - **Node.js 20+ + npm** — Required only for dashboard development (`infra/gcp/dashboard/`)
-- **Bash 4+** — All scripts use `set -euo pipefail` and POSIX-compatible tools
 - **Git** — Version control and release tagging
-- **Tested platforms** — macOS and Linux. CI runs on both via `ci.yml`. WSL supported via installer detection.
+- **Tested platforms** — macOS 10.15+ and Linux. CI runs on both via `ci.yml`. WSL supported via installer detection.
 
 ## Development Environment Setup
 

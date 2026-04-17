@@ -374,10 +374,10 @@ Pure bash assertions (no test framework). ~200 assertions covering:
 
 ## Requirements
 
-- **bash** (macOS default bash 3.2+ works fine)
-- **jq** (JSON parser)
+- **bash 4+** (REQUIRED: macOS ships with Bash 3.2; install via `brew install bash`)
+- **jq 1.6+** (JSON parser)
 - **git** (for guard scripts)
-- **Node.js 24+** (for GitHub Actions workflows only)
+- **Node.js 20+** (for dashboard development only; not required for hooks)
 
 For cloud logging (optional):
 - **gcloud CLI** (Cloud Storage, Cloud Functions, BigQuery)
