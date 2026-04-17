@@ -110,6 +110,12 @@ guardrails:
 
 Deploy a real-time analytics dashboard to GitHub Pages to monitor guardrail events across your team.
 
+### Live Demo
+
+**[🚀 View Live Demo](https://hapai.oute.pro)** — Real-time dashboard showing guardrail enforcement across teams.
+
+![hapai Dashboard Overview](.docs/images/dashboard-overview.svg)
+
 ### Features
 
 - **KPI Bar** — Denials, warnings, allows, deny rate, allow rate — with period comparison (current vs previous), trend arrows, and sparklines

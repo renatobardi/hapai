@@ -1,0 +1,111 @@
+<svg viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="700" fill="#f8f9fa"/>
+
+  <!-- Header -->
+  <rect width="1200" height="60" fill="#1a1a1a"/>
+  <text x="30" y="40" font-size="24" font-weight="bold" fill="#fff">= | hapai</text>
+  <text x="100" y="40" font-size="24" font-weight="bold" fill="#888">Guardrails Analytics</text>
+  <text x="1050" y="40" font-size="12" fill="#888">DASHBOARD</text>
+
+  <!-- KPI Bar -->
+  <rect x="20" y="80" width="1160" height="100" fill="#fff" stroke="#e0e0e0" stroke-width="1" rx="8"/>
+
+  <!-- KPI Card 1 -->
+  <text x="50" y="105" font-size="11" font-weight="bold" fill="#666" letter-spacing="1">ACTIONS MONITORED</text>
+  <text x="50" y="135" font-size="32" font-weight="bold" fill="#1a1a1a">8,561</text>
+  <text x="50" y="155" font-size="12" fill="#4caf50">↑ +568.8% vs prev 7d</text>
+
+  <!-- KPI Card 2 -->
+  <text x="350" y="105" font-size="11" font-weight="bold" fill="#666" letter-spacing="1">DENIAL RATE</text>
+  <text x="350" y="135" font-size="32" font-weight="bold" fill="#d32f2f">0.8%</text>
+  <text x="350" y="155" font-size="12" fill="#d32f2f">↓ -42.9% vs prev 7d</text>
+
+  <!-- KPI Card 3 -->
+  <text x="650" y="105" font-size="11" font-weight="bold" fill="#666" letter-spacing="1">WARNING RATE</text>
+  <text x="650" y="135" font-size="32" font-weight="bold" fill="#ff9800">5.3%</text>
+  <text x="650" y="155" font-size="12" fill="#ff9800">↑ +6.0% vs prev 7d</text>
+
+  <!-- KPI Card 4 -->
+  <text x="950" y="105" font-size="11" font-weight="bold" fill="#666" letter-spacing="1">TOTAL BLOCKED</text>
+  <text x="950" y="135" font-size="32" font-weight="bold" fill="#d32f2f">71</text>
+  <text x="950" y="155" font-size="12" fill="#d32f2f">↑ +294.4% vs prev 7d</text>
+
+  <!-- Tabs -->
+  <rect x="20" y="195" width="1160" height="40" fill="#fff" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="50" y="220" font-size="12" font-weight="bold" fill="#1a1a1a">Overview</text>
+  <rect x="50" y="225" width="70" height="2" fill="#1a1a1a"/>
+  <text x="140" y="220" font-size="12" fill="#999">Projects</text>
+  <text x="230" y="220" font-size="12" fill="#999">Guardrails</text>
+  <text x="320" y="220" font-size="12" fill="#999">Events</text>
+
+  <!-- Timeline Chart -->
+  <rect x="20" y="250" width="720" height="230" fill="#fff" stroke="#e0e0e0" stroke-width="1" rx="4"/>
+  <text x="40" y="270" font-size="12" font-weight="bold" fill="#1a1a1a">ACTIVITY TIMELINE</text>
+  <text x="40" y="285" font-size="11" fill="#999">Guardrail intervention rate over time</text>
+
+  <!-- Mini timeline chart -->
+  <line x1="40" y1="310" x2="700" y2="310" stroke="#e0e0e0" stroke-width="1"/>
+  <path d="M 50 370 Q 80 350 110 355 T 170 345 T 230 340 T 290 350 T 350 330 T 410 355 T 470 340 T 530 360 T 590 345 T 650 350 T 700 360"
+        stroke="#ff9800" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <circle cx="50" cy="370" r="3" fill="#ff9800"/>
+  <circle cx="700" cy="360" r="3" fill="#ff9800"/>
+
+  <!-- Legend -->
+  <line x1="40" y1="400" x2="60" y2="400" stroke="#d32f2f" stroke-width="2"/>
+  <text x="70" y="404" font-size="11" fill="#666">Denial Rate (%)</text>
+
+  <line x1="260" y1="400" x2="280" y2="400" stroke="#ff9800" stroke-width="2"/>
+  <text x="290" y="404" font-size="11" fill="#666">Warning Rate (%)</text>
+
+  <!-- Period selector -->
+  <rect x="600" y="400" width="40" height="24" fill="#1a1a1a" rx="4"/>
+  <text x="610" y="416" font-size="10" fill="#fff" font-weight="bold">7D</text>
+
+  <text x="660" y="416" font-size="10" fill="#999">14D</text>
+  <text x="700" y="416" font-size="10" fill="#999">30D</text>
+
+  <!-- Left side: Denial Reasons -->
+  <rect x="20" y="500" width="480" height="180" fill="#fff" stroke="#e0e0e0" stroke-width="1" rx="4"/>
+  <text x="40" y="520" font-size="12" font-weight="bold" fill="#1a1a1a">TOP DENIAL REASONS</text>
+  <text x="40" y="535" font-size="10" fill="#999">Most common messages per guardrail</text>
+
+  <!-- Reason 1 -->
+  <rect x="40" y="550" width="20" height="12" fill="#d32f2f" rx="2"/>
+  <text x="70" y="559" font-size="10" fill="#1a1a1a">Push blocked on protected branch 'main'</text>
+  <text x="430" y="559" font-size="10" fill="#d32f2f" font-weight="bold">15</text>
+
+  <!-- Reason 2 -->
+  <rect x="40" y="575" width="18" height="12" fill="#d32f2f" rx="2" opacity="0.7"/>
+  <text x="70" y="584" font-size="10" fill="#1a1a1a">Write blocked — .env edit</text>
+  <text x="430" y="584" font-size="10" fill="#d32f2f" font-weight="bold">9</text>
+
+  <!-- Reason 3 -->
+  <rect x="40" y="600" width="15" height="12" fill="#d32f2f" rx="2" opacity="0.5"/>
+  <text x="70" y="609" font-size="10" fill="#1a1a1a">Commit blocked on protected branch</text>
+  <text x="430" y="609" font-size="10" fill="#d32f2f" font-weight="bold">6</text>
+
+  <!-- Right side: Top Guards -->
+  <rect x="520" y="500" width="660" height="180" fill="#fff" stroke="#e0e0e0" stroke-width="1" rx="4"/>
+  <text x="540" y="520" font-size="12" font-weight="bold" fill="#1a1a1a">TOP GUARDS</text>
+
+  <!-- Guard bars -->
+  <rect x="540" y="550" width="600" height="20" fill="#d32f2f" rx="3"/>
+  <text x="550" y="564" font-size="11" fill="#fff" font-weight="bold">_lib</text>
+  <text x="1130" y="564" font-size="11" fill="#666">50</text>
+
+  <rect x="540" y="580" width="150" height="20" fill="#d32f2f" rx="3" opacity="0.7"/>
+  <text x="550" y="594" font-size="11" fill="#fff" font-weight="bold">guard-branch</text>
+  <text x="700" y="594" font-size="11" fill="#666">12</text>
+
+  <rect x="540" y="610" width="60" height="20" fill="#d32f2f" rx="3" opacity="0.5"/>
+  <text x="550" y="624" font-size="11" fill="#fff" font-weight="bold">guard-destructive</text>
+  <text x="610" y="624" font-size="11" fill="#666">5</text>
+
+  <rect x="540" y="640" width="45" height="20" fill="#d32f2f" rx="3" opacity="0.4"/>
+  <text x="550" y="654" font-size="11" fill="#fff" font-weight="bold">guard-commit-msg</text>
+  <text x="595" y="654" font-size="11" fill="#666">4</text>
+
+  <!-- Footer info -->
+  <text x="40" y="695" font-size="9" fill="#999">Real-time analytics • Cloud Functions + BigQuery • GitHub Pages deployment</text>
+</svg>
