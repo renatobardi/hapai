@@ -134,6 +134,47 @@ hapai_dataset.events (BigQuery, MERGE dedup on event_id)
 Dashboard (Svelte 5, GitHub Pages)
 ```
 
+### Dashboard Views
+
+**Overview Tab** — Real-time guardrail enforcement snapshot
+```
+┌─────────────────────────────────────────────────────┐
+│  📊 KPI Bar: Denials | Warnings | Allow Rate | Deny │
+├─────────────────────────────────────────────────────┤
+│  📈 Timeline: Daily enforcement trends (7/14/30d)   │
+│  🎯 Project Health: Per-project health scores       │
+│  📋 Denial Reasons: Top reasons ranked by frequency │
+└─────────────────────────────────────────────────────┘
+```
+
+**Projects Tab** — Per-project enforcement summary
+```
+Project Name          Deny Rate    Top Guard          Events
+──────────────────────────────────────────────────────────
+my-app               12%           branch-protection  234
+api-service          8%            file-protection    89
+dashboard            5%            commit-hygiene     42
+```
+
+**Guardrails Tab** — Guard documentation & stats
+```
+Guard               Blocks    Warns    Last Event      Drill-Down
+────────────────────────────────────────────────────────────────
+branch-protection   1,245     342      2 min ago       [Details]
+file-protection     523       91       15 min ago      [Details]
+commit-hygiene      187       445      1 hour ago      [Details]
+```
+
+**Events Tab** — Full audit log with filtering
+```
+Timestamp     Hook                Tool    Project    Result    Reason
+──────────────────────────────────────────────────────────────────────
+14:32:15      guard-branch        Bash    my-app     DENY      Protected branch
+14:31:02      guard-files         Write   api-service DENY     .env edit blocked
+14:29:45      guard-blast-radius  Bash    dashboard   WARN     7 files touched
+[Load More...]
+```
+
 ### Setup
 
 1. Create Firebase project with GitHub OAuth provider
@@ -141,6 +182,8 @@ Dashboard (Svelte 5, GitHub Pages)
 3. Set GitHub Actions secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_APP_ID`, `VITE_BQ_PROXY_URL`)
 4. Merge to main → GitHub Actions builds and deploys to GitHub Pages
 5. Dashboard live at: `https://{owner}.github.io/{repo}/`
+
+**Live Demo:** https://hapai.oute.pro (requires GitHub OAuth login)
 
 See [`infra/gcp/SETUP.md`](infra/gcp/SETUP.md) for complete setup guide.
 
