@@ -9,7 +9,22 @@
 
 > Deterministic guardrails for AI coding assistants. Hooks that enforce rules **before execution** — not probabilistic prompts that get ignored.
 
-**hapai** v1.6+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
+**hapai** v1.7+ combines shell-based enforcement hooks with a cloud-native analytics dashboard. It intercepts Claude Code, Cursor, and Copilot tool calls in real-time and blocks violations immediately. When combined with Cloud Storage + BigQuery + GitHub Pages, it provides real-time visibility into guard enforcement across your team.
+
+## What's New in v1.7.0 (Release Wave 3)
+
+**Infrastructure & Release Automation:**
+- **CORS origin validation** — Cloud Function now validates `CORS_ORIGINS` env var (origin format, length, scheme checks); secure-by-default
+- **Installer improvements** — Automatic PATH auto-update on fallback, Bash 4+ hard gate for macOS, post-install hook count verification
+- **CLI standalone mode** — `HAPAI_ROOT` fallback detection, OS-aware `jq` hints, proper library sourcing guards
+- **Release automation** — `scripts/tag-release.sh` for consistent version tagging with semver validation; trunk-based workflow enforcement (feature branch → PR merge → tag push)
+- **Community docs** — `CONTRIBUTING.md`, GitHub issue/PR templates, README badges (Pure Bash, CI/CD, License)
+- **Code quality** — 133 tests passing, comprehensive security review completed, validated against CLAUDE.md compliance
+
+**Previous v1.7.0 Wave 1-2 (PRs #49–#56):**
+- **Dashboard reform** — Tabbed layout, 7 new BigQuery queries, drill-down analytics (L2), event detail drawer (L3)
+- **Audit dedup pipeline** — 4-layer deduplication (P0-P3), 22-field context RECORD for analytics
+- **Cloud Function hardening** — Gen2 CloudEvent support, 30s timeout, per-status error messages
 
 ## What's New in v1.6.2
 

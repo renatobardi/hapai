@@ -1,5 +1,52 @@
 # hapai Changelog
 
+## v1.7.0 Wave 3 (2026-04-16) — Infrastructure Hardening & Release Automation
+
+### 🔒 Security
+
+**CORS origin validation (PR #62)**
+- Cloud Function `_get_allowed_origins()` now validates `CORS_ORIGINS` env var with `_validate_cors_origin()`
+- Validation checks: origin format (https/http only), max length (256 chars), rejects wildcards and path components
+- Fallback to secure defaults if env var contains invalid origins
+- Complies with CLAUDE.md input validation pattern
+
+### 🚀 Features
+
+**Release automation (PR #64)**
+- Added `scripts/tag-release.sh` — automated semver tagging with version consistency checks
+- Validates semver format (X.Y.Z), checks version consistency between `bin/hapai` and `hooks/_lib.sh`
+- Creates git commit + annotated tag locally
+- **Updated workflow to follow trunk-based model:** create feature branch → push → open PR → merge to main → push tag
+- Prevents direct pushes to protected main branch
+
+**Installer robustness (PR #60)**
+- Automatic PATH auto-update: appends `~/.local/bin` to shell RC files (bash, zsh, fish) on fallback
+- Bash 4+ hard gate for macOS with clear installation instructions
+- Post-install hook count verification prevents silent installation failures
+
+**CLI standalone mode (PR #61)**
+- `HAPAI_ROOT` fallback detection: checks `~/.hapai/hooks/` if repo root hooks not found
+- OS-aware `jq` installation hints (brew for macOS, apt-get for Linux)
+- `_lib.sh` source guard in `cmd_sync` prevents sourcing errors
+
+**Template deduplication (PR #59)**
+- Removed 2 duplicate `guard-branch.sh` hook registrations in `settings.hooks.json`
+- Prevents triple execution of branch protection per `gh api` operation
+
+**Community documentation (PR #63)**
+- Added `CONTRIBUTING.md` with full contributor workflow, guardrail philosophy, commit conventions, branch naming, PR checklist
+- GitHub issue templates: `bug_report.md` (OS, Bash version, reproduction), `feature_request.md` (use case, contributor interest)
+- GitHub PR template with checklist: tests, dependencies, CHANGELOG, docs updates
+- README badges: Pure Bash (green), CI/CD status, License (MIT)
+
+### ✅ Quality
+
+- **133 tests passing** — all guardrails, automations, and core utilities validated
+- **Code review completed** — 6 PRs reviewed for bugs, CLAUDE.md compliance, security
+- **Zero regressions** — Python syntax valid, Bash syntax valid, no hardcoded secrets, proper file permissions
+
+---
+
 ## v1.6.3 (2026-04-15) — Security: Close gh api Branch Deletion Bypass
 
 ### 🔒 Security
