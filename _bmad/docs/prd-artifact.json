@@ -1,0 +1,573 @@
+{
+  "version": "1.0",
+  "product_name": "Ensi",
+  "scope": "v1",
+  "date": "2026-04-17",
+  "produced_by": "PM",
+  "input_artifact": "brief-artifact.json",
+  "status": "complete",
+  "pipeline_stages": [
+    "discovery",
+    "planning",
+    "architecture",
+    "development",
+    "review"
+  ],
+  "validation_spikes": [
+    {
+      "id": "SP-01",
+      "title": "ACP + Multica Daemon Integration",
+      "goal": "Prove that an ACP-compatible TypeScript agent can register with the Multica daemon, receive a task, and post a response end-to-end without a custom fork of Multica.",
+      "done_when": [
+        "A minimal ACP agent (< 50 LOC) registers with the local Multica daemon",
+        "The agent receives a task payload sent via multica CLI",
+        "The agent posts a comment back to the triggering issue",
+        "No daemon fork, monkey-patching, or undocumented APIs required",
+        "ACP SDK version is pinned; adapter layer is defined"
+      ],
+      "fail_criteria": "If registration or message exchange requires changes to the Multica daemon source, stop and escalate",
+      "effort": "S",
+      "blocks": ["EP-03"]
+    },
+    {
+      "id": "SP-02",
+      "title": "BMad Prompt Portability",
+      "goal": "Confirm that core BMad Analyst, PM, and Architect prompts produce useful structured output when invoked via the Anthropic API directly — without IDE, CLAUDE.md, or human guidance during generation.",
+      "done_when": [
+        "Analyst prompt produces a product-brief.md rated >= 4/5 by a developer unfamiliar with the project",
+        "PM prompt consumes the brief and produces a PRD with >= 3 testable user stories",
+        "Architect prompt consumes the PRD and produces an ADR with >= 1 concrete stack recommendation",
+        "All prompts run without modification to core BMad prompt text"
+      ],
+      "fail_criteria": "If prompts require substantial rewriting or output quality < 3/5, escalate scope pivot",
+      "effort": "S",
+      "blocks": ["EP-04", "EP-05", "EP-06"]
+    }
+  ],
+  "features": [
+    {
+      "id": "F-001",
+      "name": "ACP-Compatible Agent Interface",
+      "priority": "must",
+      "epic": "EP-03",
+      "user_stories": [
+        "As Marco, I want to tag a Multica issue BP and have Ensi automatically start the Analyst stage, so that I get a structured planning session without manually invoking an agent."
+      ],
+      "acceptance_criteria": [
+        "Given Ensi is registered in a Multica workspace, when a BP-tagged issue is created, then Ensi receives the task within 10 seconds",
+        "Given the Multica daemon is running, when a minimal ACP agent is started, then it appears in multica agent list within 5 seconds",
+        "Given an ACP agent is registered, when a task is sent via multica CLI, then the agent receives and processes it without daemon changes"
+      ],
+      "artifact_schema": null,
+      "functional_requirements": ["FR-01", "FR-02"]
+    },
+    {
+      "id": "F-002",
+      "name": "Analyst Stage — Clarifying Dialogue + product-brief.md",
+      "priority": "must",
+      "epic": "EP-04",
+      "user_stories": [
+        "As Marco, I want the Analyst to ask me targeted clarifying questions before writing the product brief, so that the brief reflects my specific project context.",
+        "As Marco, I want product-brief.md to be saved and committed in my project repo, so that I can review and edit it before the PM stage begins."
+      ],
+      "acceptance_criteria": [
+        "Given the Analyst stage has started, when I respond to the first question via a comment, then the Analyst posts the next question or confirms sufficient context",
+        "Given the Analyst has asked all questions, when I provide the final answer, then the Analyst generates and commits product-brief.md to .ensi/docs/",
+        "Given the Analyst completes, when the artefact is committed, then Ensi posts a comment with a summary and updates the issue status to in_review",
+        "The Analyst asks no more than 5 clarifying questions total"
+      ],
+      "artifact_schema": "BriefArtifact",
+      "functional_requirements": ["FR-05", "FR-08", "FR-09", "FR-10", "FR-11"]
+    },
+    {
+      "id": "F-003",
+      "name": "PM Stage — PRD with Testable Acceptance Criteria",
+      "priority": "must",
+      "epic": "EP-05",
+      "user_stories": [
+        "As Ana, I want the PRD to include testable acceptance criteria in Given/When/Then format for every user story, so that dev agents have unambiguous specs."
+      ],
+      "acceptance_criteria": [
+        "Given the PM stage receives a product-brief.md, when the PM agent generates the PRD, then prd.md contains >= 3 user stories",
+        "Given the PRD is generated, then each user story has a unique ID (US-01, US-02, ...), >= 1 Gherkin acceptance criterion, an effort estimate (S/M/L/XL), and a parent epic reference",
+        "Given the PRD is complete, then it includes an explicit MVP scope section with in-scope and out-of-scope lists",
+        "Given the PM completes, then prd.md is committed to .ensi/docs/ and a summary comment is posted to the Multica issue"
+      ],
+      "artifact_schema": "PrdArtifact",
+      "functional_requirements": ["FR-06", "FR-08", "FR-09", "FR-10", "FR-11"]
+    },
+    {
+      "id": "F-004",
+      "name": "Architect Stage — Architecture Decision Record",
+      "priority": "must",
+      "epic": "EP-06",
+      "user_stories": [
+        "As Marco, I want the Architect stage to produce an ADR with documented stack choices and trade-offs, so that I have a written technical decision trail before any coding begins."
+      ],
+      "acceptance_criteria": [
+        "Given the Architect stage receives prd.md, when the Architect agent generates the ADR, then architecture.md is written to .ensi/docs/",
+        "Given the ADR is generated, then it includes >= 1 architectural decision in ADR format (Context / Decision / Consequences)",
+        "Given the ADR is generated, then it explicitly names the technology chosen for each major concern (runtime, storage, LLM interaction, artefact format)",
+        "Given the ADR is generated, then rejected alternatives are listed with reasons for rejection"
+      ],
+      "artifact_schema": "ArchitectureArtifact",
+      "functional_requirements": ["FR-07", "FR-08", "FR-09", "FR-10", "FR-11"]
+    },
+    {
+      "id": "F-005",
+      "name": "Schema-Validated Artifact Handoffs",
+      "priority": "must",
+      "epic": "EP-03",
+      "user_stories": [
+        "As the engineering team, I want each stage to validate its output against a defined schema before advancing, so that downstream agents always receive well-formed input."
+      ],
+      "acceptance_criteria": [
+        "Given any stage completes, when the output is generated, then it is validated against the stage's artifact schema before the pipeline advances",
+        "Given validation fails, when the retry limit (3) is not exceeded, then the stage retries generation with the validation error as feedback context",
+        "Given validation fails after 3 retries, then the session is marked failed, the issue status is updated to blocked, and an error comment is posted"
+      ],
+      "artifact_schema": null,
+      "functional_requirements": ["FR-08"]
+    },
+    {
+      "id": "F-006",
+      "name": "Human-in-the-Loop Review Gate",
+      "priority": "must",
+      "epic": "EP-08",
+      "user_stories": [
+        "As Ana, I want the pipeline to pause between stages until my team explicitly approves the artefact, so that we can validate each output before the next agent runs."
+      ],
+      "acceptance_criteria": [
+        "Given Ensi has completed a stage, when a team member posts a comment containing LGTM or approve, then Ensi advances to the next stage automatically",
+        "Given Ensi is waiting for approval and 72 hours pass, then Ensi posts a reminder comment mentioning the assignee but does not auto-advance",
+        "Given a team member posts reject or restart with a reason, then Ensi re-runs the current stage using the rejection reason as additional context"
+      ],
+      "artifact_schema": null,
+      "functional_requirements": ["FR-09"]
+    },
+    {
+      "id": "F-007",
+      "name": "Session State Persistence and Resumption",
+      "priority": "must",
+      "epic": "EP-07",
+      "user_stories": [
+        "As Marco, I want to resume a paused or interrupted Ensi session from where it left off, so that I don't lose planning progress if the agent restarts."
+      ],
+      "acceptance_criteria": [
+        "Given an Ensi session is in progress and the process is killed, when the daemon restarts Ensi and the same issue is re-triggered, then Ensi reads .ensi/state.json and resumes from the last completed stage",
+        "Given Ensi resumes, then it posts a comment confirming resumption and the current stage",
+        "Given .ensi/state.json is corrupted or missing, then Ensi posts a comment explaining the issue and offers to restart from the beginning with human confirmation",
+        "Given a resume is offered, then Ensi does not silently re-run completed stages"
+      ],
+      "artifact_schema": null,
+      "functional_requirements": ["FR-13", "FR-14", "FR-15"]
+    },
+    {
+      "id": "F-008",
+      "name": "Zero-Config Onboarding",
+      "priority": "should",
+      "epic": "EP-03",
+      "user_stories": [
+        "As James, I want to add Ensi to my workspace and run my first session with a single command and no config file editing, so that onboarding is fast enough that I don't give up."
+      ],
+      "acceptance_criteria": [
+        "Given I have a Multica workspace and an Anthropic API key, when I run multica agent add ensi and set ANTHROPIC_API_KEY, then Ensi is registered and visible in multica agent list within 60 seconds",
+        "Given Ensi is registered, then no config file creation or editing is required to trigger a planning session",
+        "Given multica agent add ensi is run without ANTHROPIC_API_KEY, when the first BP issue is created, then Ensi posts a clear error message with the exact env var name and setup instruction"
+      ],
+      "artifact_schema": null,
+      "functional_requirements": ["FR-16", "FR-17"]
+    },
+    {
+      "id": "F-009",
+      "name": "Stage Completion Notifications",
+      "priority": "should",
+      "epic": "EP-08",
+      "user_stories": [
+        "As Ana, I want Ensi to post a comment when each stage completes, so that my team can see planning progress on the Multica board without polling."
+      ],
+      "acceptance_criteria": [
+        "Given any pipeline stage completes successfully, when the artefact is committed, then Ensi posts a comment including: which stage completed, a 2-3 sentence artefact summary, the relative path to the artefact file, and instructions for approval/rejection",
+        "Given any pipeline stage fails after retries, when the failure is unrecoverable, then Ensi posts a comment explaining the failure in plain language and updates the issue status to blocked"
+      ],
+      "artifact_schema": null,
+      "functional_requirements": ["FR-03", "FR-04"]
+    },
+    {
+      "id": "F-010",
+      "name": "Pipeline Status Visibility on Multica Board",
+      "priority": "should",
+      "epic": "EP-08",
+      "user_stories": [
+        "As Ana, I want to see which pipeline stage Ensi is in from the Multica issue view, so that I can track planning progress alongside development work."
+      ],
+      "acceptance_criteria": [
+        "Given Ensi is executing any stage, when I view the triggering issue, then the status reflects the current state (in_progress while running, in_review while awaiting approval, blocked on failure, done when all artefacts committed)",
+        "Given a stage completes, when I view the issue comments, then the most recent Ensi comment clearly states which stage completed and includes the artefact path"
+      ],
+      "artifact_schema": null,
+      "functional_requirements": ["FR-03", "FR-04"]
+    }
+  ],
+  "functional_requirements": {
+    "agent_protocol": [
+      {"id": "FR-01", "description": "The system must expose an ACP-compatible agent interface that the Multica daemon can discover and register automatically."},
+      {"id": "FR-02", "description": "The system must receive task payloads from the Multica daemon when a Multica issue is tagged BP (Brainstorm/Planning)."},
+      {"id": "FR-03", "description": "The system must post structured comments to the triggering Multica issue at stage completion, stage failure, and when awaiting human input."},
+      {"id": "FR-04", "description": "The system must update the Multica issue status to reflect pipeline state (in_progress, in_review, blocked, done)."}
+    ],
+    "planning_pipeline": [
+      {"id": "FR-05", "description": "The system must execute the Analyst stage first, producing product-brief.md in .ensi/docs/."},
+      {"id": "FR-06", "description": "The system must execute the PM stage after Analyst completes and human approval is granted, producing prd.md."},
+      {"id": "FR-07", "description": "The system must execute the Architect stage after PM completes and human approval is granted, producing architecture.md."},
+      {"id": "FR-08", "description": "Each stage must validate its output against a defined schema before advancing. On validation failure, retry up to 3 times before marking the session failed."},
+      {"id": "FR-09", "description": "The system must pause between stages and wait for explicit human approval (comment containing LGTM or approve) before advancing."}
+    ],
+    "artifact_management": [
+      {"id": "FR-10", "description": "All artefacts must be stored as plain markdown in .ensi/docs/ within the project repo."},
+      {"id": "FR-11", "description": "The system must commit artefacts to the project repository at each stage boundary."},
+      {"id": "FR-12", "description": "Artefact filenames must be consistent and predictable — no timestamps or hashes in filenames."}
+    ],
+    "session_state": [
+      {"id": "FR-13", "description": "The system must persist session state to .ensi/state.json after every stage transition."},
+      {"id": "FR-14", "description": "The system must resume a paused or interrupted session from the last successfully completed stage."},
+      {"id": "FR-15", "description": "The system must support concurrent sessions across different project repos without interference."}
+    ],
+    "onboarding": [
+      {"id": "FR-16", "description": "The system must be installable as a Multica agent with a single command (multica agent add ensi). No config file editing required beyond setting ANTHROPIC_API_KEY."},
+      {"id": "FR-17", "description": "The system must display a clear, human-readable error message if ANTHROPIC_API_KEY is not set, with setup instructions."}
+    ]
+  },
+  "non_functional_requirements": {
+    "performance": {
+      "NFR-01": "Analyst stage completion time must be < 5 minutes at p95 for a typical greenfield project brief.",
+      "NFR-02": "Full pipeline (Analyst + PM + Architect, excluding human review time) must complete in < 20 minutes at p95.",
+      "NFR-03": "Time from multica agent add ensi to first completed product-brief.md must be < 10 minutes on a clean setup."
+    },
+    "reliability": {
+      "NFR-04": "< 5% of sessions must require human restart due to agent error (non-human-caused failures).",
+      "NFR-05": ">= 80% of sessions must produce all three artefacts without manual intervention, given human approvals are provided.",
+      "NFR-06": "The system must handle Anthropic API transient errors with exponential backoff and a maximum of 3 retries before surfacing the error."
+    },
+    "security": {
+      "NFR-07": "API keys must never be written to disk, logs, or artefacts. Read ANTHROPIC_API_KEY from environment variables exclusively.",
+      "NFR-08": "No PII must be stored in artefacts beyond what the user explicitly inputs into the planning session.",
+      "NFR-09": "No telemetry or session content must be transmitted to any third party without explicit user opt-in."
+    },
+    "scalability": {
+      "NFR-10": "MVP scope is single-tenant: one Multica workspace, one user's API key.",
+      "NFR-11": "The system must support concurrent sessions across multiple project repos without resource contention."
+    },
+    "observability": {
+      "NFR-12": "All stage transitions, retries, and errors must be logged to .ensi/logs/ with ISO 8601 timestamps and log levels (INFO, WARN, ERROR).",
+      "NFR-13": "The Multica issue must always reflect the current pipeline state via status and comments."
+    },
+    "compatibility": {
+      "NFR-14": "The system must run on Node.js v20+ on macOS and Linux. No OS-specific native dependencies in MVP.",
+      "NFR-15": "The ACP SDK version must be pinned. The adapter layer must isolate ACP-specific code so a version upgrade does not require changes to the pipeline logic."
+    },
+    "deployment": "Single binary / single npm install, zero external services beyond Anthropic API and Multica daemon"
+  },
+  "artifact_schemas": {
+    "BriefArtifact": {
+      "description": "Produced by the Analyst agent at the Discovery stage. Captures the validated product brief including personas, risks, and constraints.",
+      "required_fields": ["version", "product_name", "scope", "date", "produced_by", "status", "vision", "problem_statement", "personas", "key_goals", "non_goals_v1", "features_classified", "competitive_landscape", "constraints", "risks", "assumptions_to_validate", "success_metrics", "recommendations_to_pm"],
+      "schema": {
+        "version": {"type": "string", "example": "1.0"},
+        "product_name": {"type": "string"},
+        "scope": {"type": "string", "example": "v1"},
+        "date": {"type": "string", "format": "YYYY-MM-DD"},
+        "produced_by": {"type": "string", "enum": ["Analyst"]},
+        "status": {"type": "string", "enum": ["draft", "complete"]},
+        "vision": {"type": "string"},
+        "problem_statement": {"type": "string"},
+        "personas": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "P-[0-9]+"},
+            "name": {"type": "string"},
+            "archetype": {"type": "string"},
+            "profile": {"type": "string"},
+            "pain_points": {"type": "array", "items": {"type": "string"}},
+            "goals": {"type": "array", "items": {"type": "string"}},
+            "trigger": {"type": "string"}
+          },
+          "minItems": 1
+        },
+        "key_goals": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "non_goals_v1": {"type": "array", "items": {"type": "string"}},
+        "features_classified": {
+          "type": "object",
+          "properties": {
+            "must": {"type": "array", "items": {"id": "string", "name": "string"}},
+            "should": {"type": "array", "items": {"id": "string", "name": "string"}},
+            "could": {"type": "array", "items": {"id": "string", "name": "string"}}
+          },
+          "required": ["must", "should", "could"]
+        },
+        "competitive_landscape": {
+          "type": "array",
+          "items": {
+            "name": {"type": "string"},
+            "approach": {"type": "string"},
+            "gap": {"type": "string"}
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "technical": {"type": "array", "items": {"type": "string"}},
+            "business": {"type": "array", "items": {"type": "string"}},
+            "compliance": {"type": "array", "items": {"type": "string"}},
+            "timeline": {"type": "string"}
+          },
+          "required": ["technical", "business", "compliance"]
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "R-[0-9]+"},
+            "title": {"type": "string"},
+            "impact": {"type": "string", "enum": ["low", "medium", "high"]},
+            "probability": {"type": "string", "enum": ["low", "medium", "high"]},
+            "score": {"type": "number", "minimum": 1, "maximum": 9},
+            "mitigation": {"type": "string"}
+          }
+        },
+        "assumptions_to_validate": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "A-[0-9]+"},
+            "statement": {"type": "string"},
+            "validation": {"type": "string"}
+          }
+        },
+        "success_metrics": {"type": "object"},
+        "recommendations_to_pm": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "PrdArtifact": {
+      "description": "Produced by the PM agent at the Planning stage. Contains functional/non-functional requirements, user stories with Gherkin acceptance criteria, epics, MVP scope, and artifact schemas.",
+      "required_fields": ["version", "product_name", "scope", "date", "produced_by", "input_artifact", "status", "pipeline_stages", "validation_spikes", "features", "functional_requirements", "non_functional_requirements", "artifact_schemas", "out_of_scope_v1", "open_questions"],
+      "schema": {
+        "version": {"type": "string", "example": "1.0"},
+        "product_name": {"type": "string"},
+        "scope": {"type": "string"},
+        "date": {"type": "string", "format": "YYYY-MM-DD"},
+        "produced_by": {"type": "string", "enum": ["PM"]},
+        "input_artifact": {"type": "string", "example": "brief-artifact.json"},
+        "status": {"type": "string", "enum": ["draft", "complete"]},
+        "pipeline_stages": {"type": "array", "items": {"type": "string"}, "minItems": 3},
+        "validation_spikes": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "SP-[0-9]+"},
+            "title": {"type": "string"},
+            "goal": {"type": "string"},
+            "done_when": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "fail_criteria": {"type": "string"},
+            "effort": {"type": "string", "enum": ["S", "M", "L", "XL"]},
+            "blocks": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "F-[0-9]+"},
+            "name": {"type": "string"},
+            "priority": {"type": "string", "enum": ["must", "should", "could"]},
+            "epic": {"type": "string"},
+            "user_stories": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "acceptance_criteria": {"type": "array", "items": {"type": "string"}, "minItems": 3},
+            "artifact_schema": {"type": ["string", "null"]},
+            "functional_requirements": {"type": "array", "items": {"type": "string"}}
+          },
+          "minItems": 1
+        },
+        "functional_requirements": {"type": "object"},
+        "non_functional_requirements": {"type": "object"},
+        "artifact_schemas": {"type": "object"},
+        "out_of_scope_v1": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "open_questions": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "OQ-[0-9]+"},
+            "question": {"type": "string"},
+            "owner": {"type": "string"},
+            "needed_by": {"type": "string"}
+          }
+        }
+      }
+    },
+    "ArchitectureArtifact": {
+      "description": "Produced by the Architect agent at the Architecture stage. Documents the selected tech stack, component design, and Architecture Decision Records (ADRs).",
+      "required_fields": ["version", "product_name", "scope", "date", "produced_by", "input_artifact", "status", "tech_stack", "components", "adrs", "deployment", "open_questions"],
+      "schema": {
+        "version": {"type": "string"},
+        "product_name": {"type": "string"},
+        "scope": {"type": "string"},
+        "date": {"type": "string", "format": "YYYY-MM-DD"},
+        "produced_by": {"type": "string", "enum": ["Architect"]},
+        "input_artifact": {"type": "string", "example": "prd-artifact.json"},
+        "status": {"type": "string", "enum": ["draft", "complete"]},
+        "tech_stack": {
+          "type": "object",
+          "properties": {
+            "runtime": {"type": "string"},
+            "language": {"type": "string"},
+            "acp_sdk": {"type": "string"},
+            "llm_provider": {"type": "string"},
+            "llm_models": {"type": "array", "items": {"type": "string"}},
+            "state_persistence": {"type": "string"},
+            "testing": {"type": "string"},
+            "package_manager": {"type": "string"}
+          },
+          "required": ["runtime", "language", "acp_sdk", "llm_provider", "state_persistence"]
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "C-[0-9]+"},
+            "name": {"type": "string"},
+            "responsibility": {"type": "string"},
+            "interfaces": {"type": "array", "items": {"type": "string"}},
+            "dependencies": {"type": "array", "items": {"type": "string"}}
+          },
+          "minItems": 1
+        },
+        "adrs": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "ADR-[0-9]+"},
+            "title": {"type": "string"},
+            "status": {"type": "string", "enum": ["proposed", "accepted", "superseded", "deprecated"]},
+            "context": {"type": "string"},
+            "decision": {"type": "string"},
+            "consequences": {"type": "string"},
+            "alternatives_rejected": {
+              "type": "array",
+              "items": {
+                "name": {"type": "string"},
+                "reason": {"type": "string"}
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "deployment": {
+          "type": "object",
+          "properties": {
+            "method": {"type": "string"},
+            "prerequisites": {"type": "array", "items": {"type": "string"}},
+            "install_command": {"type": "string"},
+            "env_vars_required": {"type": "array", "items": {"type": "string"}}
+          },
+          "required": ["method", "install_command"]
+        },
+        "open_questions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "SprintPlanArtifact": {
+      "description": "Produced by the Scrum Master agent at the Development stage. Contains the sprint goal, story breakdown, estimates, and definition of done. Post-MVP (v2).",
+      "required_fields": ["version", "product_name", "scope", "sprint_number", "date", "produced_by", "input_artifact", "status", "sprint_goal", "duration_days", "stories", "dependencies", "definition_of_done"],
+      "schema": {
+        "version": {"type": "string"},
+        "product_name": {"type": "string"},
+        "scope": {"type": "string"},
+        "sprint_number": {"type": "integer", "minimum": 1},
+        "date": {"type": "string", "format": "YYYY-MM-DD"},
+        "produced_by": {"type": "string", "enum": ["ScrumMaster"]},
+        "input_artifact": {"type": "string", "example": "architecture-artifact.json"},
+        "status": {"type": "string", "enum": ["draft", "active", "complete"]},
+        "sprint_goal": {"type": "string"},
+        "duration_days": {"type": "integer", "minimum": 1},
+        "stories": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "US-[0-9]+"},
+            "title": {"type": "string"},
+            "estimate": {"type": "string", "enum": ["S", "M", "L", "XL"]},
+            "assignee": {"type": ["string", "null"]},
+            "status": {"type": "string", "enum": ["todo", "in_progress", "in_review", "done", "blocked"]},
+            "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+            "dependencies": {"type": "array", "items": {"type": "string"}}
+          },
+          "minItems": 1
+        },
+        "dependencies": {"type": "array", "items": {"type": "string"}},
+        "definition_of_done": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "velocity_story_points": {"type": ["number", "null"]}
+      }
+    },
+    "CodeReviewArtifact": {
+      "description": "Produced by the Code Reviewer agent at the Review stage. Contains a structured list of findings with severity, file/line references, and an overall approval decision.",
+      "required_fields": ["version", "product_name", "scope", "date", "produced_by", "pr_ref", "status", "summary", "issues", "approval"],
+      "schema": {
+        "version": {"type": "string"},
+        "product_name": {"type": "string"},
+        "scope": {"type": "string"},
+        "date": {"type": "string", "format": "YYYY-MM-DD"},
+        "produced_by": {"type": "string", "enum": ["CodeReviewer"]},
+        "pr_ref": {"type": "string", "description": "PR URL or branch reference"},
+        "status": {"type": "string", "enum": ["draft", "complete"]},
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total_issues": {"type": "integer", "minimum": 0},
+            "critical": {"type": "integer", "minimum": 0},
+            "high": {"type": "integer", "minimum": 0},
+            "medium": {"type": "integer", "minimum": 0},
+            "low": {"type": "integer", "minimum": 0},
+            "files_reviewed": {"type": "integer", "minimum": 0}
+          },
+          "required": ["total_issues", "critical", "high", "medium", "low"]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "id": {"type": "string", "pattern": "CR-[0-9]+"},
+            "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+            "category": {"type": "string", "enum": ["security", "correctness", "performance", "maintainability", "style"]},
+            "file": {"type": "string"},
+            "line": {"type": ["integer", "null"]},
+            "description": {"type": "string"},
+            "recommendation": {"type": "string"},
+            "fixed": {"type": "boolean", "default": false}
+          }
+        },
+        "approval": {
+          "type": "string",
+          "enum": ["approved", "approved_with_comments", "request_changes"]
+        },
+        "notes": {"type": ["string", "null"]}
+      }
+    }
+  },
+  "out_of_scope_v1": [
+    "Deploy stage — deferred to v2",
+    "Observability stage (OTel traces) — deferred to v2",
+    "Agent Memory (vector search) — deferred to v2",
+    "Transversal agents beyond Code Reviewer (Tech Writer, Data Engineer, UX Designer) — deferred to v2",
+    "Multi-LLM support — only Anthropic API in v1",
+    "Brownfield / existing-codebase analysis — requires repo scanning; separate spike needed",
+    "Rich artefact UI (web rendering, rich editor) — plain markdown covers MVP needs",
+    "Billing / per-token metering — user provides own API key",
+    "Multi-tenant / team API key management — single-tenant assumption for MVP",
+    "Automated sprint planning from PRD — requires deeper Multica board integration",
+    "BMad Developer and QA agent stages — Analyst/PM/Architect pipeline must be validated first",
+    "Custom approval keywords — LGTM / approve covers MVP",
+    "Slack / email notifications — Multica issue comments are sufficient for MVP"
+  ],
+  "open_questions": [
+    {"id": "OQ-01", "question": "What exact Multica daemon registration API does an ACP agent use? Is there a published endpoint spec or only convention?", "owner": "Architect (post SP-01)", "needed_by": "Before EP-03"},
+    {"id": "OQ-02", "question": "Does multica agent add support a registry / npm-install flow, or does the binary need to be on PATH manually?", "owner": "Engineering (spike SP-01)", "needed_by": "Before US-08"},
+    {"id": "OQ-03", "question": "What is the approval comment syntax? Should Ensi support natural language approval detection or a strict keyword?", "owner": "Product / Ana persona", "needed_by": "Before US-04 implementation"},
+    {"id": "OQ-04", "question": "Should the human approval gate be skippable via a config option (e.g., ENSI_AUTO_ADVANCE=true) for automated pipelines?", "owner": "Product", "needed_by": "Before US-04 implementation"},
+    {"id": "OQ-05", "question": "Is .ensi/state.json safe to commit to a public repo, or should state be gitignored by default?", "owner": "Architect", "needed_by": "Before US-07 implementation"},
+    {"id": "OQ-06", "question": "What is the Multica daemon's behaviour when an ACP agent is unreachable — retry, surface error, or drop?", "owner": "Architect (post SP-01)", "needed_by": "Before EP-03"},
+    {"id": "OQ-07", "question": "Are there rate limits on multica issue comment add that could affect stage progress updates during long-running LLM calls?", "owner": "Engineering", "needed_by": "Before EP-04"},
+    {"id": "OQ-08", "question": "Should the 72-hour approval timeout be configurable per workspace, per project, or global?", "owner": "Product", "needed_by": "Before US-04 implementation"},
+    {"id": "OQ-09", "question": "How much prompt adaptation is required to port BMad prompts to work with Anthropic API for general greenfield projects without IDE context?", "owner": "Engineering (spike SP-02)", "needed_by": "Before EP-04"},
+    {"id": "OQ-10", "question": "Does the Architect stage need access to the project's existing repo (git history, package.json) for greenfield, or is the PRD sufficient?", "owner": "Architect", "needed_by": "Before EP-06"}
+  ]
+}

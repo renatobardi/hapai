@@ -1,0 +1,218 @@
+{
+  "version": "1.0",
+  "product_name": "Ensi",
+  "scope": "v1",
+  "date": "2026-04-17",
+  "produced_by": "Analyst",
+  "status": "complete",
+  "vision": "Ensi is an ACP-compatible agent that brings structured software planning (BMAD Analyst → PM → Architect) into the Multica workspace as autonomous teammates, eliminating the gap between ideation and implementation.",
+  "problem_statement": "Teams on Multica skip structured planning and jump straight to coding agents, causing rework, scope creep, and missed requirements. BMad Method (45k+ stars) provides the methodology but is CLI-only and stateless. Multica has the platform but no planning layer. Ensi bridges them via ACP.",
+  "personas": [
+    {
+      "id": "P-01",
+      "name": "Marco",
+      "archetype": "Solo AI-Forward Developer",
+      "profile": "Full-stack dev, uses Multica to delegate coding tasks to agents. Comfortable with AI tooling.",
+      "pain_points": ["Starts coding before the problem is fully understood", "Wastes cycles on features nobody needs"],
+      "goals": ["Get a structured brief and feature list before assigning coding issues — without leaving Multica"],
+      "trigger": "Creates an issue tagged BP (Brainstorm/Planning); Ensi runs automatically"
+    },
+    {
+      "id": "P-02",
+      "name": "Ana",
+      "archetype": "Small Engineering Team Lead",
+      "profile": "Leads a small product team of 3–5 devs. Uses Multica as the team's project board.",
+      "pain_points": ["Planning sessions are ad-hoc", "No consistent artefacts (briefs, PRDs, ADRs)", "Technical decisions aren't documented"],
+      "goals": ["Ensi acts as a planning teammate — produces briefs and ADRs the team can review before any code is written"],
+      "trigger": "Tags issues for planning; uses artefacts as input to sprint planning"
+    },
+    {
+      "id": "P-03",
+      "name": "James",
+      "archetype": "AI Enablement Engineer (BMad power user)",
+      "profile": "Uses BMad via Claude Code or Cursor. Values structured planning but dislikes CLI-only workflows.",
+      "pain_points": ["Each BMad session is ephemeral — no state persistence", "No team visibility, no audit trail"],
+      "goals": ["Resume sessions, share artefacts with teammates, see progress on a board"],
+      "trigger": "Discovery of Ensi brings him to Multica; familiar with the BMad persona names"
+    }
+  ],
+  "key_goals": [
+    "Deliver BMAD Analyst → PM → Architect pipeline inside Multica as a single ACP agent",
+    "Persist all artefacts (product-brief.md, prd.md, architecture.md) in .ensi/docs/ within the project repo",
+    "Stateful session management — sessions can be paused and resumed; state survives process restarts",
+    "Handoff protocol — each stage produces a structured output and triggers the next stage automatically",
+    "Zero-config onboarding — developers add Ensi as a Multica agent with no BMad CLI installation required"
+  ],
+  "non_goals_v1": [
+    "Developer/coding agent — Ensi does planning only",
+    "Custom LLM provider support — MVP uses Anthropic API only",
+    "Existing-codebase analysis — MVP scope is greenfield projects only",
+    "UI customisation — artefacts are plain markdown",
+    "Billing / metering — no per-token accounting in MVP"
+  ],
+  "features_classified": {
+    "must": [
+      {"id": "FEAT-01", "name": "BMAD FSM (pipeline state machine)"},
+      {"id": "FEAT-02", "name": "13 BMAD personas (prompts)"},
+      {"id": "FEAT-03", "name": "Schema-validated artifacts"},
+      {"id": "FEAT-04", "name": "Async task queue"},
+      {"id": "FEAT-05", "name": "Single-binary deployment"},
+      {"id": "FEAT-06", "name": "ACP-compatible agent interface"},
+      {"id": "FEAT-07", "name": "Session state persistence and resumption"}
+    ],
+    "should": [
+      {"id": "FEAT-08", "name": "Human approval gate between pipeline stages"},
+      {"id": "FEAT-09", "name": "Stage completion notifications via Multica comments"},
+      {"id": "FEAT-10", "name": "Zero-config onboarding (single command install)"},
+      {"id": "FEAT-11", "name": "Clarifying dialogue in Analyst stage"},
+      {"id": "FEAT-12", "name": "Exponential backoff + retry on LLM errors"}
+    ],
+    "could": [
+      {"id": "FEAT-13", "name": "Multi-LLM provider support"},
+      {"id": "FEAT-14", "name": "Brownfield/existing-codebase analysis"},
+      {"id": "FEAT-15", "name": "Automated sprint planning from PRD (Scrum Master agent)"}
+    ]
+  },
+  "competitive_landscape": [
+    {
+      "name": "GitHub Copilot Workspace",
+      "approach": "Plan → approve → execute; strong GitHub Issues integration",
+      "gap": "Proprietary, GitHub-only, no persistent BMAD-style artefacts"
+    },
+    {
+      "name": "Devin 2.0",
+      "approach": "Fully autonomous; minimal human checkpoints",
+      "gap": "No structured planning methodology; not designed for planning-first workflows"
+    },
+    {
+      "name": "BMad Method (raw)",
+      "approach": "Full Analyst→PM→Architect pipeline; 45k stars",
+      "gap": "CLI-only, IDE-dependent, stateless, no platform integration"
+    },
+    {
+      "name": "CrewAI",
+      "approach": "Multi-agent framework",
+      "gap": "Framework only — no PM layer, no artifact validation, no pipeline FSM"
+    },
+    {
+      "name": "Chat-only AI (Claude, GPT)",
+      "approach": "Conversational planning",
+      "gap": "No structure, no persistence, no schema validation, no team visibility"
+    }
+  ],
+  "constraints": {
+    "technical": [
+      "Must be ACP-compatible (Agent Client Protocol, Apache 2.0, TypeScript SDK)",
+      "Must integrate with Multica daemon/CLI architecture",
+      "Artefacts stored in .ensi/docs/ within the checked-out project repo",
+      "LLM: Anthropic API (Claude Sonnet/Haiku); MVP does not support other providers",
+      "Runtime: Node.js v20+ (TypeScript/Node.js, consistent with ACP SDK)",
+      "Session state: must survive process restarts (file-based or embedded DB)"
+    ],
+    "business": [
+      "Apache-2.0 license",
+      "MVP scope: 3 agents (Analyst, PM, Architect), 1 workflow (greenfield)",
+      "No external service dependencies beyond Anthropic API and Multica daemon"
+    ],
+    "compliance": [
+      "No PII stored in artefacts beyond what the user explicitly inputs",
+      "API keys must never be persisted to disk in plaintext; use environment variables",
+      "No telemetry without explicit opt-in"
+    ],
+    "timeline": "No hard deadline; MVP deliverable in a single sprint (1–2 weeks)"
+  },
+  "risks": [
+    {
+      "id": "R-01",
+      "title": "ACP SDK immaturity — breaking changes or missing features",
+      "impact": "high",
+      "probability": "high",
+      "score": 9,
+      "mitigation": "Pin SDK version; abstract behind thin adapter layer"
+    },
+    {
+      "id": "R-02",
+      "title": "Multica daemon API changes break agent registration",
+      "impact": "high",
+      "probability": "medium",
+      "score": 6,
+      "mitigation": "Use only stable CLI commands; monitor changelog; integration tests"
+    },
+    {
+      "id": "R-03",
+      "title": "LLM output non-determinism breaks structured handoffs",
+      "impact": "high",
+      "probability": "medium",
+      "score": 6,
+      "mitigation": "Define strict output schemas per stage; validate before advancing; retry on parse failure"
+    },
+    {
+      "id": "R-04",
+      "title": "BMad workflow doesn't translate to async Multica task model",
+      "impact": "high",
+      "probability": "medium",
+      "score": 6,
+      "mitigation": "Prototype Analyst stage as a spike before building PM/Architect stages"
+    },
+    {
+      "id": "R-05",
+      "title": "Anthropic API latency/cost makes sessions feel slow or expensive",
+      "impact": "medium",
+      "probability": "medium",
+      "score": 4,
+      "mitigation": "Use Haiku for iterative steps; Sonnet for final artefact generation"
+    }
+  ],
+  "assumptions_to_validate": [
+    {
+      "id": "A-01",
+      "statement": "ACP TypeScript SDK agents can register with the Multica daemon without custom fork",
+      "validation": "Run a minimal ACP hello-world agent against the daemon before scoping the full build"
+    },
+    {
+      "id": "A-02",
+      "statement": "BMad prompts produce useful output via Anthropic API without IDE context",
+      "validation": "Test BMad prompts directly via API with a sample greenfield project"
+    },
+    {
+      "id": "A-03",
+      "statement": "File-based state (.ensi/state.json) is sufficient for MVP session resumption",
+      "validation": "Model the state schema explicitly; prototype resume flow"
+    },
+    {
+      "id": "A-04",
+      "statement": "Issue tag trigger (BP) is the right UX for Multica users",
+      "validation": "User interviews or Discord feedback before investing in alternative triggers"
+    },
+    {
+      "id": "A-05",
+      "statement": "Three agents (Analyst, PM, Architect) cover 80% of greenfield planning needs",
+      "validation": "Survey BMad Method users"
+    }
+  ],
+  "success_metrics": {
+    "adoption": {
+      "unique_workspaces_30d": 50,
+      "planning_sessions_60d": 200
+    },
+    "quality": {
+      "sessions_producing_all_artifacts_pct": 80,
+      "sessions_requiring_human_restart_pct_max": 5
+    },
+    "engagement": {
+      "briefs_progressed_to_pm_stage_pct": 60,
+      "analyst_stage_max_minutes": 5,
+      "full_pipeline_max_minutes": 20
+    },
+    "developer_experience": {
+      "time_to_first_brief_minutes_max": 10,
+      "config_files_to_edit": 0
+    }
+  },
+  "recommendations_to_pm": [
+    "Finalize artifact schemas BEFORE writing persona prompts",
+    "Reduce pipeline MVP to 5 stages (defer Deploy + Observability to v2)",
+    "Ship only Code Reviewer as the sole transversal agent in MVP",
+    "Both validation spikes (ACP integration + BMad prompt portability) must pass before feature development begins"
+  ]
+}
