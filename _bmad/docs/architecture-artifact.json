@@ -1,0 +1,630 @@
+{
+  "version": "1.0",
+  "product_name": "Ensi",
+  "scope": "v1",
+  "cargo_workspace": {
+    "crates": [
+      {
+        "name": "ensi-core",
+        "responsibility": "Domain entities and port traits (hexagonal architecture inner layer). No I/O, no frameworks.",
+        "ports": [
+          "IssueRepository",
+          "ProjectRepository",
+          "WorkspaceRepository",
+          "MemberRepository",
+          "AgentRepository",
+          "TaskRepository",
+          "ArtifactRepository",
+          "PipelineRepository",
+          "EventPublisher",
+          "AgentExecutor",
+          "ArtifactStore"
+        ],
+        "adapters": []
+      },
+      {
+        "name": "ensi-db",
+        "responsibility": "SurrealDB 3.0 embedded adapter. Implements all *Repository traits from ensi-core.",
+        "ports": [],
+        "adapters": [
+          "IssueRepository",
+          "ProjectRepository",
+          "WorkspaceRepository",
+          "MemberRepository",
+          "AgentRepository",
+          "TaskRepository",
+          "ArtifactRepository",
+          "PipelineRepository"
+        ]
+      },
+      {
+        "name": "ensi-events",
+        "responsibility": "NATS JetStream embedded adapter. Implements EventPublisher trait. Defines subject hierarchy.",
+        "ports": [],
+        "adapters": ["EventPublisher"]
+      },
+      {
+        "name": "ensi-pipeline",
+        "responsibility": "Pipeline FSM: state transitions, guards, artifact validation. Calls AgentExecutor via trait.",
+        "ports": [],
+        "adapters": []
+      },
+      {
+        "name": "ensi-server",
+        "responsibility": "Axum 0.8 HTTP server: REST API, WebSocket hub, static file serving (Leptos SSR). JWT/PAT auth middleware.",
+        "ports": [],
+        "adapters": []
+      },
+      {
+        "name": "ensi-daemon",
+        "responsibility": "Task poller/subscriber. Execenv lifecycle (~/ensi_workspaces/{ws_id}/{task_id}/). Hosts AgentExecutor impl (Gemini API calls, schema preprocessing, retry loop).",
+        "ports": [],
+        "adapters": ["AgentExecutor"]
+      },
+      {
+        "name": "ensi-frontend",
+        "responsibility": "Leptos SSR + WASM client. Click-to-move issue board, pipeline view, issue detail, agent task feed.",
+        "ports": [],
+        "adapters": []
+      },
+      {
+        "name": "ensi-cli",
+        "responsibility": "CLI commands for workspace management, issue CRUD, pipeline control, and PAT management.",
+        "ports": [],
+        "adapters": []
+      }
+    ]
+  },
+  "pipeline_fsm": {
+    "states": [
+      "Idle",
+      "Discovery",
+      "Planning",
+      "Architecture",
+      "Development",
+      "Review",
+      "Blocked",
+      "Complete"
+    ],
+    "transitions": [
+      {
+        "from": "Idle",
+        "to": "Discovery",
+        "event": "pipeline_started",
+        "guard": "issue has no active pipeline_state"
+      },
+      {
+        "from": "Discovery",
+        "to": "Planning",
+        "event": "artifact_validated",
+        "guard": "BriefArtifact schema-valid and stored"
+      },
+      {
+        "from": "Planning",
+        "to": "Architecture",
+        "event": "artifact_validated",
+        "guard": "PrdArtifact schema-valid and stored"
+      },
+      {
+        "from": "Architecture",
+        "to": "Development",
+        "event": "artifact_validated",
+        "guard": "ArchitectureArtifact schema-valid and stored"
+      },
+      {
+        "from": "Development",
+        "to": "Review",
+        "event": "artifact_validated",
+        "guard": "SprintPlanArtifact schema-valid and stored"
+      },
+      {
+        "from": "Review",
+        "to": "Complete",
+        "event": "artifact_validated",
+        "guard": "CodeReviewArtifact schema-valid and approved flag true"
+      },
+      {
+        "from": "Discovery",
+        "to": "Blocked",
+        "event": "max_retries_exceeded",
+        "guard": "retry_count >= 3"
+      },
+      {
+        "from": "Planning",
+        "to": "Blocked",
+        "event": "max_retries_exceeded",
+        "guard": "retry_count >= 3"
+      },
+      {
+        "from": "Architecture",
+        "to": "Blocked",
+        "event": "max_retries_exceeded",
+        "guard": "retry_count >= 3"
+      },
+      {
+        "from": "Development",
+        "to": "Blocked",
+        "event": "max_retries_exceeded",
+        "guard": "retry_count >= 3"
+      },
+      {
+        "from": "Review",
+        "to": "Blocked",
+        "event": "max_retries_exceeded",
+        "guard": "retry_count >= 3"
+      },
+      {
+        "from": "Blocked",
+        "to": "Discovery",
+        "event": "retry_reset",
+        "guard": "human sets blocked_stage=Discovery and resets retry_count"
+      },
+      {
+        "from": "Blocked",
+        "to": "Planning",
+        "event": "retry_reset",
+        "guard": "human sets blocked_stage=Planning and resets retry_count"
+      },
+      {
+        "from": "Blocked",
+        "to": "Architecture",
+        "event": "retry_reset",
+        "guard": "human sets blocked_stage=Architecture and resets retry_count"
+      },
+      {
+        "from": "Blocked",
+        "to": "Development",
+        "event": "retry_reset",
+        "guard": "human sets blocked_stage=Development and resets retry_count"
+      },
+      {
+        "from": "Blocked",
+        "to": "Review",
+        "event": "retry_reset",
+        "guard": "human sets blocked_stage=Review and resets retry_count"
+      }
+    ],
+    "retry_policy": {
+      "max_retries": 3,
+      "strategy": "error_injection",
+      "error_injection_template": "Your previous response violated the output schema. Error: {validation_error}. Retry with a corrected response.",
+      "success_rate": "85-90%",
+      "owner": "AgentExecutor (not Pipeline FSM)",
+      "note": "Retry loop is encapsulated in AgentExecutor.execute(). FSM only sees success or max_retries_exceeded."
+    }
+  },
+  "agent_executor": {
+    "trait_definition": "AgentExecutor: model_for_stage(stage: PipelineStage) -> GeminiModel, execute(stage, context, schema) -> Result<Value, ExecutorError>",
+    "model_selection": {
+      "Discovery": "gemini-2.5-flash",
+      "Planning": "gemini-2.5-pro",
+      "Architecture": "gemini-2.5-pro",
+      "Development": "gemini-2.5-flash",
+      "Review": "gemini-2.5-flash"
+    },
+    "model_selection_note": "gemini-2.0-flash deprecated for new accounts (404 on first run). Updated to gemini-2.5-flash. gemini-2.5-pro unchanged.",
+    "schema_preprocessing": [
+      "strip additionalProperties",
+      "strip $ref",
+      "strip oneOf",
+      "strip anyOf"
+    ],
+    "max_output_tokens": 8192,
+    "max_output_tokens_note": "4096 caused truncation on PrdArtifact with gemini-2.5-pro (~192-line responses). 8192 required for Pro stages.",
+    "latency_validated": {
+      "flash_model": "gemini-2.5-flash",
+      "pro_model": "gemini-2.5-pro",
+      "brief_artifact_p50_ms": 6361,
+      "brief_artifact_p95_ms": 7980,
+      "prd_artifact_p50_ms": 42754,
+      "prd_artifact_p95_ms": 50285,
+      "brief_compliance_rate": "10/10",
+      "prd_compliance_rate": "5/5",
+      "retry_loop_needed": false,
+      "retry_loop_note": "responseSchema constraint overrides contradictory prompt instructions — compliance was 100% without retries. Retry loop remains as safety net for edge cases.",
+      "nfr_limit_ms": 300000,
+      "nfr_status": "PASS — p95 Pro ~50s per call; 2 Pro calls (PRD+Arch) + 3 Flash calls (Brief+Stories+Review) = ~115s typical pipeline. Well within 5-min NFR.",
+      "validated_on": "2026-04-18"
+    }
+  },
+  "database_schema": {
+    "engine": "SurrealDB 3.0 embedded",
+    "schema_mode": "SCHEMAFULL",
+    "tables": [
+      {
+        "name": "workspace",
+        "fields": ["id", "name: string", "slug: string", "created_at: datetime"],
+        "indexes": ["UNIQUE idx_workspace_slug ON (slug)"],
+        "relations": []
+      },
+      {
+        "name": "member",
+        "fields": [
+          "id", "workspace_id: record<workspace>", "email: string",
+          "name: string", "role: string (owner|admin|member)",
+          "password_hash: string", "created_at: datetime"
+        ],
+        "indexes": ["UNIQUE idx_member_email ON (email)"],
+        "relations": ["->workspace"]
+      },
+      {
+        "name": "agent",
+        "fields": [
+          "id", "workspace_id: record<workspace>", "name: string",
+          "slug: string", "persona: string", "system_prompt: string",
+          "created_at: datetime"
+        ],
+        "indexes": ["UNIQUE idx_agent_ws_slug ON (workspace_id, slug)"],
+        "relations": ["->workspace"]
+      },
+      {
+        "name": "project",
+        "fields": [
+          "id", "workspace_id: record<workspace>", "name: string",
+          "slug: string", "issue_counter: int DEFAULT 0",
+          "created_at: datetime"
+        ],
+        "indexes": ["UNIQUE idx_project_ws_slug ON (workspace_id, slug)"],
+        "relations": ["->workspace"]
+      },
+      {
+        "name": "issue",
+        "fields": [
+          "id", "project_id: record<project>", "workspace_id: record<workspace>",
+          "number: int", "title: string", "description: option<string>",
+          "status: string (todo|in_progress|in_review|done|blocked)",
+          "priority: string (urgent|high|medium|low)",
+          "parent_id: option<record<issue>>",
+          "assignee_id: option<string>", "assignee_type: option<string>",
+          "created_at: datetime", "updated_at: datetime"
+        ],
+        "indexes": [
+          "idx_issue_project ON (project_id)",
+          "UNIQUE idx_issue_number ON (project_id, number)",
+          "idx_issue_ws_status ON (workspace_id, status)"
+        ],
+        "relations": ["->project", "->workspace", "->issue (parent)"]
+      },
+      {
+        "name": "pipeline_state",
+        "fields": [
+          "id", "issue_id: record<issue>",
+          "stage: string (Discovery|Planning|Architecture|Development|Review|Blocked|Complete)",
+          "stage_status: string (pending|running|done|failed)",
+          "blocked_from_stage: option<string>",
+          "current_task_id: option<record<task>>",
+          "retry_count: int DEFAULT 0",
+          "created_at: datetime", "updated_at: datetime"
+        ],
+        "indexes": ["UNIQUE idx_pipeline_issue ON (issue_id)"],
+        "relations": ["->issue"]
+      },
+      {
+        "name": "task",
+        "fields": [
+          "id", "issue_id: record<issue>", "agent_id: record<agent>",
+          "pipeline_stage: string", "status: string (pending|running|completed|failed)",
+          "execenv_path: string", "attempt_number: int DEFAULT 1",
+          "started_at: option<datetime>", "completed_at: option<datetime>",
+          "error: option<string>", "created_at: datetime"
+        ],
+        "indexes": [
+          "idx_task_issue ON (issue_id)",
+          "idx_task_status ON (status)"
+        ],
+        "relations": ["->issue", "->agent"]
+      },
+      {
+        "name": "task_message",
+        "fields": [
+          "id", "task_id: record<task>", "sequence: int",
+          "role: string (assistant|tool_use|tool_result|system)",
+          "content: string", "created_at: datetime"
+        ],
+        "indexes": ["idx_task_message_seq ON (task_id, sequence)"],
+        "relations": ["->task"]
+      },
+      {
+        "name": "artifact",
+        "fields": [
+          "id", "issue_id: record<issue>",
+          "artifact_type: string (BriefArtifact|PrdArtifact|ArchitectureArtifact|SprintPlanArtifact|CodeReviewArtifact)",
+          "pipeline_stage: string", "data: object",
+          "schema_version: string DEFAULT '1.0'",
+          "created_by_task: record<task>", "created_at: datetime"
+        ],
+        "indexes": [
+          "idx_artifact_issue ON (issue_id)",
+          "idx_artifact_type ON (issue_id, artifact_type)"
+        ],
+        "relations": ["->issue", "->task"]
+      },
+      {
+        "name": "comment",
+        "fields": [
+          "id", "issue_id: record<issue>",
+          "author_id: string", "author_type: string (member|agent)",
+          "content: string", "parent_id: option<record<comment>>",
+          "created_at: datetime"
+        ],
+        "indexes": ["idx_comment_issue ON (issue_id)"],
+        "relations": ["->issue"]
+      },
+      {
+        "name": "pat",
+        "fields": [
+          "id", "member_id: record<member>", "token_hash: string",
+          "name: string", "last_used_at: option<datetime>",
+          "expires_at: option<datetime>", "created_at: datetime"
+        ],
+        "indexes": ["UNIQUE idx_pat_hash ON (token_hash)"],
+        "relations": ["->member"]
+      },
+      {
+        "name": "daemon_token",
+        "fields": [
+          "id", "task_id: record<task>", "token_hash: string",
+          "expires_at: datetime", "created_at: datetime"
+        ],
+        "indexes": ["UNIQUE idx_daemon_token_hash ON (token_hash)"],
+        "relations": ["->task"]
+      }
+    ],
+    "naming_conventions": {
+      "tables": "snake_case singular",
+      "fields": "snake_case",
+      "indexes": "idx_{table}_{field(s)}",
+      "timestamps": "created_at + updated_at on all mutable tables",
+      "soft_deletes": "none in v1 — hard delete only"
+    }
+  },
+  "api_surface": {
+    "style": "REST JSON over HTTP/1.1",
+    "base_path": "/api/v1",
+    "versioning": "URL path prefix — no header-based versioning",
+    "rest_endpoints": [
+      {"method": "POST", "path": "/auth/login", "description": "Email+password → JWT"},
+      {"method": "GET",  "path": "/auth/me", "description": "Current authenticated identity"},
+      {"method": "POST", "path": "/auth/pat", "description": "Create PAT (ens_*)"},
+      {"method": "GET",  "path": "/auth/pat", "description": "List PATs for current member"},
+      {"method": "DELETE","path": "/auth/pat/:pat_id", "description": "Revoke PAT"},
+      {"method": "GET",  "path": "/workspaces", "description": "List workspaces for member"},
+      {"method": "POST", "path": "/workspaces", "description": "Create workspace"},
+      {"method": "GET",  "path": "/workspaces/:ws_id", "description": "Get workspace"},
+      {"method": "GET",  "path": "/workspaces/:ws_id/members", "description": "List members"},
+      {"method": "POST", "path": "/workspaces/:ws_id/members/invite", "description": "Invite member"},
+      {"method": "GET",  "path": "/workspaces/:ws_id/agents", "description": "List agents"},
+      {"method": "POST", "path": "/workspaces/:ws_id/agents", "description": "Create agent"},
+      {"method": "GET",  "path": "/agents/:agent_id", "description": "Get agent"},
+      {"method": "PATCH","path": "/agents/:agent_id", "description": "Update agent"},
+      {"method": "GET",  "path": "/workspaces/:ws_id/projects", "description": "List projects"},
+      {"method": "POST", "path": "/workspaces/:ws_id/projects", "description": "Create project"},
+      {"method": "GET",  "path": "/projects/:project_id", "description": "Get project"},
+      {"method": "GET",  "path": "/projects/:project_id/issues", "description": "List issues (filters: status, priority, assignee, limit, offset)"},
+      {"method": "POST", "path": "/projects/:project_id/issues", "description": "Create issue"},
+      {"method": "GET",  "path": "/issues/:issue_id", "description": "Get issue"},
+      {"method": "PATCH","path": "/issues/:issue_id", "description": "Update issue (title, description, status, priority, assignee)"},
+      {"method": "DELETE","path": "/issues/:issue_id", "description": "Delete issue"},
+      {"method": "GET",  "path": "/issues/:issue_id/comments", "description": "List comments"},
+      {"method": "POST", "path": "/issues/:issue_id/comments", "description": "Add comment"},
+      {"method": "DELETE","path": "/comments/:comment_id", "description": "Delete comment"},
+      {"method": "GET",  "path": "/issues/:issue_id/pipeline", "description": "Get pipeline state"},
+      {"method": "POST", "path": "/issues/:issue_id/pipeline/start", "description": "Start pipeline"},
+      {"method": "POST", "path": "/issues/:issue_id/pipeline/unblock", "description": "Unblock pipeline (human override, resets retry_count)"},
+      {"method": "GET",  "path": "/issues/:issue_id/tasks", "description": "List tasks for issue"},
+      {"method": "GET",  "path": "/tasks/:task_id", "description": "Get task"},
+      {"method": "GET",  "path": "/tasks/:task_id/messages", "description": "Get task messages (params: limit, since_seq)"},
+      {"method": "GET",  "path": "/issues/:issue_id/artifacts", "description": "List artifacts for issue"},
+      {"method": "GET",  "path": "/artifacts/:artifact_id", "description": "Get artifact (full data)"}
+    ],
+    "daemon_endpoints": [
+      {"method": "POST", "path": "/daemon/tasks/:task_id/messages", "description": "Append task message (requires edt_* token)", "auth": "DaemonToken"},
+      {"method": "PUT",  "path": "/daemon/tasks/:task_id/status", "description": "Update task status (completed|failed)", "auth": "DaemonToken"},
+      {"method": "POST", "path": "/daemon/tasks/:task_id/artifacts", "description": "Submit validated artifact", "auth": "DaemonToken"}
+    ],
+    "websocket_events": [
+      {"type": "task.started",       "payload": {"task_id": "string", "issue_id": "string", "stage": "string", "agent_name": "string"}},
+      {"type": "task.message",       "payload": {"task_id": "string", "seq": "int", "role": "string", "content": "string"}},
+      {"type": "task.completed",     "payload": {"task_id": "string", "artifact_id": "string", "artifact_type": "string"}},
+      {"type": "task.failed",        "payload": {"task_id": "string", "error": "string", "retry_count": "int"}},
+      {"type": "pipeline.transition","payload": {"issue_id": "string", "from": "string", "to": "string", "timestamp": "string"}},
+      {"type": "issue.updated",      "payload": {"issue_id": "string", "changes": "object"}}
+    ],
+    "nats_subjects": [
+      {"subject": "ensi.task.created",              "publisher": "ensi-server", "subscriber": "ensi-daemon", "payload": "task_id, issue_id, agent_id, stage, execenv_path"},
+      {"subject": "ensi.task.{task_id}.message",    "publisher": "ensi-daemon", "subscriber": "ensi-server (WS hub)", "payload": "seq, role, content"},
+      {"subject": "ensi.task.{task_id}.completed",  "publisher": "ensi-daemon", "subscriber": "ensi-server, ensi-pipeline", "payload": "artifact_id, artifact_type"},
+      {"subject": "ensi.task.{task_id}.failed",     "publisher": "ensi-daemon", "subscriber": "ensi-server, ensi-pipeline", "payload": "error, retry_count"},
+      {"subject": "ensi.pipeline.{issue_id}.transition", "publisher": "ensi-pipeline", "subscriber": "ensi-server (WS hub)", "payload": "from, to, timestamp"},
+      {"subject": "ensi.issue.{issue_id}.updated",  "publisher": "ensi-server",  "subscriber": "ensi-server (WS hub)", "payload": "changes"}
+    ],
+    "error_format": {
+      "schema": {"error": {"code": "string", "message": "string", "details": "object|null"}},
+      "example_codes": [
+        "UNAUTHENTICATED", "FORBIDDEN", "NOT_FOUND", "VALIDATION_ERROR",
+        "ARTIFACT_VALIDATION_FAILED", "PIPELINE_ALREADY_STARTED",
+        "PIPELINE_NOT_STARTED", "MAX_RETRIES_EXCEEDED", "CONFLICT"
+      ]
+    },
+    "pagination": {
+      "style": "offset",
+      "params": {"limit": "int (default 50, max 200)", "offset": "int (default 0)"},
+      "response": {"items": "array", "total": "int", "has_more": "bool"}
+    },
+    "rate_limiting": "none in v1 — deferred"
+  },
+  "frontend": {
+    "framework": "Leptos 0.7 SSR + WASM",
+    "wasm_budget_kb_gzipped": 500,
+    "measured_baseline_kb_gzipped": 233,
+    "js_glue_kb": 23,
+    "warm_build_seconds": 3.9,
+    "v1_uis": [
+      "Issue Board (click-to-move columns)",
+      "Pipeline View (5 stages with status indicators)",
+      "Issue Detail with artifact viewer",
+      "Agent task feed (live updates via WebSocket)"
+    ],
+    "deferred_to_v1_1": [
+      "Drag-and-drop board (DnD library not available in Leptos v1)"
+    ],
+    "patterns": {
+      "state_management": "Leptos signals and resources (no external state lib)",
+      "styling": "TailwindCSS via trunk/leptos-style",
+      "routing": "leptos_router",
+      "websocket": "leptos WebSocket resource polling task feed",
+      "ssr": "Axum-hosted Leptos SSR, hydrated on client"
+    },
+    "known_constraints": [
+      "borrow-checker + clone-before-capture pattern required in closures",
+      "LOC ~30% larger than equivalent Next.js — budget accordingly",
+      "3-4 day learning curve for Rust devs new to reactive UI"
+    ]
+  },
+  "daemon": {
+    "task_lifecycle": "poll NATS ensi.task.created → create execenv → inject context files → spawn claude-code subprocess → stream messages via NATS → on exit: submit artifact or report failure",
+    "execenv_path": "~/ensi_workspaces/{ws_id}/{task_id}/",
+    "context_files": [
+      {"file": "AGENT.md",    "content": "Agent persona, instructions, capabilities"},
+      {"file": "ISSUE.md",    "content": "Issue title, description, status, comments"},
+      {"file": "PIPELINE.md", "content": "Current pipeline state, previous artifact summaries"},
+      {"file": "REPOS.md",    "content": "Checked-out repository paths and branches"}
+    ],
+    "polling_interval_ms": 3000,
+    "subprocess_tool": "claude-code CLI (claude binary)",
+    "output_streaming": "task_message rows + NATS publish on each line",
+    "cleanup": "execenv deleted after task completion (success or failure after max retries)"
+  },
+  "auth": {
+    "mechanisms": [
+      {
+        "type": "JWT HS256",
+        "prefix": null,
+        "usage": "Short-lived user sessions (exp: 24h). Issued on /auth/login.",
+        "claims": {"sub": "member_id", "ws": "workspace_id", "role": "string", "exp": "unix", "iat": "unix"}
+      },
+      {
+        "type": "PAT",
+        "prefix": "ens_",
+        "usage": "Long-lived API access for members. Stored as bcrypt hash in pat table.",
+        "claims": "same as JWT but loaded from DB on each request"
+      },
+      {
+        "type": "DaemonToken",
+        "prefix": "edt_",
+        "usage": "Per-task short-lived token (exp: task TTL + 1h). Only allows daemon endpoints.",
+        "claims": {"task_id": "string", "exp": "unix"}
+      }
+    ],
+    "enforcement": "Axum middleware layer — extracts token from Authorization: Bearer <token>, resolves identity, attaches to request extensions",
+    "authorization": "Workspace-scoped RBAC: owner > admin > member. Agent tokens are workspace-scoped with pipeline-only permissions."
+  },
+  "adr": [
+    {
+      "id": "ADR-001",
+      "title": "Leptos SSR + WASM over Next.js / SvelteKit",
+      "context": "Frontend framework selection for Ensi v1. Team is Rust-first. SP-02 validated Leptos feasibility.",
+      "decision": "Leptos 0.7 with Axum SSR and WASM hydration.",
+      "consequences": [
+        "POSITIVE: Single language (Rust) across full stack — no context switch",
+        "POSITIVE: Single binary deployment — Axum serves both API and SSR frontend",
+        "POSITIVE: Type-safe server functions — no REST/GraphQL layer for UI calls",
+        "NEGATIVE: DnD not available — deferred to v1.1 (click-to-move instead)",
+        "NEGATIVE: LOC ~30% larger than Next.js equivalent",
+        "NEGATIVE: 3-4 day learning curve for devs new to Leptos reactive model",
+        "ALTERNATIVE REJECTED: Next.js — adds Node.js runtime, breaks single-binary deploy, splits language stack"
+      ]
+    },
+    {
+      "id": "ADR-002",
+      "title": "Gemini model selection by pipeline stage (Flash vs Pro)",
+      "context": "SP-01 validated Gemini structured output. Cost/latency tradeoff between Flash and Pro varies by stage complexity.",
+      "decision": "gemini-2.5-flash for Discovery, Development, Review (simpler structured outputs). gemini-2.5-pro for Planning and Architecture (complex reasoning and large schemas). NOTE: gemini-2.0-flash deprecated for new accounts — replaced by gemini-2.5-flash per T-008 real validation.",
+      "consequences": [
+        "POSITIVE: Flash reduces cost and latency for high-frequency stages",
+        "POSITIVE: Pro quality for the two most architecturally critical stages",
+        "NEGATIVE: Two SDK configurations to maintain",
+        "ALTERNATIVE REJECTED: Pro-only — 3-4x cost increase, latency acceptable but unnecessary for simpler tasks",
+        "ALTERNATIVE REJECTED: Flash-only — SP-01 showed quality degradation on complex PRD/Architecture schemas"
+      ]
+    },
+    {
+      "id": "ADR-003",
+      "title": "AgentExecutor retry policy: error injection over re-generation",
+      "context": "T-008 real validation: gemini-2.5-flash achieved 10/10 compliance and gemini-2.5-pro achieved 5/5 compliance when responseSchema is set. Retry was not triggered — responseSchema overrides contradictory prompts. Retry loop kept as safety net for production edge cases.",
+      "decision": "Maximum 3 retries with error injection: on validation failure, the validation error is appended to the prompt as context for the next attempt. Retry loop is owned by AgentExecutor, not Pipeline FSM.",
+      "consequences": [
+        "POSITIVE: 85-90% of violations resolved within 3 attempts per SP-01",
+        "POSITIVE: FSM stays simple — only sees success or max_retries_exceeded",
+        "POSITIVE: Error injection gives the model context to self-correct without a full re-generation",
+        "NEGATIVE: Up to 3 Gemini API calls per stage on bad runs — ~3x latency in worst case",
+        "ALTERNATIVE REJECTED: Schema simplification only — reduces but doesn't eliminate failures",
+        "ALTERNATIVE REJECTED: Retry without error injection — lower success rate per SP-01"
+      ]
+    },
+    {
+      "id": "ADR-004",
+      "title": "SurrealDB 3.0 embedded over PostgreSQL",
+      "context": "Need a persistent store that supports single-binary deployment and flexible schema for artifact blobs.",
+      "decision": "SurrealDB 3.0 in embedded mode (no separate DB process). Data stored under ~/ensi_data/.",
+      "consequences": [
+        "POSITIVE: Single binary — no separate DB process to manage",
+        "POSITIVE: SCHEMAFULL mode gives schema enforcement without a migration framework",
+        "POSITIVE: Native record links replace foreign keys for graph-like relations (issue → project → workspace)",
+        "POSITIVE: `object` field type stores artifact JSON blobs natively without serialization overhead",
+        "NEGATIVE: Smaller ecosystem than PostgreSQL — fewer ORM options",
+        "NEGATIVE: SurrealDB 3.0 is relatively new — fewer production case studies",
+        "NEGATIVE: No horizontal scaling in embedded mode — single node only (acceptable for v1 scope)",
+        "ALTERNATIVE REJECTED: PostgreSQL + separate process — breaks single-binary deploy and adds ops complexity"
+      ]
+    },
+    {
+      "id": "ADR-005",
+      "title": "Click-to-move over drag-and-drop for issue board v1",
+      "context": "SP-02 confirmed no mature DnD library for Leptos WASM. Implementing DnD from scratch is high-risk.",
+      "decision": "Click-to-move: clicking an issue opens a column picker dropdown. Drag-and-drop deferred to v1.1.",
+      "consequences": [
+        "POSITIVE: Eliminates high-risk custom DnD implementation",
+        "POSITIVE: Accessible by default — keyboard-navigable column picker",
+        "POSITIVE: Works identically on desktop and mobile",
+        "NEGATIVE: Less intuitive UX than DnD for power users",
+        "NEGATIVE: Feature parity gap vs. Jira/Linear until v1.1",
+        "ALTERNATIVE REJECTED: Custom DnD from scratch — estimated 2-3 week spike, unacceptable for 8-week MVP"
+      ]
+    }
+  ],
+  "technical_risks": [
+    {
+      "risk": "gemini-2.5-pro latency ~43-50s per call — two Pro stages (PRD+Arch) add ~90-100s to pipeline",
+      "severity": "low",
+      "mitigation": "NFR target is 5 min — typical pipeline ~115s total (well within limit). Monitor p95 in production; fallback to Flash if Pro SLA degrades beyond 90s.",
+      "owner": "ensi-daemon crate maintainer"
+    },
+    {
+      "risk": "SurrealDB 3.0 embedded stability — limited production data",
+      "severity": "low",
+      "mitigation": "Use SCHEMAFULL mode to catch schema violations early. Add DB health check to server startup.",
+      "owner": "ensi-db crate maintainer"
+    },
+    {
+      "risk": "Leptos reactive model learning curve causes schedule slip",
+      "severity": "medium",
+      "mitigation": "Reserve 3-4 days frontend onboarding. Start with static Leptos components before adding reactivity.",
+      "owner": "SM to budget in sprint plan"
+    }
+  ],
+  "open_items": [
+    {
+      "id": "OI-001",
+      "description": "RESOLVED — T-008 executed spike with real GEMINI_API_KEY on 2026-04-18. Real metrics: Flash 10/10 compliance p50=6361ms p95=7980ms; Pro 5/5 compliance p50=42754ms p95=50285ms. Architecture updated.",
+      "action": "DONE",
+      "blocking": false
+    },
+    {
+      "id": "OI-002",
+      "description": "Artifact schemas for SprintPlanArtifact and CodeReviewArtifact not yet defined in prd-artifact.json",
+      "action": "SM and Dev agents must define these schemas before their respective pipeline stages begin",
+      "blocking": false
+    }
+  ]
+}
