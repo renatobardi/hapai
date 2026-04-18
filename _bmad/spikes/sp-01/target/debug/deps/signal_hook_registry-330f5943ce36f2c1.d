@@ -1,9 +1,0 @@
-/Users/bardi/multica_workspaces/6545d1ca-af77-437d-a2ce-df5aabbaed78/efc17c0a/workdir/hapai/_bmad/spikes/sp-01/target/debug/deps/signal_hook_registry-330f5943ce36f2c1.d: /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/lib.rs /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/half_lock.rs /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/vec_map.rs
-
-/Users/bardi/multica_workspaces/6545d1ca-af77-437d-a2ce-df5aabbaed78/efc17c0a/workdir/hapai/_bmad/spikes/sp-01/target/debug/deps/libsignal_hook_registry-330f5943ce36f2c1.rlib: /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/lib.rs /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/half_lock.rs /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/vec_map.rs
-
-/Users/bardi/multica_workspaces/6545d1ca-af77-437d-a2ce-df5aabbaed78/efc17c0a/workdir/hapai/_bmad/spikes/sp-01/target/debug/deps/libsignal_hook_registry-330f5943ce36f2c1.rmeta: /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/lib.rs /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/half_lock.rs /Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/vec_map.rs
-
-/Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/lib.rs:
-/Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/half_lock.rs:
-/Users/bardi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/signal-hook-registry-1.4.8/src/vec_map.rs:
