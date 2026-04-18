@@ -1,0 +1,4 @@
+[package]
+name = "ensi-pipeline"
+version.workspace = true
+edition.workspace = true

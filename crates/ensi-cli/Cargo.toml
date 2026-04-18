@@ -1,0 +1,4 @@
+[package]
+name = "ensi-cli"
+version.workspace = true
+edition.workspace = true

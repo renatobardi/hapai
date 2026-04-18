@@ -30,3 +30,7 @@ notes/
 *.patch
 500
 .claude/settings.json
+
+# Rust
+target/
+Cargo.lock

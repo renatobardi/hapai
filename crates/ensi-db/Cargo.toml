@@ -1,0 +1,4 @@
+[package]
+name = "ensi-db"
+version.workspace = true
+edition.workspace = true

@@ -1,0 +1,4 @@
+[package]
+name = "ensi-daemon"
+version.workspace = true
+edition.workspace = true
