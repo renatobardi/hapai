@@ -1,0 +1,11 @@
+[package]
+name = "ensi-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "ensi"
+path = "src/main.rs"
+
+[dependencies]
+ensi-core = { path = "../ensi-core" }

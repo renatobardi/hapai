@@ -1,0 +1,41 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ensi-core",
+    "crates/ensi-db",
+    "crates/ensi-events",
+    "crates/ensi-pipeline",
+    "crates/ensi-server",
+    "crates/ensi-daemon",
+    "crates/ensi-frontend",
+    "crates/ensi-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Renato Bardi <renato.bardi@outlook.com>"]
+
+[workspace.dependencies]
+# async runtime
+tokio = { version = "1.52", features = ["full"] }
+async-trait = "0.1"
+
+# serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# database
+surrealdb = { version = "3.0", features = ["kv-surrealkv"] }
+
+# error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# ids & dates
+uuid = { version = "1.23", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }

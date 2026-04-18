@@ -1,0 +1,7 @@
+[package]
+name = "ensi-events"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ensi-core = { path = "../ensi-core" }

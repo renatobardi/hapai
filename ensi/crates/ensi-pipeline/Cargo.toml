@@ -1,0 +1,7 @@
+[package]
+name = "ensi-pipeline"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ensi-core = { path = "../ensi-core" }
