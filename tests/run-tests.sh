@@ -1354,113 +1354,59 @@ cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
 echo ""
 echo -e "${BOLD}Testing installer (install.sh)${NC}"
 
-# Test 1: Verify installer checks Bash version in install.sh
-test_bash_version_check() {
-  # This test verifies that install.sh has the Bash 4+ check in check_deps()
-  if grep -q 'if \[\[ "${BASH_VERSINFO\[0\]}" -lt 4 \]\]' "$HAPAI_ROOT/install.sh"; then
-    echo -e "  ${GREEN}✓${NC} install.sh contains Bash 4+ version check"
-    PASS=$((PASS + 1))
-  else
-    echo -e "  ${RED}✗${NC} install.sh missing Bash 4+ version check"
-    FAIL=$((FAIL + 1))
-  fi
-  TOTAL=$((TOTAL + 1))
+# Helper: build a sourceable file containing the real setup_path() from install.sh
+# Stubs out log_ok/log_warn so their output can be captured cleanly.
+_installer_func_file() {
+  local out="$1"
+  {
+    echo 'log_ok()   { echo "$*"; }'
+    echo 'log_warn() { echo "WARN: $*"; }'
+    awk '/^setup_path\(\) \{/{p=1} p{print} /^\}/{if(p){p=0;exit}}' "$HAPAI_ROOT/install.sh"
+  } > "$out"
 }
 
-# Test 2: setup_path() detects zsh and uses .zprofile
+# Test: setup_path() detects zsh and uses .zprofile when it exists
 test_zsh_path_detection() {
-  local temp_home
+  local temp_home install_dir func_file output
   temp_home="$(mktemp -d)"
+  install_dir="$(mktemp -d)"  # unique dir guaranteed not to be in PATH
+  func_file="$(mktemp)"
+  _installer_func_file "$func_file"
 
-  # Simulate zsh with ~/.zprofile
   touch "$temp_home/.zprofile"
 
-  local output
-  local test_script="$(mktemp)"
-  cat > "$test_script" << 'PATH_TEST'
-#!/usr/bin/env bash
-set -euo pipefail
+  output="$(HOME="$temp_home" SHELL="/bin/zsh" \
+    bash -c "source '$func_file'; setup_path '$install_dir'" 2>/dev/null)"
 
-HOME="$1"
-SHELL="/bin/zsh"
-
-setup_path() {
-  local dir="$2"
-  local profile
-
-  if [[ "$SHELL" == *"zsh"* ]]; then
-    if [[ -f "$HOME/.zprofile" ]]; then
-      profile="$HOME/.zprofile"
-    else
-      profile="$HOME/.zshrc"
-    fi
-  else
-    profile="$HOME/.profile"
-  fi
-
-  echo "$profile"
+  assert_contains "$output" ".zprofile" "setup_path() detects zsh and uses .zprofile"
+  rm -rf "$temp_home" "$install_dir" "$func_file"
 }
 
-setup_path "$@"
-PATH_TEST
-
-  output="$(bash "$test_script" "$temp_home" ~/.local/bin)"
-  if [[ "$output" == "$temp_home/.zprofile" ]]; then
-    echo -e "  ${GREEN}✓${NC} setup_path() detects zsh and uses .zprofile"
-    PASS=$((PASS + 1))
-  else
-    echo -e "  ${RED}✗${NC} setup_path() did not detect zsh correctly (got: $output)"
-    FAIL=$((FAIL + 1))
-  fi
-  TOTAL=$((TOTAL + 1))
-  rm -f "$test_script" && rm -rf "$temp_home"
-}
-
-# Test 3: setup_path() falls back to .bashrc for bash
+# Test: setup_path() uses .bash_profile for bash when it exists, falls back to .bashrc
 test_bash_path_detection() {
-  local temp_home
+  local temp_home install_dir func_file output_with output_without
   temp_home="$(mktemp -d)"
+  func_file="$(mktemp)"
+  _installer_func_file "$func_file"
 
-  local test_script="$(mktemp)"
-  cat > "$test_script" << 'BASH_PATH_TEST'
-#!/usr/bin/env bash
-set -euo pipefail
+  # Branch 1: .bash_profile present — should use it
+  install_dir="$(mktemp -d)"
+  touch "$temp_home/.bash_profile"
+  output_with="$(HOME="$temp_home" SHELL="/bin/bash" \
+    bash -c "source '$func_file'; setup_path '$install_dir'" 2>/dev/null)"
+  assert_contains "$output_with" ".bash_profile" "setup_path() uses .bash_profile for bash when present"
 
-HOME="$1"
-SHELL="/bin/bash"
+  # Branch 2: no .bash_profile — should fall back to .bashrc
+  install_dir="$(mktemp -d)"
+  rm -f "$temp_home/.bash_profile"
+  output_without="$(HOME="$temp_home" SHELL="/bin/bash" \
+    bash -c "source '$func_file'; setup_path '$install_dir'" 2>/dev/null)"
+  assert_contains "$output_without" ".bashrc" "setup_path() falls back to .bashrc when .bash_profile absent"
 
-setup_path() {
-  local dir="$2"
-  local profile
-
-  if [[ "$SHELL" == *"bash"* ]]; then
-    if [[ -f "$HOME/.bash_profile" ]]; then
-      profile="$HOME/.bash_profile"
-    else
-      profile="$HOME/.bashrc"
-    fi
-  fi
-
-  echo "$profile"
-}
-
-setup_path "$@"
-BASH_PATH_TEST
-
-  output="$(bash "$test_script" "$temp_home" ~/.local/bin)"
-  if [[ "$output" == "$temp_home/.bashrc" ]]; then
-    echo -e "  ${GREEN}✓${NC} setup_path() uses .bashrc for bash (no .bash_profile)"
-    PASS=$((PASS + 1))
-  else
-    echo -e "  ${RED}✗${NC} setup_path() did not detect bash correctly (got: $output)"
-    FAIL=$((FAIL + 1))
-  fi
-  TOTAL=$((TOTAL + 1))
-  rm -f "$test_script" && rm -rf "$temp_home"
+  rm -rf "$temp_home" "$install_dir" "$func_file"
 }
 
 # Run installer tests
-test_bash_version_check
 test_zsh_path_detection
 test_bash_path_detection
 

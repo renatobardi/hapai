@@ -64,7 +64,10 @@ setup_path() {
   fi
 
   if ! grep -qF "$dir" "$profile" 2>/dev/null; then
-    printf '\n# hapai — added by installer\nexport PATH="%s:$PATH"\n' "$dir" >> "$profile"
+    if ! printf '\n# hapai — added by installer\nexport PATH="%s:$PATH"\n' "$dir" >> "$profile" 2>/dev/null; then
+      log_warn "Could not update $profile (check file permissions)"
+      return 0
+    fi
     log_ok "Added $dir to PATH in $profile"
   fi
 }
@@ -93,15 +96,6 @@ detect_os() {
 check_deps() {
   local missing=()
 
-  # Bash 4+ — required for BASH_REMATCH and other constructs used in _lib.sh
-  local bash_version
-  bash_version="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
-  if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-    log_error "Bash 4+ required (you have $bash_version)"
-    log_info "Install with: brew install bash  (macOS) or apt-get install bash (Linux)"
-    exit 1
-  fi
-
   command -v git  &>/dev/null || missing+=(git)
   command -v jq   &>/dev/null || missing+=(jq)
   command -v curl &>/dev/null || { command -v wget &>/dev/null || missing+=(curl); }
@@ -117,7 +111,7 @@ check_deps() {
     exit 1
   fi
 
-  log_ok "Dependencies: bash 4+, git, jq — OK"
+  log_ok "Dependencies: git, jq — OK"
 }
 
 # ─── Resolve version ─────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ The system combines:
 ## Prerequisites
 
 Before working on this codebase, ensure:
-- **Bash 4+** (CRITICAL) — All hook scripts and installer require Bash 4+ for `BASH_REMATCH`, `set -euo pipefail`, and other constructs. Install: `brew install bash` (macOS comes with Bash 3.2)
+- **Bash 3.2+** — All hook scripts and installer are compatible with the stock `/bin/bash` on macOS (3.2). `BASH_REMATCH` and `set -euo pipefail` are available since Bash 3.0/2.0 respectively.
 - **jq 1.6+** — Required for all hook scripts and validation. Install: `brew install jq`
 - **Node.js 20+ + npm** — Required only for dashboard development (`infra/gcp/dashboard/`)
 - **Git** — Version control and release tagging
@@ -853,7 +853,7 @@ Add tests for any new feature or bug fix.
 ## Version Compatibility
 
 **Minimum requirements:**
-- Bash 4.0+ (macOS ships with Bash 3.2 — install via `brew install bash` if needed)
+- Bash 3.2+ (works with macOS's stock `/bin/bash`)
 - jq 1.6+ (released 2018; widely available)
 - Git 2.0+
 - Python 3.12 (for Cloud Functions only; hooks are pure Bash)
