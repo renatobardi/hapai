@@ -9,7 +9,7 @@
 
 [![Pure Bash](https://img.shields.io/badge/Pure%20Bash-Yes-green?style=flat-square)](https://github.com/renatobardi/hapai)
 [![CI/CD](https://img.shields.io/github/actions/workflow/status/renatobardi/hapai/ci.yml?style=flat-square&branch=main)](https://github.com/renatobardi/hapai/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-133%2F133-green?style=flat-square)](tests/run-tests.sh)
+[![Tests](https://img.shields.io/badge/Tests-135%2F135-green?style=flat-square)](tests/run-tests.sh)
 [![License](https://img.shields.io/github/license/renatobardi/hapai?style=flat-square)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/renatobardi/hapai?style=flat-square)](https://github.com/renatobardi/hapai/releases)
 
@@ -374,10 +374,10 @@ Pure bash assertions (no test framework). ~200 assertions covering:
 
 ## Requirements
 
-- **bash** (macOS default bash 3.2+ works fine)
-- **jq** (JSON parser)
+- **bash 3.2+** (works with macOS's stock `/bin/bash`)
+- **jq 1.6+** (JSON parser)
 - **git** (for guard scripts)
-- **Node.js 24+** (for GitHub Actions workflows only)
+- **Node.js 20+** (for dashboard development only; not required for hooks)
 
 For cloud logging (optional):
 - **gcloud CLI** (Cloud Storage, Cloud Functions, BigQuery)

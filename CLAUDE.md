@@ -15,11 +15,11 @@ The system combines:
 ## Prerequisites
 
 Before working on this codebase, ensure:
+- **Bash 3.2+** — All hook scripts and installer are compatible with the stock `/bin/bash` on macOS (3.2). `BASH_REMATCH` and `set -euo pipefail` are available since Bash 3.0/2.0 respectively.
 - **jq 1.6+** — Required for all hook scripts and validation. Install: `brew install jq`
 - **Node.js 20+ + npm** — Required only for dashboard development (`infra/gcp/dashboard/`)
-- **Bash 4+** — All scripts use `set -euo pipefail` and POSIX-compatible tools
 - **Git** — Version control and release tagging
-- **Tested platforms** — macOS and Linux. CI runs on both via `ci.yml`. WSL supported via installer detection.
+- **Tested platforms** — macOS 10.15+ and Linux. CI runs on both via `ci.yml`. WSL supported via installer detection.
 
 ## Development Environment Setup
 
@@ -853,7 +853,7 @@ Add tests for any new feature or bug fix.
 ## Version Compatibility
 
 **Minimum requirements:**
-- Bash 4.0+ (macOS ships with Bash 3.2 — install via `brew install bash` if needed)
+- Bash 3.2+ (works with macOS's stock `/bin/bash`)
 - jq 1.6+ (released 2018; widely available)
 - Git 2.0+
 - Python 3.12 (for Cloud Functions only; hooks are pure Bash)

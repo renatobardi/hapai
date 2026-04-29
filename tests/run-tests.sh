@@ -1348,6 +1348,69 @@ rm -f "$WORKFLOW_CONFIG"
 cd "$MOCK_REPO" && git checkout main -q 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Installer Tests (install.sh)
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo ""
+echo -e "${BOLD}Testing installer (install.sh)${NC}"
+
+# Helper: build a sourceable file containing the real setup_path() from install.sh
+# Stubs out log_ok/log_warn so their output can be captured cleanly.
+_installer_func_file() {
+  local out="$1"
+  {
+    echo 'log_ok()   { echo "$*"; }'
+    echo 'log_warn() { echo "WARN: $*"; }'
+    awk '/^setup_path\(\) \{/{p=1} p{print} /^\}/{if(p){p=0;exit}}' "$HAPAI_ROOT/install.sh"
+  } > "$out"
+}
+
+# Test: setup_path() detects zsh and uses .zprofile when it exists
+test_zsh_path_detection() {
+  local temp_home install_dir func_file output
+  temp_home="$(mktemp -d)"
+  install_dir="$(mktemp -d)"  # unique dir guaranteed not to be in PATH
+  func_file="$(mktemp)"
+  _installer_func_file "$func_file"
+
+  touch "$temp_home/.zprofile"
+
+  output="$(HOME="$temp_home" SHELL="/bin/zsh" \
+    bash -c "source '$func_file'; setup_path '$install_dir'" 2>/dev/null)"
+
+  assert_contains "$output" ".zprofile" "setup_path() detects zsh and uses .zprofile"
+  rm -rf "$temp_home" "$install_dir" "$func_file"
+}
+
+# Test: setup_path() uses .bash_profile for bash when it exists, falls back to .bashrc
+test_bash_path_detection() {
+  local temp_home install_dir func_file output_with output_without
+  temp_home="$(mktemp -d)"
+  func_file="$(mktemp)"
+  _installer_func_file "$func_file"
+
+  # Branch 1: .bash_profile present — should use it
+  install_dir="$(mktemp -d)"
+  touch "$temp_home/.bash_profile"
+  output_with="$(HOME="$temp_home" SHELL="/bin/bash" \
+    bash -c "source '$func_file'; setup_path '$install_dir'" 2>/dev/null)"
+  assert_contains "$output_with" ".bash_profile" "setup_path() uses .bash_profile for bash when present"
+
+  # Branch 2: no .bash_profile — should fall back to .bashrc
+  install_dir="$(mktemp -d)"
+  rm -f "$temp_home/.bash_profile"
+  output_without="$(HOME="$temp_home" SHELL="/bin/bash" \
+    bash -c "source '$func_file'; setup_path '$install_dir'" 2>/dev/null)"
+  assert_contains "$output_without" ".bashrc" "setup_path() falls back to .bashrc when .bash_profile absent"
+
+  rm -rf "$temp_home" "$install_dir" "$func_file"
+}
+
+# Run installer tests
+test_zsh_path_detection
+test_bash_path_detection
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Summary
 # ═══════════════════════════════════════════════════════════════════════════
 
